@@ -39,6 +39,11 @@ def main() -> None:
 
     play = sub.add_parser("play", help="Interactive session (UX_design.md)")
     play.add_argument("--seed", type=int, default=None, help="RNG seed (optional)")
+    play.add_argument(
+        "--enable-chaos",
+        action="store_true",
+        help="Enable chaos actions during player turns (off by default in MVP v1 mode)",
+    )
 
     demo = sub.add_parser("demo", help="One automated round (no input)")
     demo.add_argument("--seed", type=int, default=42)
@@ -47,9 +52,9 @@ def main() -> None:
     if args.cmd == "demo":
         _run_demo(args.seed)
     elif args.cmd == "play":
-        run_interactive_session(seed=args.seed)
+        run_interactive_session(seed=args.seed, enable_chaos=args.enable_chaos)
     else:
-        run_interactive_session(seed=None)
+        run_interactive_session(seed=None, enable_chaos=False)
 
 
 if __name__ == "__main__":

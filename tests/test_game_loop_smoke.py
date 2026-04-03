@@ -15,6 +15,13 @@ def test_new_round_and_chaos_phase() -> None:
     assert st2.chaos_budget_remaining <= st.chaos_budget_remaining
 
 
+def test_new_round_inventory_override() -> None:
+    loop = GameLoop()
+    inv = ("peek", "swap")
+    st = loop.new_round(seed=7, inventory_override=inv)
+    assert st.inventory == inv
+
+
 def test_run_round_until_done_resolves() -> None:
     loop = GameLoop()
     st = loop.new_round(seed=999)

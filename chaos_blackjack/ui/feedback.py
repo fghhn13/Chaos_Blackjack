@@ -61,5 +61,41 @@ class FeedbackLog:
         rk = pl.get("peeked_rank")
         if rk is not None:
             self.add(f"🎒 Item [{item}] — next rank peek: {rk}")
-        else:
-            self.add(f"🎒 Item used: {item}")
+            return
+
+        hole_rank = pl.get("hole_rank")
+        if hole_rank is not None:
+            self.add(f"🎒 Item [{item}] — dealer hole card: {hole_rank}")
+            return
+
+        peeked_ranks = pl.get("peeked_ranks")
+        if isinstance(peeked_ranks, list) and peeked_ranks:
+            shown = ", ".join(str(x) for x in peeked_ranks)
+            self.add(f"🎒 Item [{item}] — top {len(peeked_ranks)} ranks: {shown}")
+            return
+
+        if pl.get("shield_requested"):
+            self.add(f"🎒 Item [{item}] — shield primed")
+            return
+
+        swap_from = pl.get("swap_from_rank")
+        swap_to = pl.get("swap_to_rank")
+        if swap_from is not None and swap_to is not None:
+            self.add(f"🎒 Item [{item}] — swap queued: {swap_from} -> {swap_to}")
+            return
+
+        danger_high_count = pl.get("danger_high_count")
+        danger_total = pl.get("danger_total")
+        if (
+            isinstance(danger_high_count, int)
+            and isinstance(danger_total, int)
+            and danger_total > 0
+        ):
+            rate = pl.get("danger_rate")
+            rate_s = f"{rate:.0%}" if isinstance(rate, float) else "?"
+            self.add(
+                f"🎒 Item [{item}] — high cards: {danger_high_count}/{danger_total} (rate {rate_s})"
+            )
+            return
+
+        self.add(f"🎒 Item used: {item}")

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import random
 import shlex
 import sys
-from typing import TextIO
+from typing import Callable, TextIO
 
 from chaos_blackjack import auto_load_plugins
+from chaos_blackjack.contracts.items import ItemResult
 from chaos_blackjack.core.game_loop import GameLoop
 from chaos_blackjack.core.game_state import GamePhase, GameState
 from chaos_blackjack.events.dispatcher import EventDispatcher
@@ -32,9 +34,28 @@ def _remove_one(inv: tuple[str, ...], item_id: str) -> tuple[str, ...]:
     return tuple(lst)
 
 
+MVP_START_MONEY = 100
+MVP_TARGET_MONEY = 400
+MVP_REWARD_STREAK = 2
+MVP_DEFAULT_REWARD_POOL: tuple[str, ...] = ("peek", "shield", "swap")
+
+
+@dataclass
+class RunState:
+    money: int
+    target_money: int
+    win_streak: int
+    current_bet: int
+    persistent_inventory: tuple[str, ...]
+
+
 def run_interactive_session(
     *,
     seed: int | None = None,
+    enable_chaos: bool = False,
+    start_money: int = MVP_START_MONEY,
+    target_money: int = MVP_TARGET_MONEY,
+    reward_pool: tuple[str, ...] = MVP_DEFAULT_REWARD_POOL,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
 ) -> None:
@@ -46,7 +67,15 @@ def run_interactive_session(
     log.wire_dispatcher(dispatcher.register)
 
     loop = GameLoop(dispatcher=dispatcher)
+    loop.initial_inventory = ()
     rng = random.Random(seed) if seed is not None else random.Random()
+    run = RunState(
+        money=start_money,
+        target_money=target_money,
+        win_streak=0,
+        current_bet=0,
+        persistent_inventory=loop.initial_inventory,
+    )
 
     def read_line(prompt: str = "") -> str:
         stdout.write(prompt)
@@ -54,13 +83,38 @@ def run_interactive_session(
         return stdin.readline()
 
     while True:
-        st = loop.new_round(seed=rng.randint(0, 2**30))
+        min_bet, max_bet = _bet_limits(run.money)
+        if max_bet < min_bet:
+            stdout.write(
+                "\nYou no longer have enough bankroll to place a valid bet.\n"
+                "Game Over.\n"
+            )
+            return
+
+        run.current_bet = _prompt_bet(
+            read_line=read_line,
+            stdout=stdout,
+            money=run.money,
+        )
+        st = loop.new_round(
+            seed=rng.randint(0, 2**30),
+            inventory_override=run.persistent_inventory,
+        )
         turn = 0
 
         while st.phase == GamePhase.PLAYER_TURN:
             turn += 1
-            st = loop.apply_chaos_phase(st)
-            _render_screen(stdout, turn, st, loop, hide_dealer_hole=True)
+            if enable_chaos:
+                st = loop.maybe_apply_chaos_phase(st)
+            _render_screen(
+                stdout,
+                turn,
+                st,
+                loop,
+                run=run,
+                enable_chaos=enable_chaos,
+                hide_dealer_hole=True,
+            )
             pending = log.drain()
             if pending:
                 stdout.write("\n--- Events ---\n")
@@ -74,6 +128,8 @@ def run_interactive_session(
                 log,
                 st,
                 turn,
+                run,
+                enable_chaos=enable_chaos,
             )
             if st.phase != GamePhase.PLAYER_TURN:
                 break
@@ -98,11 +154,34 @@ def run_interactive_session(
             stdout.write("House wins.\n")
         else:
             stdout.write("Push.\n")
+        run.money = _settle_money(run.money, run.current_bet, out)
+        run.persistent_inventory = st.inventory
+
+        rewarded = _update_streak_and_maybe_reward(
+            run=run,
+            outcome=out,
+            reward_pool=reward_pool,
+            rng=rng,
+        )
+
+        stdout.write(f"Bet: {run.current_bet}\n")
+        if out == "player":
+            stdout.write(f"Round settlement: +{run.current_bet}\n")
+        elif out == "dealer":
+            stdout.write(f"Round settlement: -{run.current_bet}\n")
+        else:
+            stdout.write("Round settlement: +0\n")
+        stdout.write(f"Bankroll: {run.money} / Target: {run.target_money}\n")
+        stdout.write(f"Win streak: {run.win_streak}/{MVP_REWARD_STREAK}\n")
+        if rewarded is not None:
+            stdout.write(f"Reward earned: {rewarded}\n")
         stdout.write("=" * 30 + "\n")
 
-        q = read_line("\nPlay again? [y/N]: ").strip().lower()
-        if q not in ("y", "yes"):
-            stdout.write("Goodbye.\n")
+        if run.money >= run.target_money:
+            stdout.write("\nVictory! You reached the target bankroll.\n")
+            return
+        if run.money <= 0:
+            stdout.write("\nGame Over. You are out of money.\n")
             return
 
 
@@ -111,6 +190,8 @@ def _render_screen(
     turn: int,
     state: GameState,
     loop: GameLoop,
+    run: RunState,
+    enable_chaos: bool,
     *,
     hide_dealer_hole: bool,
 ) -> None:
@@ -121,21 +202,28 @@ def _render_screen(
     stdout.write("🃏 Chaos Blackjack\n")
     stdout.write("=" * 30 + "\n")
     stdout.write(f"Turn: {turn}\n\n")
+    stdout.write(
+        f"Bankroll: {run.money}  Target: {run.target_money}  Bet: {run.current_bet}\n",
+    )
+    stdout.write(f"Win streak: {run.win_streak}/{MVP_REWARD_STREAK}\n\n")
     stdout.write("Your Hand:\n")
     stdout.write(f"  {format_hand(state.player_hand)}  → Total: {pv}\n\n")
     stdout.write("Dealer:\n")
     stdout.write(f"  {format_dealer_visible(state.dealer_hand, hide_hole=hide_dealer_hole)}\n\n")
     stdout.write("-" * 30 + "\n")
-    stdout.write("🤖 Chaos AI Active:\n")
-    narration = getattr(loop, "last_chaos_narration", None)
-    if narration:
-        stdout.write(f'"{narration}"\n\n')
+    if enable_chaos:
+        stdout.write("🤖 Chaos AI Active:\n")
+        narration = getattr(loop, "last_chaos_narration", None)
+        if narration:
+            stdout.write(f'"{narration}"\n\n')
+        else:
+            stdout.write(f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n')
+        stdout.write("⚡ Active Effects:\n")
+        for line in describe_active_modifiers(loop.modifiers):
+            stdout.write(f"- {line} (this round)\n")
+        stdout.write(f"- Chaos budget remaining: {state.chaos_budget_remaining}\n")
     else:
-        stdout.write(f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n')
-    stdout.write("⚡ Active Effects:\n")
-    for line in describe_active_modifiers(loop.modifiers):
-        stdout.write(f"- {line} (this round)\n")
-    stdout.write(f"- Chaos budget remaining: {state.chaos_budget_remaining}\n")
+        stdout.write("🤖 Chaos AI: disabled for MVP v1 run mode.\n")
     stdout.write("-" * 30 + "\n")
     stdout.write("🎒 Items:\n")
     counts = _inventory_counts(state.inventory)
@@ -164,6 +252,9 @@ def _player_turn_loop(
     log: FeedbackLog,
     state: GameState,
     turn: int,
+    run: RunState,
+    *,
+    enable_chaos: bool,
 ) -> GameState:
     st = state
     while st.phase == GamePhase.PLAYER_TURN:
@@ -181,18 +272,24 @@ def _player_turn_loop(
             raise SystemExit(0)
 
         if cmd == "info":
-            stdout.write("\n" + info_rules_text(loop.modifiers) + "\n\n> ")
+            if enable_chaos:
+                stdout.write("\n" + info_rules_text(loop.modifiers) + "\n\n> ")
+            else:
+                stdout.write("\nChaos is disabled in MVP v1 mode.\n\n> ")
             continue
 
         if cmd == "ai":
-            stdout.write("\n🤖 Chaos AI:\n")
-            narration = getattr(loop, "last_chaos_narration", None)
-            if narration:
-                stdout.write(f'"{narration}"\n\n> ')
+            if enable_chaos:
+                stdout.write("\n🤖 Chaos AI:\n")
+                narration = getattr(loop, "last_chaos_narration", None)
+                if narration:
+                    stdout.write(f'"{narration}"\n\n> ')
+                else:
+                    stdout.write(
+                        f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n> ',
+                    )
             else:
-                stdout.write(
-                    f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n> ',
-                )
+                stdout.write("\nChaos is disabled in MVP v1 mode.\n\n> ")
             continue
 
         if cmd == "items":
@@ -230,7 +327,15 @@ def _player_turn_loop(
             if loop.rules.is_bust(pv, loop.context()):
                 stdout.write("💀 BUST!\n")
                 return st.with_phase(GamePhase.RESOLVED)
-            _render_screen(stdout, turn + 1, st, loop, hide_dealer_hole=True)
+            _render_screen(
+                stdout,
+                turn + 1,
+                st,
+                loop,
+                run=run,
+                enable_chaos=enable_chaos,
+                hide_dealer_hole=True,
+            )
             for line in log.drain():
                 stdout.write(line + "\n")
             continue
@@ -242,7 +347,15 @@ def _player_turn_loop(
             st = _use_item_menu(stdin, stdout, loop, log, st)
             if st.phase != GamePhase.PLAYER_TURN:
                 return st
-            _render_screen(stdout, turn, st, loop, hide_dealer_hole=True)
+            _render_screen(
+                stdout,
+                turn,
+                st,
+                loop,
+                run=run,
+                enable_chaos=enable_chaos,
+                hide_dealer_hole=True,
+            )
             continue
 
         stdout.write("Unknown input. Try 1/2/3 or info/quit.\n> ")
@@ -311,11 +424,78 @@ def _apply_item_use(
     for line in log.drain():
         stdout.write(line + "\n")
     if result.ok:
-        new_inv = _remove_one(state.inventory, item_id)
+        state_after_effect = _apply_item_effects(state, result)
+        new_inv = _remove_one(state_after_effect.inventory, item_id)
         stdout.write(f"{result.message}\n\n> ")
-        return state.with_inventory(new_inv)
+        return state_after_effect.with_inventory(new_inv)
     stdout.write(f"{result.message}\n\n> ")
     return state
+
+
+def _apply_item_effects(state: GameState, result: ItemResult) -> GameState:
+    extra = result.extra if isinstance(result.extra, dict) else {}
+    if not extra.get("swap_top_into_first_player_card"):
+        return state
+    if not state.player_hand or not state.deck:
+        return state
+    top, *rest = state.deck
+    player = state.player_hand
+    swapped = (top,) + player[1:]
+    return state.with_player_hand(swapped).with_deck(tuple(rest))
+
+
+def _bet_limits(money: int) -> tuple[int, int]:
+    return (1, money // 2)
+
+
+def _prompt_bet(
+    *,
+    read_line: Callable[[str], str],
+    stdout: TextIO,
+    money: int,
+) -> int:
+    min_bet, max_bet = _bet_limits(money)
+    while True:
+        raw = read_line(f"\nMoney: {money}\nEnter bet ({min_bet}~{max_bet}): ")
+        if not raw:
+            raise SystemExit(0)
+        raw = raw.strip()
+        try:
+            bet = int(raw)
+        except ValueError:
+            stdout.write("Bet must be an integer.\n")
+            continue
+        if bet < min_bet or bet > max_bet:
+            stdout.write(f"Invalid bet. Allowed range: {min_bet}~{max_bet}\n")
+            continue
+        return bet
+
+
+def _settle_money(money: int, bet: int, outcome: str) -> int:
+    if outcome == "player":
+        return money + bet
+    if outcome == "dealer":
+        return money - bet
+    return money
+
+
+def _update_streak_and_maybe_reward(
+    *,
+    run: RunState,
+    outcome: str,
+    reward_pool: tuple[str, ...],
+    rng: random.Random,
+) -> str | None:
+    if outcome == "player":
+        run.win_streak += 1
+        if run.win_streak >= MVP_REWARD_STREAK and reward_pool:
+            reward = rng.choice(reward_pool)
+            run.persistent_inventory = run.persistent_inventory + (reward,)
+            run.win_streak = 0
+            return reward
+        return None
+    run.win_streak = 0
+    return None
 
 
 def _run_dealer_with_feedback(

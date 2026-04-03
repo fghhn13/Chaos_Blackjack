@@ -15,7 +15,8 @@ def validate_chaos_action(
     actions_this_turn: int,
 ) -> tuple[bool, str]:
     """Return (ok, reason)."""
-    max_turn = int(profile.get("max_actions_per_turn", 1))
+    attempt_limits = profile.get("attempt_limits") if isinstance(profile.get("attempt_limits"), dict) else {}
+    max_turn = int(attempt_limits.get("max_actions_per_turn", profile.get("max_actions_per_turn", 1)))
     verb = action.get("action", "noop")
 
     if verb == "noop":

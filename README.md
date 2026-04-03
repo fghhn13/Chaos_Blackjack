@@ -100,12 +100,25 @@ pip install -e .
 
 ## Run
 
-**Interactive session** (default — structured screen: header, state, chaos, items, actions, commands; see [UX_design.md](UX_design.md)):
+**Interactive session (MVP v1 run mode by default)**:
+
+- Start bankroll: `100`
+- Target bankroll: `400`
+- Bet each round: integer in `1 .. floor(money * 0.5)`
+- Settlement: win `+bet`, lose/bust `-bet`, push `0`
+- Win streak reward: every 2 consecutive wins grants 1 random item
+- Chaos is disabled by default in this mode
 
 ```bash
 python cli/main.py
 # or
 python cli/main.py play
+```
+
+**Enable chaos during interactive play** (optional):
+
+```bash
+python cli/main.py play --enable-chaos
 ```
 
 **Non-interactive demo** (one automated round):

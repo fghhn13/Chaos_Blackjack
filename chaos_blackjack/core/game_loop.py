@@ -47,7 +47,8 @@ def _default_pipeline() -> "ChaosPipeline":
 
 def _standard_deck() -> list[Card]:
     ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-    return [Card(Rank(r), "") for r in ranks for _ in range(4)]
+    suits = ["♠", "♥", "♦", "♣"]
+    return [Card(Rank(r), suit) for suit in suits for r in ranks]
 
 
 def _shuffle(cards: list[Card], rng: random.Random) -> tuple[Card, ...]:
@@ -72,16 +73,23 @@ class GameLoop:
     rng: random.Random = field(default_factory=random.Random)
     dispatcher: EventDispatcher | None = None
     chaos_budget_initial: int = 5
-    initial_inventory: tuple[str, ...] = field(default_factory=lambda: ("peek",))
+    initial_inventory: tuple[str, ...] = field(
+        default_factory=lambda: ("peek", "hole_card_hacker", "fate_oracle", "danger_radar")
+    )
     _chaos_actions_this_turn: int = field(default=0, repr=False)
     last_chaos_narration: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        cb = self.pipeline.permission_profile.get("chaos_budget")
+        cb = getattr(self.pipeline.policy, "chaos_budget_cap", None)
         if cb is not None:
             self.chaos_budget_initial = int(cb)
 
-    def new_round(self, seed: int | None = None) -> GameState:
+    def new_round(
+        self,
+        seed: int | None = None,
+        *,
+        inventory_override: tuple[str, ...] | None = None,
+    ) -> GameState:
         if seed is not None:
             self.rng.seed(seed)
         self._chaos_actions_this_turn = 0
@@ -96,7 +104,7 @@ class GameLoop:
             deck=tuple(rest),
             phase=GamePhase.PLAYER_TURN,
             chaos_budget_remaining=self.chaos_budget_initial,
-            inventory=self.initial_inventory,
+            inventory=inventory_override if inventory_override is not None else self.initial_inventory,
         )
 
     def _emit(self, event: Event) -> None:
@@ -108,7 +116,11 @@ class GameLoop:
         self._emit(event)
 
     def apply_chaos_phase(self, state: GameState) -> GameState:
-        """Run chaos pipeline once (interactive UX: before each player decision)."""
+        """Backward compatible alias (older code called apply_chaos_phase directly)."""
+        return self.maybe_apply_chaos_phase(state)
+
+    def maybe_apply_chaos_phase(self, state: GameState) -> GameState:
+        """Run chaos pipeline if policy/scheduler allows it."""
         return self._apply_chaos(state)
 
     def draw_for_player(self, state: GameState) -> GameState:
@@ -136,6 +148,10 @@ class GameLoop:
             chaos_budget_remaining=state.chaos_budget_remaining,
             chaos_actions_this_turn=self._chaos_actions_this_turn,
         )
+        policy = self.pipeline.policy
+        if not self.pipeline.scheduler.should_attempt(obs):
+            return state
+
         effect = self.pipeline.run(
             obs,
             emit=self._emit,
@@ -145,12 +161,14 @@ class GameLoop:
         s = state
         if effect.modifier is not None:
             self.modifiers = self.modifiers.with_added(effect.modifier)
-            s = s.with_chaos_budget(max(0, s.chaos_budget_remaining - 1))
-            self._chaos_actions_this_turn += 1
         if effect.consume_item_id:
             s = _remove_one_item(s, effect.consume_item_id)
-            s = s.with_chaos_budget(max(0, s.chaos_budget_remaining - 1))
-            self._chaos_actions_this_turn += 1
+
+        delta = policy.charge_for_effect(effect)
+        if delta.budget_charge > 0:
+            s = s.with_chaos_budget(max(0, s.chaos_budget_remaining - delta.budget_charge))
+        if delta.actions_charge > 0:
+            self._chaos_actions_this_turn += delta.actions_charge
         return s
 
     def context(self) -> RuleContext:

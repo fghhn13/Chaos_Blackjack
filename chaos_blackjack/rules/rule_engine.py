@@ -61,6 +61,8 @@ class DefaultBlackjackRules:
         return total
 
     def is_bust(self, value: int, ctx: RuleContext) -> bool:
+        if "fragile_bust" in ctx.modifiers.chaos_flags():
+            return value > 18
         return value > 21
 
     def compare_player_dealer(self, state: GameState, ctx: RuleContext) -> str:
@@ -79,5 +81,10 @@ class DefaultBlackjackRules:
         if pv > dv:
             return "player"
         if dv > pv:
+            return "dealer"
+        flags = ctx.modifiers.chaos_flags()
+        if "player_wins_ties" in flags:
+            return "player"
+        if "dealer_wins_ties" in flags:
             return "dealer"
         return "push"

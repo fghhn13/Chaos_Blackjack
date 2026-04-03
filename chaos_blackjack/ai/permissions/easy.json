@@ -1,6 +1,12 @@
 {
-  "allowed_rules": ["modify_card_value", "reverse_bust"],
-  "allowed_items": ["peek"],
-  "max_actions_per_turn": 1,
-  "chaos_budget": 5
+  "allowed_rules": ["modify_card_value", "reverse_bust", "great_crash", "odd_even_chaos", "suit_power", "fragile_bust", "tiebreaker_shift"],
+  "allowed_items": ["peek", "hole_card_hacker", "fate_oracle", "danger_radar", "shield", "swap"],
+  "attempt_limits": {
+    "max_actions_per_turn": 1,
+    "max_active_effects": 1
+  },
+  "budget": {
+    "chaos_budget": 5,
+    "charge_per_effect": 1
+  }
 }

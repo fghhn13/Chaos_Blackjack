@@ -11,9 +11,10 @@ from chaos_blackjack.contracts.ai_action import StructuredAIAction, parse_struct
 from chaos_blackjack.contracts.items import ItemContext
 from chaos_blackjack.contracts.llm import LLMBackend
 from chaos_blackjack.events.event import Event, EventType
-from chaos_blackjack.ai.permission_validator import validate_chaos_action
 from chaos_blackjack.ai.permissions_loader import load_permission_profile
 from chaos_blackjack.ai.prompts_loader import load_prompt
+from chaos_blackjack.ai.chaos_policy import ChaosPolicy
+from chaos_blackjack.ai.chaos_scheduler import ChaosScheduler
 from chaos_blackjack.contracts.observation import ChaosObservation
 from chaos_blackjack.registry.registry import Registry, get_registry
 from chaos_blackjack.rules.modifiers import RuleModifier
@@ -40,6 +41,8 @@ class ChaosPipeline:
     """Sandboxed chaos: structured JSON only, then registry + permissions."""
 
     permission_profile: dict[str, Any]
+    policy: ChaosPolicy
+    scheduler: ChaosScheduler
     prompt_name: str
     llm: LLMBackend
     registry: Registry | None = None
@@ -55,8 +58,12 @@ class ChaosPipeline:
         llm: LLMBackend,
         registry: Registry | None = None,
     ) -> ChaosPipeline:
+        profile = load_permission_profile(permission_name)
+        policy = ChaosPolicy.from_profile(profile)
         return ChaosPipeline(
-            permission_profile=load_permission_profile(permission_name),
+            permission_profile=profile,
+            policy=policy,
+            scheduler=ChaosScheduler(policy),
             prompt_name=prompt_name,
             llm=llm,
             registry=registry,
@@ -122,12 +129,7 @@ class ChaosPipeline:
                     )
                 return ChaosEffect()
 
-        ok, reason = validate_chaos_action(
-            parsed,
-            self.permission_profile,
-            budget_remaining=obs.chaos_budget_remaining,
-            actions_this_turn=obs.chaos_actions_this_turn,
-        )
+        ok, reason = self.policy.validate_action(parsed, obs)
         if not ok:
             emit(
                 Event(
