@@ -32,7 +32,22 @@ class GeminiLLM:
             self.model_name,
             system_instruction=system_prompt,
         )
-        response = model.generate_content(user_prompt)
+        generation_config = None
+        try:
+            generation_config = genai.types.GenerationConfig(
+                temperature=0.2,
+                max_output_tokens=256,
+            )
+        except Exception:
+            generation_config = None
+
+        if generation_config is not None:
+            response = model.generate_content(
+                user_prompt,
+                generation_config=generation_config,
+            )
+        else:
+            response = model.generate_content(user_prompt)
         try:
             text = response.text
         except ValueError:

@@ -8,6 +8,6 @@ Allowed items (when using action use_item):
 - peek — params: {}
 
 You must respond with a single JSON object only, no markdown:
-{ "action": "noop" | "apply_rule" | "use_item", "rule_id": string?, "params": object?, "item_id": string? }
+{ "action": "noop" | "apply_rule" | "use_item", "rule_id": string?, "params": object?, "item_id": string?, "narration": string? }
 
 Goal: introduce challenge without breaking the game.

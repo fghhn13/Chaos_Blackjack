@@ -74,6 +74,7 @@ class GameLoop:
     chaos_budget_initial: int = 5
     initial_inventory: tuple[str, ...] = field(default_factory=lambda: ("peek",))
     _chaos_actions_this_turn: int = field(default=0, repr=False)
+    last_chaos_narration: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         cb = self.pipeline.permission_profile.get("chaos_budget")
@@ -84,6 +85,7 @@ class GameLoop:
         if seed is not None:
             self.rng.seed(seed)
         self._chaos_actions_this_turn = 0
+        self.last_chaos_narration = None
         self.modifiers = self.modifiers.with_cleared()
         deck = list(_standard_deck())
         deck_t = _shuffle(deck, self.rng)
@@ -139,6 +141,7 @@ class GameLoop:
             emit=self._emit,
             peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
         )
+        self.last_chaos_narration = effect.narration
         s = state
         if effect.modifier is not None:
             self.modifiers = self.modifiers.with_added(effect.modifier)

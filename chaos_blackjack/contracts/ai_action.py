@@ -11,6 +11,9 @@ class StructuredAIAction(TypedDict, total=False):
     action: str
     """High-level verb: apply_rule, noop, use_item."""
 
+    narration: NotRequired[str]
+    """Short human-readable explanation for UI (no markdown)."""
+
     rule_id: NotRequired[str | None]
     params: NotRequired[dict[str, Any]]
     item_id: NotRequired[str | None]
@@ -22,6 +25,11 @@ def parse_structured_action(raw: dict[str, Any]) -> StructuredAIAction | None:
     if not isinstance(action, str) or not action:
         return None
     out: StructuredAIAction = {"action": action}
+    narration = raw.get("narration")
+    if narration is not None:
+        if not isinstance(narration, str):
+            return None
+        out["narration"] = narration
     rid = raw.get("rule_id")
     if rid is not None:
         out["rule_id"] = str(rid) if not isinstance(rid, str) else rid

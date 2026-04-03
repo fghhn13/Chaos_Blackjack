@@ -32,6 +32,7 @@ class ChaosEffect:
     modifier: RuleModifier | None = None
     consume_item_id: str | None = None
     log_message: str | None = None
+    narration: str | None = None
 
 
 @dataclass
@@ -71,25 +72,55 @@ class ChaosPipeline:
         system = load_prompt(self.prompt_name)
         user = self._build_user_prompt(obs)
         raw = self.llm.complete(system, user)
-        try:
-            data = json.loads(_strip_json_fence(raw))
-        except json.JSONDecodeError:
-            emit(
-                Event(
-                    EventType.CHAOS_ACTION_REJECTED,
-                    {"reason": "invalid_json", "raw": raw[:200]},
-                ),
+        def _repair_user_prompt(prev_raw: str) -> str:
+            # Keep the base prompt (so the model still sees the state/permissions),
+            # then enforce JSON-only output.
+            prev = prev_raw.strip()
+            if len(prev) > 800:
+                prev = prev[:800] + "..."
+            return (
+                user
+                + "\n\nYour previous output was invalid JSON or didn't match the schema. "
+                + "Return ONLY a single JSON object (no markdown/code fences) with keys: "
+                + "{action, narration?, rule_id?, params?, item_id}. "
+                + "Do not include any other text.\n\nPrevious output:\n"
+                + prev
             )
-            return ChaosEffect()
 
-        if not isinstance(data, dict):
-            emit(Event(EventType.CHAOS_ACTION_REJECTED, {"reason": "not_object"}))
-            return ChaosEffect()
+        def _parse_once(raw_text: str) -> tuple[StructuredAIAction | None, str | None]:
+            try:
+                data = json.loads(_strip_json_fence(raw_text))
+            except json.JSONDecodeError:
+                return None, "invalid_json"
+            if not isinstance(data, dict):
+                return None, "not_object"
+            parsed = parse_structured_action(data)
+            if parsed is None:
+                return None, "bad_action"
+            return parsed, None
 
-        parsed = parse_structured_action(data)
+        parsed, parse_reason = _parse_once(raw)
         if parsed is None:
-            emit(Event(EventType.CHAOS_ACTION_REJECTED, {"reason": "bad_action"}))
-            return ChaosEffect()
+            repaired_raw = self.llm.complete(system, _repair_user_prompt(raw))
+            repaired_parsed, repaired_reason = _parse_once(repaired_raw)
+            if repaired_parsed is not None:
+                parsed = repaired_parsed
+            else:
+                if repaired_reason == "invalid_json":
+                    emit(
+                        Event(
+                            EventType.CHAOS_ACTION_REJECTED,
+                            {"reason": "invalid_json", "raw": repaired_raw[:200]},
+                        ),
+                    )
+                else:
+                    emit(
+                        Event(
+                            EventType.CHAOS_ACTION_REJECTED,
+                            {"reason": repaired_reason},
+                        ),
+                    )
+                return ChaosEffect()
 
         ok, reason = validate_chaos_action(
             parsed,
@@ -106,9 +137,10 @@ class ChaosPipeline:
             )
             return ChaosEffect()
 
+        narration = parsed.get("narration")
         act = parsed.get("action", "noop")
         if act == "noop":
-            return ChaosEffect(log_message="noop")
+            return ChaosEffect(log_message="noop", narration=narration)
 
         if act == "apply_rule":
             rid = parsed.get("rule_id") or ""
@@ -129,7 +161,11 @@ class ChaosPipeline:
                     {"rule_id": rid, "params": params},
                 ),
             )
-            return ChaosEffect(modifier=mod, log_message=f"applied:{rid}")
+            return ChaosEffect(
+                modifier=mod,
+                log_message=f"applied:{rid}",
+                narration=narration,
+            )
 
         if act == "use_item":
             iid = parsed.get("item_id") or ""
@@ -163,6 +199,7 @@ class ChaosPipeline:
                 return ChaosEffect(
                     consume_item_id=iid,
                     log_message=result.message,
+                    narration=narration,
                 )
             emit(
                 Event(

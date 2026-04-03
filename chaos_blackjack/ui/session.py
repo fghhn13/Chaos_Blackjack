@@ -127,7 +127,11 @@ def _render_screen(
     stdout.write(f"  {format_dealer_visible(state.dealer_hand, hide_hole=hide_dealer_hole)}\n\n")
     stdout.write("-" * 30 + "\n")
     stdout.write("🤖 Chaos AI Active:\n")
-    stdout.write(f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n')
+    narration = getattr(loop, "last_chaos_narration", None)
+    if narration:
+        stdout.write(f'"{narration}"\n\n')
+    else:
+        stdout.write(f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n')
     stdout.write("⚡ Active Effects:\n")
     for line in describe_active_modifiers(loop.modifiers):
         stdout.write(f"- {line} (this round)\n")
@@ -182,7 +186,13 @@ def _player_turn_loop(
 
         if cmd == "ai":
             stdout.write("\n🤖 Chaos AI:\n")
-            stdout.write(f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n> ')
+            narration = getattr(loop, "last_chaos_narration", None)
+            if narration:
+                stdout.write(f'"{narration}"\n\n> ')
+            else:
+                stdout.write(
+                    f'"{chaos_ai_flavor(len(loop.modifiers.items))}"\n\n> ',
+                )
             continue
 
         if cmd == "items":
@@ -220,7 +230,6 @@ def _player_turn_loop(
             if loop.rules.is_bust(pv, loop.context()):
                 stdout.write("💀 BUST!\n")
                 return st.with_phase(GamePhase.RESOLVED)
-            st = loop.apply_chaos_phase(st)
             _render_screen(stdout, turn + 1, st, loop, hide_dealer_hole=True)
             for line in log.drain():
                 stdout.write(line + "\n")
