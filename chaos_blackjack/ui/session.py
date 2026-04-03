@@ -11,10 +11,23 @@ from typing import Callable, TextIO
 from chaos_blackjack import auto_load_plugins
 from chaos_blackjack.contracts.items import ItemResult
 from chaos_blackjack.core.game_loop import GameLoop
-from chaos_blackjack.core.game_state import GamePhase, GameState
+from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
 from chaos_blackjack.events.dispatcher import EventDispatcher
 from chaos_blackjack.registry import get_registry
 from chaos_blackjack.rules.rule_engine import RuleContext
+from chaos_blackjack.core.run_state import (
+    CardSnapshot,
+    GameStateSnapshot,
+    ModifierSnapshot,
+    RunSaveData,
+)
+from chaos_blackjack.core.save_manager import save_game
+from chaos_blackjack.logic.run_end_policy import (
+    CompositeRunEndPolicy,
+    MoneyBankruptDefeatPolicy,
+    MoneyTargetVictoryPolicy,
+)
+from chaos_blackjack.rules.modifiers import ActiveModifiers
 from chaos_blackjack.ui.descriptions import chaos_ai_flavor, describe_active_modifiers, info_rules_text
 from chaos_blackjack.ui.feedback import FeedbackLog
 from chaos_blackjack.ui.formatting import format_dealer_visible, format_hand
@@ -43,10 +56,113 @@ MVP_DEFAULT_REWARD_POOL: tuple[str, ...] = ("peek", "shield", "swap")
 @dataclass
 class RunState:
     money: int
+    start_money: int
+    round: int
     target_money: int
+    objective: str
     win_streak: int
     current_bet: int
-    persistent_inventory: tuple[str, ...]
+    items: tuple[str, ...]
+
+
+def _card_to_snapshot(card: Card) -> CardSnapshot:
+    return CardSnapshot(rank=str(card.rank), suit=str(card.suit or ""))
+
+
+def _snapshot_to_card(s: CardSnapshot) -> Card:
+    return Card(Rank(s.rank), s.suit)
+
+
+def _game_state_to_snapshot(state: GameState) -> GameStateSnapshot:
+    return GameStateSnapshot(
+        player_hand=[_card_to_snapshot(c) for c in state.player_hand],
+        dealer_hand=[_card_to_snapshot(c) for c in state.dealer_hand],
+        deck=[_card_to_snapshot(c) for c in state.deck],
+        phase=state.phase.name,
+        chaos_budget_remaining=int(state.chaos_budget_remaining),
+        inventory=list(state.inventory),
+    )
+
+
+def _snapshot_to_game_state(s: GameStateSnapshot) -> GameState:
+    return GameState(
+        player_hand=tuple(_snapshot_to_card(c) for c in s.player_hand),
+        dealer_hand=tuple(_snapshot_to_card(c) for c in s.dealer_hand),
+        deck=tuple(_snapshot_to_card(c) for c in s.deck),
+        phase=GamePhase[s.phase],
+        chaos_budget_remaining=int(s.chaos_budget_remaining),
+        inventory=tuple(s.inventory),
+    )
+
+
+def _serialize_modifier_params(mod: object) -> dict[str, object]:
+    # Generic heuristics for current modifier plugins.
+    params: dict[str, object] = {}
+    if hasattr(mod, "delta"):
+        try:
+            params["delta"] = int(getattr(mod, "delta"))
+        except Exception:
+            pass
+
+    mid = getattr(mod, "id", None)
+    if mid == "tiebreaker_shift" and hasattr(mod, "chaos_flags"):
+        flags = getattr(mod, "chaos_flags") or frozenset()
+        ties_to = "dealer" if "dealer_wins_ties" in flags else "player"
+        params["ties_to"] = ties_to
+
+    return params
+
+
+def _serialize_active_modifiers(loop: GameLoop) -> list[ModifierSnapshot]:
+    out: list[ModifierSnapshot] = []
+    for m in loop.modifiers.items:
+        mid = getattr(m, "id", None)
+        if not mid:
+            continue
+        params = _serialize_modifier_params(m)
+        out.append(ModifierSnapshot(id=str(mid), params=params))
+    return out
+
+
+def _deserialize_active_modifiers(
+    mods: list[ModifierSnapshot],
+    *,
+    registry,
+) -> ActiveModifiers:
+    built: list[object] = []
+    for m in mods:
+        inst = registry.build_chaos_rule(m.id, m.params)
+        if inst is None:
+            raise ValueError(f"Unknown chaos rule id in save: {m.id}")
+        built.append(inst)
+    return ActiveModifiers(items=tuple(built))
+
+
+def _build_save_data(
+    *,
+    run: RunState,
+    state: GameState,
+    loop: GameLoop,
+    enable_chaos: bool,
+) -> RunSaveData:
+    active = _serialize_active_modifiers(loop)
+    chaos_actions_this_turn = int(getattr(loop, "_chaos_actions_this_turn", 0))
+
+    return RunSaveData(
+        version=1,
+        money=run.money,
+        start_money=run.start_money,
+        round=run.round,
+        items=list(state.inventory),
+        objective=run.objective,
+        win_streak=run.win_streak,
+        target_money=run.target_money,
+        current_bet=run.current_bet,
+        enable_chaos=bool(enable_chaos),
+        game_state=_game_state_to_snapshot(state),
+        active_modifiers=active,
+        chaos_actions_this_turn=chaos_actions_this_turn,
+    )
 
 
 def run_interactive_session(
@@ -55,6 +171,8 @@ def run_interactive_session(
     enable_chaos: bool = False,
     start_money: int = MVP_START_MONEY,
     target_money: int = MVP_TARGET_MONEY,
+    objective: str = "double_money",
+    round_limit: int | None = None,
     reward_pool: tuple[str, ...] = MVP_DEFAULT_REWARD_POOL,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
@@ -69,12 +187,18 @@ def run_interactive_session(
     loop = GameLoop(dispatcher=dispatcher)
     loop.initial_inventory = ()
     rng = random.Random(seed) if seed is not None else random.Random()
+    run_end_policy = CompositeRunEndPolicy(
+        policies=(MoneyBankruptDefeatPolicy(), MoneyTargetVictoryPolicy()),
+    )
     run = RunState(
         money=start_money,
+        start_money=start_money,
+        round=1,
         target_money=target_money,
+        objective=objective,
         win_streak=0,
         current_bet=0,
-        persistent_inventory=loop.initial_inventory,
+        items=loop.initial_inventory,
     )
 
     def read_line(prompt: str = "") -> str:
@@ -98,7 +222,7 @@ def run_interactive_session(
         )
         st = loop.new_round(
             seed=rng.randint(0, 2**30),
-            inventory_override=run.persistent_inventory,
+            inventory_override=run.items,
         )
         turn = 0
 
@@ -155,7 +279,7 @@ def run_interactive_session(
         else:
             stdout.write("Push.\n")
         run.money = _settle_money(run.money, run.current_bet, out)
-        run.persistent_inventory = st.inventory
+        run.items = st.inventory
 
         rewarded = _update_streak_and_maybe_reward(
             run=run,
@@ -177,12 +301,174 @@ def run_interactive_session(
             stdout.write(f"Reward earned: {rewarded}\n")
         stdout.write("=" * 30 + "\n")
 
-        if run.money >= run.target_money:
-            stdout.write("\nVictory! You reached the target bankroll.\n")
+        end = run_end_policy.check(run)
+        if end is not None:
+            stdout.write(f"\n{end.message}\n")
             return
-        if run.money <= 0:
-            stdout.write("\nGame Over. You are out of money.\n")
+
+        # Next round number (for save/load display and future objectives).
+        run.round += 1
+
+
+def run_interactive_session_from_save(
+    data: RunSaveData,
+    *,
+    enable_chaos: bool = False,
+    seed: int | None = None,
+    reward_pool: tuple[str, ...] = MVP_DEFAULT_REWARD_POOL,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+) -> None:
+    """Resume an interactive game from a JSON save payload."""
+
+    auto_load_plugins()
+    stdin = stdin or sys.stdin
+    stdout = stdout or sys.stdout
+
+    log = FeedbackLog()
+    dispatcher = EventDispatcher()
+    log.wire_dispatcher(dispatcher.register)
+
+    loop = GameLoop(dispatcher=dispatcher)
+    loop.initial_inventory = ()
+    rng = random.Random(seed) if seed is not None else random.Random()
+
+    run_end_policy = CompositeRunEndPolicy(
+        policies=(MoneyBankruptDefeatPolicy(), MoneyTargetVictoryPolicy()),
+    )
+
+    effective_enable_chaos = bool(enable_chaos or data.enable_chaos)
+
+    run = RunState(
+        money=data.money,
+        start_money=data.start_money,
+        round=data.round,
+        target_money=data.target_money,
+        objective=data.objective,
+        win_streak=data.win_streak,
+        current_bet=data.current_bet,
+        items=tuple(data.items),
+    )
+
+    # Restore current round snapshot (if present).
+    st: GameState | None
+    if data.game_state is not None:
+        st = _snapshot_to_game_state(data.game_state)
+    else:
+        st = None
+
+    # Restore active chaos modifiers / accounting.
+    if st is not None and data.active_modifiers:
+        reg = get_registry()
+        loop.modifiers = _deserialize_active_modifiers(
+            data.active_modifiers,
+            registry=reg,
+        )
+        loop._chaos_actions_this_turn = int(data.chaos_actions_this_turn)
+    elif st is not None:
+        loop._chaos_actions_this_turn = int(data.chaos_actions_this_turn)
+
+    # Force starting point: if no snapshot, begin a new round (prompt bet).
+    if st is None:
+        st = _start_new_round_with_bet(
+            loop=loop,
+            rng=rng,
+        stdin=stdin,
+            stdout=stdout,
+            run=run,
+        )
+
+    while True:
+        turn = 0
+        while st.phase == GamePhase.PLAYER_TURN:
+            turn += 1
+            if effective_enable_chaos:
+                st = loop.maybe_apply_chaos_phase(st)
+            _render_screen(
+                stdout,
+                turn,
+                st,
+                loop,
+                run,
+                effective_enable_chaos,
+                hide_dealer_hole=True,
+            )
+            pending = log.drain()
+            if pending:
+                stdout.write("\n--- Events ---\n")
+                for line in pending:
+                    stdout.write(line + "\n")
+            st = _player_turn_loop(
+                stdin,
+                stdout,
+                loop,
+                log,
+                st,
+                turn,
+                run,
+                enable_chaos=effective_enable_chaos,
+            )
+            if st.phase != GamePhase.PLAYER_TURN:
+                break
+
+        if st.phase == GamePhase.DEALER_TURN:
+            st = _run_dealer_with_feedback(loop, log, st, stdout)
+
+        pv = loop.rules.hand_value(st.player_hand, loop.context())
+        dv = loop.rules.hand_value(st.dealer_hand, loop.context())
+        out = loop.outcome_label(st)
+        stdout.write("\n" + "=" * 30 + "\n")
+        stdout.write("RESULT\n")
+        stdout.write(f"Your hand: {format_hand(st.player_hand)}  → Total: {pv}\n")
+        stdout.write(
+            f"Dealer: {format_dealer_visible(st.dealer_hand, hide_hole=False)}  → Total: {dv}\n",
+        )
+        if loop.rules.is_bust(pv, loop.context()) and out == "dealer":
+            stdout.write("💀 BUST!\n")
+        elif out == "player":
+            stdout.write("🏆 You win.\n")
+        elif out == "dealer":
+            stdout.write("House wins.\n")
+        else:
+            stdout.write("Push.\n")
+
+        run.money = _settle_money(run.money, run.current_bet, out)
+        run.items = st.inventory
+
+        rewarded = _update_streak_and_maybe_reward(
+            run=run,
+            outcome=out,
+            reward_pool=reward_pool,
+            rng=rng,
+        )
+
+        stdout.write(f"Bet: {run.current_bet}\n")
+        if out == "player":
+            stdout.write(f"Round settlement: +{run.current_bet}\n")
+        elif out == "dealer":
+            stdout.write(f"Round settlement: -{run.current_bet}\n")
+        else:
+            stdout.write("Round settlement: +0\n")
+        stdout.write(f"Bankroll: {run.money} / Target: {run.target_money}\n")
+        stdout.write(f"Win streak: {run.win_streak}/{MVP_REWARD_STREAK}\n")
+        if rewarded is not None:
+            stdout.write(f"Reward earned: {rewarded}\n")
+        stdout.write("=" * 30 + "\n")
+
+        end = run_end_policy.check(run)
+        if end is not None:
+            stdout.write(f"\n{end.message}\n")
             return
+
+        run.round += 1
+        st = _start_new_round_with_bet(
+            loop=loop,
+            rng=rng,
+            stdin=stdin,
+            stdout=stdout,
+            run=run,
+        )
+
 
 
 def _render_screen(
@@ -205,6 +491,7 @@ def _render_screen(
     stdout.write(
         f"Bankroll: {run.money}  Target: {run.target_money}  Bet: {run.current_bet}\n",
     )
+    stdout.write(f"Round: {run.round}  Objective: {run.objective}\n")
     stdout.write(f"Win streak: {run.win_streak}/{MVP_REWARD_STREAK}\n\n")
     stdout.write("Your Hand:\n")
     stdout.write(f"  {format_hand(state.player_hand)}  → Total: {pv}\n\n")
@@ -239,6 +526,7 @@ def _render_screen(
         "  info   → current rules\n"
         "  ai     → chaos flavor\n"
         "  items  → inventory\n"
+        "  save   → save game (JSON)\n"
         "  debug state | debug rules\n"
         "  quit   → exit\n",
     )
@@ -266,6 +554,23 @@ def _player_turn_loop(
             stdout.write("> ")
             continue
         cmd = parts[0].lower()
+
+        if cmd == "save":
+            stdout.write("\nEnter save name:\n> ")
+            name = stdin.readline()
+            if not name:
+                stdout.write("\nSave cancelled.\n\n> ")
+                continue
+            name = name.strip()
+            data = _build_save_data(
+                run=run,
+                state=st,
+                loop=loop,
+                enable_chaos=enable_chaos,
+            )
+            save_game(data, name=name or "save_1.json")
+            stdout.write("Game saved successfully.\n\n> ")
+            continue
 
         if cmd in ("quit", "q", "exit"):
             stdout.write("Goodbye.\n")
@@ -471,6 +776,38 @@ def _prompt_bet(
         return bet
 
 
+def _start_new_round_with_bet(
+    *,
+    loop: GameLoop,
+    rng: random.Random,
+    stdin: TextIO,
+    stdout: TextIO,
+    run: RunState,
+) -> GameState:
+    min_bet, max_bet = _bet_limits(run.money)
+    if max_bet < min_bet:
+        stdout.write(
+            "\nYou no longer have enough bankroll to place a valid bet.\n"
+            "Game Over.\n"
+        )
+        raise SystemExit(0)
+
+    def read_line(prompt: str = "") -> str:
+        stdout.write(prompt)
+        stdout.flush()
+        return stdin.readline()
+
+    run.current_bet = _prompt_bet(
+        read_line=read_line,
+        stdout=stdout,
+        money=run.money,
+    )
+    return loop.new_round(
+        seed=rng.randint(0, 2**30),
+        inventory_override=run.items,
+    )
+
+
 def _settle_money(money: int, bet: int, outcome: str) -> int:
     if outcome == "player":
         return money + bet
@@ -490,7 +827,7 @@ def _update_streak_and_maybe_reward(
         run.win_streak += 1
         if run.win_streak >= MVP_REWARD_STREAK and reward_pool:
             reward = rng.choice(reward_pool)
-            run.persistent_inventory = run.persistent_inventory + (reward,)
+            run.items = run.items + (reward,)
             run.win_streak = 0
             return reward
         return None

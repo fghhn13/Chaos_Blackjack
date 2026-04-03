@@ -30,10 +30,13 @@ def test_settle_money_outcomes() -> None:
 def test_streak_reward_grants_item_and_resets() -> None:
     run = RunState(
         money=100,
+        start_money=100,
+        round=1,
         target_money=400,
+        objective="double_money",
         win_streak=MVP_REWARD_STREAK - 1,
         current_bet=10,
-        persistent_inventory=("peek",),
+        items=("peek",),
     )
     reward = _update_streak_and_maybe_reward(
         run=run,
@@ -43,16 +46,19 @@ def test_streak_reward_grants_item_and_resets() -> None:
     )
     assert reward == "shield"
     assert run.win_streak == 0
-    assert run.persistent_inventory == ("peek", "shield")
+    assert run.items == ("peek", "shield")
 
 
 def test_streak_resets_on_loss() -> None:
     run = RunState(
         money=100,
+        start_money=100,
+        round=1,
         target_money=400,
+        objective="double_money",
         win_streak=1,
         current_bet=10,
-        persistent_inventory=(),
+        items=(),
     )
     reward = _update_streak_and_maybe_reward(
         run=run,

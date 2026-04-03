@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "money": 75,
+  "start_money": 100,
+  "round": 3,
+  "items": [],
+  "objective": "double_money",
+  "win_streak": 0,
+  "target_money": 400,
+  "current_bet": 30,
+  "enable_chaos": false,
+  "game_state": {
+    "player_hand": [
+      {
+        "rank": "2",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "2",
+        "suit": "\u2663"
+      }
+    ],
+    "dealer_hand": [
+      {
+        "rank": "5",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "Q",
+        "suit": "\u2666"
+      }
+    ],
+    "deck": [
+      {
+        "rank": "7",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "J",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "4",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "3",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "10",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "5",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "4",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "A",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "J",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "9",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "8",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "6",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "4",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "K",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "6",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "7",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "K",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "A",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "8",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "Q",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "10",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "5",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "10",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "9",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "10",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "K",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "2",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "9",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "8",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "3",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "3",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "2",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "5",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "3",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "K",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "6",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "7",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "J",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "4",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "8",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "A",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "9",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "Q",
+        "suit": "\u2663"
+      },
+      {
+        "rank": "6",
+        "suit": "\u2665"
+      },
+      {
+        "rank": "J",
+        "suit": "\u2666"
+      },
+      {
+        "rank": "7",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "A",
+        "suit": "\u2660"
+      },
+      {
+        "rank": "Q",
+        "suit": "\u2660"
+      }
+    ],
+    "phase": "PLAYER_TURN",
+    "chaos_budget_remaining": 5,
+    "inventory": []
+  },
+  "active_modifiers": [],
+  "chaos_actions_this_turn": 0
+}

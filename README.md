@@ -100,7 +100,7 @@ pip install -e .
 
 ## Run
 
-**Interactive session (MVP v1 run mode by default)**:
+**Menu-driven CLI (MVP v1 run mode by default)**:
 
 - Start bankroll: `100`
 - Target bankroll: `400`
@@ -111,15 +111,22 @@ pip install -e .
 
 ```bash
 python cli/main.py
-# or
-python cli/main.py play
+# then choose:
+# 1) New Game
+# 2) Load Game
+# 3) Quit
 ```
 
 **Enable chaos during interactive play** (optional):
 
 ```bash
-python cli/main.py play --enable-chaos
+python cli/main.py --enable-chaos
 ```
+
+**Saving / Loading**
+- Save during a running game by typing `save` at the in-game prompt.
+- When loading, the CLI lists save files under `chaos_blackjack/saves/` (relative to project root).
+- Each save stores run economy state, current round snapshot, active modifiers, and `chaos_actions_this_turn`.
 
 **Non-interactive demo** (one automated round):
 
