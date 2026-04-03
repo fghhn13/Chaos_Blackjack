@@ -35,6 +35,8 @@ class GameState:
     dealer_hand: tuple[Card, ...]
     deck: tuple[Card, ...]
     phase: GamePhase
+    chaos_budget_remaining: int = 3
+    inventory: tuple[str, ...] = ()
 
     def with_player_hand(self, hand: tuple[Card, ...]) -> GameState:
         return replace(self, player_hand=hand)
@@ -47,3 +49,9 @@ class GameState:
 
     def with_phase(self, phase: GamePhase) -> GameState:
         return replace(self, phase=phase)
+
+    def with_chaos_budget(self, n: int) -> GameState:
+        return replace(self, chaos_budget_remaining=n)
+
+    def with_inventory(self, inv: tuple[str, ...]) -> GameState:
+        return replace(self, inventory=inv)

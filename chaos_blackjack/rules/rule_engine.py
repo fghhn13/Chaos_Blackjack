@@ -21,7 +21,7 @@ class RuleEngine(Protocol):
     def hand_value(self, hand: tuple[Card, ...], ctx: RuleContext) -> int:
         ...
 
-    def is_bust(self, value: int) -> bool:
+    def is_bust(self, value: int, ctx: RuleContext) -> bool:
         ...
 
     def compare_player_dealer(
@@ -60,14 +60,16 @@ class DefaultBlackjackRules:
             aces_as_eleven -= 1
         return total
 
-    def is_bust(self, value: int) -> bool:
+    def is_bust(self, value: int, ctx: RuleContext) -> bool:
         return value > 21
 
     def compare_player_dealer(self, state: GameState, ctx: RuleContext) -> str:
         pv = self.hand_value(state.player_hand, ctx)
         dv = self.hand_value(state.dealer_hand, ctx)
-        pb = self.is_bust(pv)
-        db = self.is_bust(dv)
+        pb = self.is_bust(pv, ctx)
+        if "reverse_bust" in ctx.modifiers.chaos_flags():
+            pb = False
+        db = self.is_bust(dv, ctx)
         if pb and db:
             return "push"
         if pb:

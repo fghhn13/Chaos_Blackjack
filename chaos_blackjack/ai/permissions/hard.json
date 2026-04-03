@@ -1,0 +1,6 @@
+{
+  "allowed_rules": ["modify_card_value"],
+  "allowed_items": [],
+  "max_actions_per_turn": 1,
+  "chaos_budget": 2
+}

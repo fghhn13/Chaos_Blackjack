@@ -18,6 +18,8 @@ class EventType(Enum):
     ROUND_END = auto()
     # Chaos / meta
     RULE_MODIFIER_APPLIED = auto()
+    ITEM_USED = auto()
+    CHAOS_ACTION_REJECTED = auto()
 
 
 @dataclass(frozen=True)

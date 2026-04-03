@@ -1,0 +1,17 @@
+# Chaos Blackjack — conda 环境
+# 使用: 在项目根目录执行
+#   conda env create -f environment.yml
+#   conda activate chaos-blackjack
+#   pip install -e .
+
+name: chaos-blackjack
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10,<3.13
+  - pip
+  - setuptools>=61
+  - pip:
+    - python-dotenv>=1.0.0
+    - google-generativeai>=0.8.0
+    - pytest>=7.0

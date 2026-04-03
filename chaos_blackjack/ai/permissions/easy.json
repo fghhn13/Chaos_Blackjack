@@ -1,0 +1,6 @@
+{
+  "allowed_rules": ["modify_card_value", "reverse_bust"],
+  "allowed_items": ["peek"],
+  "max_actions_per_turn": 1,
+  "chaos_budget": 5
+}

@@ -19,6 +19,15 @@ class RuleModifier(Protocol):
         ...
 
 
+def merge_chaos_flags(modifiers: tuple[RuleModifier, ...]) -> frozenset[str]:
+    out: set[str] = set()
+    for m in modifiers:
+        cf = getattr(m, "chaos_flags", None)
+        if cf:
+            out |= cf
+    return frozenset(out)
+
+
 @dataclass
 class ActiveModifiers:
     """Stack of modifiers; extend with TTL / priority as needed."""
@@ -30,3 +39,6 @@ class ActiveModifiers:
 
     def with_cleared(self) -> ActiveModifiers:
         return ActiveModifiers(items=())
+
+    def chaos_flags(self) -> frozenset[str]:
+        return merge_chaos_flags(self.items)
