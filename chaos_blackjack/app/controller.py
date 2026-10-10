@@ -7,8 +7,12 @@ back two things:
 * `drain_notices()`  -> list[Notice], what happened since the last drain
 
 Flow:  BETTING -place_bet-> [CHAOS -resolve_chaos->] PLAYER_TURN
-       -hit/stand/use_item-> DEALER_TURN -dealer_step*-> ROUND_OVER
+       -hit/stand/double_down/use_item-> DEALER_TURN -dealer_step*-> ROUND_OVER
        -next_round-> BETTING ... until RUN_OVER.
+
+Naturals are checked when the player turn opens (after chaos, so active
+rules count): a player natural pays `blackjack_pays` (3:2), a dealer natural
+wins at once, both is a push. Double and surrender are first-decision only.
 
 Every step is explicit (e.g. the dealer draws one card per `dealer_step()`),
 so a GUI can animate between steps and a CLI can just loop.
@@ -24,7 +28,6 @@ from chaos_blackjack.app.economy import (
     RunState,
     bet_limits,
     can_bet,
-    settle_money,
     settlement_delta,
     update_streak_and_maybe_reward,
 )
@@ -123,6 +126,8 @@ class GameController:
         self.phase = TablePhase.BETTING
         self.last_result: RoundResult | None = None
         self.run_end: RunEndResult | None = None
+        self._doubled = False
+        self._dealer_blackjack = False
         self._check_can_bet()
 
     # ------------------------------------------------------------------ load
@@ -185,8 +190,13 @@ class GameController:
             seed=self.rng.randint(0, 2**30),
             inventory_override=self.run.items,
         )
+        self._doubled = False
+        self._dealer_blackjack = False
         self._notify(NoticeKind.ROUND_STARTED, data={"round": self.run.round, "bet": amount})
-        self._set_phase(TablePhase.CHAOS if self.config.enable_chaos else TablePhase.PLAYER_TURN)
+        if self.config.enable_chaos:
+            self._set_phase(TablePhase.CHAOS)
+        else:
+            self._enter_player_turn()
 
     def resolve_chaos(self) -> None:
         """Let the Chaos AI act once. May block on an LLM call — GUIs should
@@ -196,21 +206,38 @@ class GameController:
         narration = self.loop.last_chaos_narration
         if narration:
             self._notify(NoticeKind.CHAOS_NARRATION, narration, {"text": narration})
-        self._set_phase(TablePhase.PLAYER_TURN)
+        self._enter_player_turn()
 
     def hit(self) -> None:
         self._require(Action.HIT)
         self.state = self.loop.draw_for_player(self._st)
-        pv = self._value(self._st.player_hand)
-        if self.loop.rules.is_bust(pv, self.loop.context()):
-            self._notify(NoticeKind.PLAYER_BUST, "💀 BUST!", {"total": pv})
-            self.state = self._st.with_phase(GamePhase.RESOLVED)
-            self._settle()
+        self._settle_if_player_bust()
 
     def stand(self) -> None:
         self._require(Action.STAND)
-        self.state = self._st.with_phase(GamePhase.DEALER_TURN)
-        self._set_phase(TablePhase.DEALER_TURN)
+        self._to_dealer()
+
+    def double_down(self) -> None:
+        """Double the bet, take exactly one card, then stand."""
+        self._require(Action.DOUBLE)
+        self.run.current_bet *= 2
+        self._doubled = True
+        self._notify(
+            NoticeKind.DOUBLED,
+            f"Double down! Bet is now {self.run.current_bet}.",
+            {"bet": self.run.current_bet},
+        )
+        self.state = self.loop.draw_for_player(self._st)
+        if not self._settle_if_player_bust():
+            self._to_dealer()
+
+    def surrender(self) -> None:
+        """Give up the hand and get half the bet back."""
+        self._require(Action.SURRENDER)
+        refund = self.run.current_bet // 2
+        self._notify(NoticeKind.SURRENDERED, f"You surrender. {refund} returned.", {"refund": refund})
+        self.state = self._st.with_phase(GamePhase.RESOLVED)
+        self._settle("surrender")
 
     def use_item(self, item_id: str) -> ItemResult:
         self._require(Action.USE_ITEM)
@@ -306,12 +333,13 @@ class GameController:
             items=tuple(ItemView(i, n) for i, n in inventory_counts(inventory)),
             chaos_enabled=self.config.enable_chaos,
             chaos_budget=st.chaos_budget_remaining if st is not None else self.loop.chaos_budget_initial,
+            # Modifiers are only cleared on the next deal; between rounds none apply.
             active_rules=tuple(
                 RuleView(str(getattr(m, "id", "?")), describe_modifier(m))
                 for m in self.loop.modifiers.items
-            ),
+            ) if st is not None else (),
             narration=self.loop.last_chaos_narration,
-            available_actions=_ACTIONS_BY_PHASE[self.phase],
+            available_actions=self._available_actions(),
             last_result=self.last_result,
             run_end=self.run_end,
         )
@@ -326,8 +354,19 @@ class GameController:
     def _value(self, hand) -> int:
         return self.loop.rules.hand_value(hand, self.loop.context())
 
+    def _available_actions(self) -> frozenset[str]:
+        actions = _ACTIONS_BY_PHASE[self.phase]
+        if self.phase == TablePhase.PLAYER_TURN and len(self._st.player_hand) == 2:
+            extra = set()
+            if self.config.allow_double and self.run.money >= self.run.current_bet * 2:
+                extra.add(Action.DOUBLE)
+            if self.config.allow_surrender:
+                extra.add(Action.SURRENDER)
+            actions = actions | extra
+        return actions
+
     def _require(self, action: str) -> None:
-        if action not in _ACTIONS_BY_PHASE[self.phase]:
+        if action not in self._available_actions():
             raise ActionError(f"'{action}' is not allowed during {self.phase.value}")
 
     def _set_phase(self, phase: TablePhase) -> None:
@@ -341,15 +380,50 @@ class GameController:
     def _on_core_event(self, event: Event) -> None:
         self._notices.append(self._translator.translate(event))
 
-    def _settle(self) -> None:
+    def _is_natural(self, hand) -> bool:
+        if len(hand) != 2:
+            return False
+        v = self._value(hand)
+        return v == 21 and not self.loop.rules.is_bust(v, self.loop.context())
+
+    def _enter_player_turn(self) -> None:
+        self._set_phase(TablePhase.PLAYER_TURN)
+        st = self._st
+        player_nat = self._is_natural(st.player_hand)
+        dealer_nat = self._is_natural(st.dealer_hand)
+        if not (player_nat or dealer_nat):
+            return
+        if player_nat:
+            self._notify(NoticeKind.PLAYER_BLACKJACK, "♠ BLACKJACK!")
+        if dealer_nat:
+            self._dealer_blackjack = True
+            self._notify(NoticeKind.DEALER_BLACKJACK, "Dealer has blackjack.")
+        self.state = st.with_phase(GamePhase.RESOLVED)
+        self._settle("push" if player_nat and dealer_nat else "blackjack" if player_nat else "dealer")
+
+    def _settle_if_player_bust(self) -> bool:
+        pv = self._value(self._st.player_hand)
+        if not self.loop.rules.is_bust(pv, self.loop.context()):
+            return False
+        self._notify(NoticeKind.PLAYER_BUST, "💀 BUST!", {"total": pv})
+        self.state = self._st.with_phase(GamePhase.RESOLVED)
+        self._settle()
+        return True
+
+    def _to_dealer(self) -> None:
+        self.state = self._st.with_phase(GamePhase.DEALER_TURN)
+        self._set_phase(TablePhase.DEALER_TURN)
+
+    def _settle(self, outcome: str | None = None) -> None:
         st = self._st
         ctx = self.loop.context()
         pv = self._value(st.player_hand)
         dv = self._value(st.dealer_hand)
-        out = self.loop.outcome_label(st)
+        out = outcome or self.loop.outcome_label(st)
         bet = self.run.current_bet
+        delta = settlement_delta(bet, out, blackjack_pays=self.config.blackjack_pays)
 
-        self.run.money = settle_money(self.run.money, bet, out)
+        self.run.money += delta
         self.run.items = st.inventory
         reward = update_streak_and_maybe_reward(
             run=self.run,
@@ -365,9 +439,11 @@ class GameController:
             dealer_total=dv,
             player_bust=self.loop.rules.is_bust(pv, ctx),
             bet=bet,
-            delta=settlement_delta(bet, out),
+            delta=delta,
             money_after=self.run.money,
             reward=reward,
+            doubled=self._doubled,
+            dealer_blackjack=self._dealer_blackjack,
         )
         self._notify(NoticeKind.ROUND_SETTLED, data={"result": self.last_result})
         if reward is not None:

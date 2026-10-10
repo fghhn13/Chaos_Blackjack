@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import random
 from dataclasses import dataclass, field
 
@@ -15,24 +14,24 @@ from chaos_blackjack.rules.modifiers import ActiveModifiers
 from chaos_blackjack.rules.rule_engine import DefaultBlackjackRules, RuleContext, RuleEngine
 
 
-def _env_truthy(name: str) -> bool:
-    v = os.environ.get(name, "").strip().lower()
-    return v in ("1", "true", "yes", "on")
+# What the offline stub "AI" answers every time (no network, no cost).
+STUB_CHAOS_RESPONSE = '{"action":"apply_rule","rule_id":"modify_card_value","params":{"delta":-1}}'
 
 
 def _default_llm() -> LLMBackend:
     # Lazy imports avoid circular import: core → ai → pipeline → contracts → core
-    from chaos_blackjack.ai.gemini_llm import try_create_gemini_llm
+    from chaos_blackjack.ai.env import env_truthy, load_dotenv_from_project_root
+    from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
     from chaos_blackjack.ai.pipeline import StubLLM
 
-    # Default: stub only (no network). Set CHAOS_USE_GEMINI=1 to use Gemini when key is in .env.
-    if _env_truthy("CHAOS_USE_GEMINI"):
-        llm = try_create_gemini_llm()
+    # Default: stub only (no network). Set CHAOS_USE_LLM=1 (+ GPTSAPI_* in .env)
+    # to let the GPTsAPI relay drive the Chaos AI.
+    load_dotenv_from_project_root()
+    if env_truthy("CHAOS_USE_LLM"):
+        llm = try_create_gptsapi_llm()
         if llm is not None:
             return llm
-    return StubLLM(
-        response_json='{"action":"apply_rule","rule_id":"modify_card_value","params":{"delta":-1}}',
-    )
+    return StubLLM(response_json=STUB_CHAOS_RESPONSE)
 
 
 def _default_pipeline() -> "ChaosPipeline":

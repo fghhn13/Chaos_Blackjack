@@ -10,6 +10,7 @@ DEFAULT_TARGET_MONEY = 400
 DEFAULT_REWARD_STREAK = 2
 DEFAULT_REWARD_POOL: tuple[str, ...] = ("peek", "shield", "swap")
 DEFAULT_DEALER_STAND_ON = 17
+DEFAULT_BLACKJACK_PAYS = (3, 2)
 
 
 @dataclass(frozen=True)
@@ -20,5 +21,8 @@ class RunConfig:
     reward_streak: int = DEFAULT_REWARD_STREAK
     reward_pool: tuple[str, ...] = DEFAULT_REWARD_POOL
     dealer_stand_on: int = DEFAULT_DEALER_STAND_ON
+    blackjack_pays: tuple[int, int] = DEFAULT_BLACKJACK_PAYS  # natural 21 payout ratio
+    allow_double: bool = True
+    allow_surrender: bool = True
     enable_chaos: bool = False
     seed: int | None = None

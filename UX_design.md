@@ -1,25 +1,25 @@
-# 🃏 Chaos Blackjack — CLI 交互设计规范（User-Facing UX）
+# 🃏 Chaos Blackjack — CLI Interaction Spec (User-Facing UX)
 
 ---
 
-## 🎯 设计目标
+## 🎯 Design goals
 
-本CLI不是“简陋界面”，而是一个：
+This CLI is not a "bare-bones interface". It is:
 
-> **可读、可控、可解释的回合式交互系统**
+> **A readable, controllable, explainable turn-based interaction system**
 
-核心要求：
+Core requirements:
 
-* ✅ 状态清晰（State Visibility）
-* ✅ 行为明确（Action Clarity）
-* ✅ 变化可感知（Feedback Transparency）
-* ✅ AI可理解（Explainable Chaos）
+* ✅ State Visibility
+* ✅ Action Clarity
+* ✅ Feedback Transparency
+* ✅ Explainable Chaos
 
 ---
 
-## 🧠 单回合结构（标准模板）
+## 🧠 Turn structure (standard template)
 
-每一回合必须严格遵循以下顺序：
+Every turn must follow this order exactly:
 
 ```text
 [HEADER]
@@ -34,7 +34,7 @@
 
 ---
 
-## 🧩 1. Header（视觉锚点）
+## 🧩 1. Header (visual anchor)
 
 ```text
 ==============================
@@ -45,7 +45,7 @@ Turn: 3
 
 ---
 
-## 🧩 2. Game State（核心信息）
+## 🧩 2. Game State (core information)
 
 ```text
 Your Hand:
@@ -55,15 +55,15 @@ Dealer:
   [6♣, ?]
 ```
 
-👉 规则：
+👉 Rules:
 
-* 必须对齐
-* 必须显示总点数
-* 必须区分可见/不可见信息
+* Must be aligned
+* Must show the total
+* Must distinguish visible from hidden information
 
 ---
 
-## 🧩 3. Chaos Effects（AI行为展示）
+## 🧩 3. Chaos Effects (AI behaviour)
 
 ```text
 ------------------------------
@@ -76,15 +76,15 @@ Dealer:
 ------------------------------
 ```
 
-👉 规则：
+👉 Rules:
 
-* AI行为必须显式展示
-* 效果必须列表化
-* 必须说明持续时间（如this turn）
+* AI behaviour must be shown explicitly
+* Effects must be listed
+* Duration must be stated (e.g. "this turn")
 
 ---
 
-## 🧩 4. Items（玩家资源）
+## 🧩 4. Items (player resources)
 
 ```text
 🎒 Items:
@@ -92,14 +92,14 @@ Dealer:
   2. Shield (1 use)
 ```
 
-👉 规则：
+👉 Rules:
 
-* 显示剩余次数
-* 顺序编号
+* Show remaining uses
+* Number items in order
 
 ---
 
-## 🧩 5. Actions（主操作）
+## 🧩 5. Actions (main moves)
 
 ```text
 Available Actions:
@@ -108,9 +108,9 @@ Available Actions:
   3. Use Item
 ```
 
-👉 动态生成（受AI影响）
+👉 Generated dynamically (the AI can affect them)
 
-例如：
+For example:
 
 ```text
 ⚡ Effect: Forced Hit
@@ -121,39 +121,39 @@ Available Actions:
 
 ---
 
-## 🧩 6. Commands（辅助指令）
+## 🧩 6. Commands (auxiliary)
 
 ```text
 Commands:
-  info   → 查看当前规则
-  ai     → 查看AI解释
-  items  → 查看道具详情
+  info   → show current rules
+  ai     → show the AI's explanation
+  items  → show item details
   debug  → (dev only)
-  quit   → 退出游戏
+  quit   → exit the game
 ```
 
 ---
 
-## 🧩 7. Input（统一入口）
+## 🧩 7. Input (single entry point)
 
 ```text
 > 
 ```
 
-### 支持输入：
+### Accepted input
 
-| 输入        | 含义       |
-| --------- | -------- |
-| 1 / hit   | Hit      |
-| 2 / stand | Stand    |
-| 3         | Use Item |
-| info      | 查看规则     |
-| ai        | AI解释     |
-| quit      | 退出       |
+| Input     | Meaning          |
+| --------- | ---------------- |
+| 1 / hit   | Hit              |
+| 2 / stand | Stand            |
+| 3         | Use Item         |
+| info      | Show rules       |
+| ai        | AI explanation   |
+| quit      | Exit             |
 
 ---
 
-## 🧩 8. 子菜单（Use Item）
+## 🧩 8. Sub-menu (Use Item)
 
 ```text
 Choose Item:
@@ -165,28 +165,28 @@ Choose Item:
 
 ---
 
-## 🔁 9. 反馈阶段（必须明确）
+## 🔁 9. Feedback phase (must be explicit)
 
-### 玩家行为反馈
+### Player action feedback
 
 ```text
 You draw: 10♥
 ```
 
-### Chaos反馈
+### Chaos feedback
 
 ```text
 ⚡ Chaos Effect Triggered:
 10 → 8
 ```
 
-### 状态变化
+### State change
 
 ```text
 New Total: 24
 ```
 
-### 结果
+### Result
 
 ```text
 💀 BUST!
@@ -194,7 +194,7 @@ New Total: 24
 
 ---
 
-## 🤖 AI解释系统（可选但强烈建议）
+## 🤖 AI explanation system (optional, strongly recommended)
 
 ```text
 > ai
@@ -205,7 +205,7 @@ New Total: 24
 
 ---
 
-## 📊 info命令（规则可视化）
+## 📊 `info` command (rules made visible)
 
 ```text
 > info
@@ -217,7 +217,7 @@ Current Rules:
 
 ---
 
-## 🧪 debug模式（开发用）
+## 🧪 Debug mode (development)
 
 ```text
 > debug state
@@ -226,32 +226,30 @@ Current Rules:
 
 ---
 
-## ⚠️ UX设计约束（必须遵守）
+## ⚠️ UX constraints (mandatory)
 
-### ❌ 禁止：
+### ❌ Never
 
-* 自由文本输入（无约束）
-* 隐藏AI行为
-* 不显示规则变化
-* 模糊反馈（如“something happened”）
-
----
-
-### ✅ 必须：
-
-* 所有变化必须可见
-* 所有行为必须可解释
-* 所有输入必须受控
+* Free-form, unconstrained text input
+* Hidden AI behaviour
+* Rule changes that are not shown
+* Vague feedback (e.g. "something happened")
 
 ---
 
-## 🎯 关键体验目标
+### ✅ Always
 
-玩家每回合必须清楚：
+* Every change is visible
+* Every action is explainable
+* Every input is constrained
 
-1. 我现在是什么状态
-2. 规则有没有变化
-3. 我可以做什么
-4. AI刚刚做了什么
+---
 
+## 🎯 Key experience goals
 
+Every turn the player must clearly know:
+
+1. What state am I in?
+2. Did the rules change?
+3. What can I do?
+4. What did the AI just do?

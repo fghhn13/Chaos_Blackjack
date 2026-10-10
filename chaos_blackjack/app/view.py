@@ -24,6 +24,8 @@ class Action:
     RESOLVE_CHAOS = "resolve_chaos"
     HIT = "hit"
     STAND = "stand"
+    DOUBLE = "double"
+    SURRENDER = "surrender"
     USE_ITEM = "use_item"
     DEALER_STEP = "dealer_step"
     NEXT_ROUND = "next_round"
@@ -52,7 +54,7 @@ class RuleView:
 @dataclass(frozen=True)
 class RoundResult:
     round: int
-    outcome: str  # "player" | "dealer" | "push"
+    outcome: str  # "player" | "dealer" | "push" | "blackjack" | "surrender"
     player_total: int
     dealer_total: int
     player_bust: bool
@@ -60,6 +62,8 @@ class RoundResult:
     delta: int
     money_after: int
     reward: str | None
+    doubled: bool = False
+    dealer_blackjack: bool = False
 
 
 @dataclass(frozen=True)
