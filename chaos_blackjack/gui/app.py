@@ -4,7 +4,7 @@ Scenes draw on a fixed 1280x720 canvas (`settings.LOGICAL_SIZE`). The App
 scales it into the real window with letterboxing and converts mouse
 positions back, so scenes only ever see canvas coordinates.
 
-Global keys: F11 fullscreen, F5 rescan assets, M mute, +/- master volume.
+Global keys: F11 fullscreen, F5 rescan assets/sounds, M mute, +/- volume.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ import pygame
 
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import AssetManager
+from chaos_blackjack.gui.audio import SoundManager
+from chaos_blackjack.gui.assets.sound_manifest import DEFAULT_MASTER_VOLUME
 from chaos_blackjack.gui.scene import SceneManager
 from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.data.prefs import get_pref, set_pref
 from chaos_blackjack.gui.settings import LOGICAL_SIZE, GuiSettings
 from chaos_blackjack.app.config import RunConfig
-from chaos_blackjack.audio import AudioManager
-from chaos_blackjack.audio.pygame_backend import PygameAudioBackend
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
 
@@ -33,6 +33,8 @@ class Preferences:
     """Choices made in menus that later scenes read; kept in data/game.db."""
 
     enable_chaos: bool = False
+    master_volume: float = DEFAULT_MASTER_VOLUME
+    muted: bool = False
 
     @classmethod
     def load(cls) -> "Preferences":
@@ -60,8 +62,10 @@ class App:
         self.prefs = Preferences.load()
         if run_config is not None:
             self.prefs.enable_chaos = run_config.enable_chaos
-        self.audio = AudioManager(PygameAudioBackend(), volume=self.settings.master_volume,
-                                  muted=self.settings.audio_muted)
+        self.prefs.master_volume = self.settings.master_volume
+        self.prefs.muted = self.settings.audio_muted
+        self.audio = SoundManager(self.settings.asset_dirs, preferences=self.prefs)
+        self.assets.audio = self.audio
         self.scenes = SceneManager(self)
         self.running = False
         self._viewport = pygame.Rect((0, 0), LOGICAL_SIZE)
@@ -83,7 +87,6 @@ class App:
                     self._dispatch(event)
                 self.scenes.update(dt)
                 self.scenes.apply_pending()
-                self.audio.update(dt)
                 self._render()
                 frames += 1
                 if max_frames is not None and frames >= max_frames:
@@ -109,6 +112,7 @@ class App:
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             self.assets.refresh()
+            self.audio.refresh()
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
             self.audio.toggle_mute()

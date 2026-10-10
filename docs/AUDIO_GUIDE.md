@@ -1,5 +1,12 @@
 # Casino audio: agent implementation and handoff guide
 
+Integration note: the GUI now uses `gui.audio.SoundManager` and animation-aligned
+semantic cues (see `assets/sounds/README.md`). It does not also subscribe the
+legacy notice mapper, which would duplicate playback. The standalone casino
+library, its backend contracts, bundled originals and validator below remain
+available for other front-ends. GUI startup volume/mute flags still apply.
+
+
 The GUI has five semantic sound cues backed by the original Kenney Casino Audio
 OGG files. The game controller emits notices; `AudioManager` observes those
 notices and delegates playback through `AudioBackend`. Game rules, the text CLI,

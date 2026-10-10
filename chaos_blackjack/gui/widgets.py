@@ -79,8 +79,10 @@ class Button(Widget):
         font_size: int = theme.FONT_BUTTON,
         tooltip: str = "",
         key_hint: str | None = None,
+        sound: bool = True,
     ) -> None:
         self.assets = assets
+        self.sound = sound
         # None = derive from `hotkey`; "" = no badge.
         self.key_hint = key_name(hotkey) if key_hint is None else key_hint
         self.rect = pygame.Rect(rect)
@@ -117,8 +119,11 @@ class Button(Widget):
         return False
 
     def click(self) -> None:
-        if self.enabled and self.on_click is not None:
-            self.on_click()
+        if self.enabled:
+            if self.sound and self.assets.audio is not None:
+                self.assets.audio.play("button_click")
+            if self.on_click is not None:
+                self.on_click()
 
     def draw(self, surface: pygame.Surface) -> None:
         if not self.visible:

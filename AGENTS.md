@@ -130,6 +130,7 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 ## Working in the repo
 
 - Audio materials, cue ids, notice integration and offline checks: [docs/AUDIO_GUIDE.md](docs/AUDIO_GUIDE.md). `python -m chaos_blackjack.audio validate` needs no pygame or sound device; `preview` explicitly plays sound.
+- GUI sound ids, animation timing, offline checks and approved export workflow: [assets/sounds/README.md](assets/sounds/README.md). `python scripts/export_sounds.py --verify` validates delivered clips without raw sources or playback.
 
 - Repository content is English (UI strings, comments, docs, commits), except the intentionally Chinese player guide `docs/PLAYER_GUIDE.zh-CN.md`. Keep both guides in sync when rules change.
 - Run tests with `python -m pytest`. Tests force `CHAOS_USE_LLM=0`; never make billed API calls in tests or CI.

@@ -35,6 +35,8 @@ HANDS = ("player", "dealer")  # deal order within each round of dealing
 class CardFx:
     kind: str  # "deal" | "flip"
     tween: Tween
+    flip_at: float | None = None
+    flip_played: bool = False
 
 
 @dataclass
@@ -44,7 +46,10 @@ class SettleFx:
 
 
 class TableFx:
-    def __init__(self, view: GameView, *, bankroll_anchor: tuple[int, int], dealer_anchor: tuple[int, int]) -> None:
+    def __init__(self, view: GameView, *, bankroll_anchor: tuple[int, int], dealer_anchor: tuple[int, int],
+                 audio=None) -> None:
+        self.audio = audio
+        self._sound_epoch = 0
         self.anim = Animator()
         self.cards: dict[tuple[str, int], CardFx] = {}
         self.chip_drop: Tween | None = None
@@ -64,11 +69,28 @@ class TableFx:
 
     def update(self, dt: float) -> None:
         self.anim.update(dt)
+        for fx in self.cards.values():
+            if fx.flip_at is not None and fx.tween.raw >= fx.flip_at and not fx.flip_played:
+                fx.flip_played = True
+                self._sound("card_flip")
         for key in [k for k, fx in self.cards.items() if fx.tween.done]:
             del self.cards[key]
 
+    def _sound(self, sound_id: str) -> None:
+        if self.audio is not None:
+            self.audio.play(sound_id)
+
+    def _sound_callback(self, sound_id: str):
+        """Discard old-round sound callbacks without changing any Tween timing."""
+        epoch = self._sound_epoch
+        def play() -> None:
+            if epoch == self._sound_epoch:
+                self._sound(sound_id)
+        return play
+
     def view_changed(self, prev: GameView, new: GameView) -> None:
         if new.phase == TablePhase.BETTING and prev.phase != TablePhase.BETTING:
+            self._sound_epoch += 1
             self.cards.clear()
             self.settle = self.banner = None
         self._diff_cards(prev, new)
@@ -80,18 +102,27 @@ class TableFx:
 
     def react(self, n: Notice) -> None:
         if n.kind == NoticeKind.ROUND_STARTED:
-            self.chip_drop = self.anim.add(Tween(CHIP_DROP, ease=out_back, blocking=False))
+            self.chip_drop = self.anim.add(Tween(CHIP_DROP, ease=out_back, blocking=False,
+                                                  on_done=self._sound_callback("chip_stack")))
         elif n.kind == NoticeKind.ROUND_SETTLED and isinstance(n.data.get("result"), RoundResult):
             # Let the last card land before the chips move and the banner appears.
             wait = max((fx.tween.delay + fx.tween.duration - fx.tween.elapsed for fx in self.cards.values()),
                        default=0.0) + 0.1
-            tween = self.anim.add(Tween(SETTLE_TIME, ease=in_out_cubic, delay=wait, blocking=False))
-            self.settle = SettleFx(tween, n.data["result"])
+            result = n.data["result"]
+            chips = "chips_win" if result.delta > 0 else "chips_lose" if result.delta < 0 else None
+            tween = self.anim.add(Tween(SETTLE_TIME, ease=in_out_cubic, delay=wait, blocking=False,
+                                        on_start=self._sound_callback(chips) if chips else None))
+            self.settle = SettleFx(tween, result)
+            cue = ("push" if result.outcome == "push" else "blackjack" if result.outcome == "blackjack"
+                   else "bust" if result.player_bust else "round_win" if result.delta > 0 else "round_lose")
             # The banner covers the betting circle, so it waits until the chips have mostly left.
             self.banner = self.anim.add(Tween(BANNER_TIME, ease=out_back, delay=wait + SETTLE_TIME * 0.8,
-                                              blocking=False))
+                                              blocking=False, on_start=self._sound_callback(cue)))
         elif n.kind == NoticeKind.RULE_MODIFIER_APPLIED:
-            self.glitch = self.anim.add(Tween(GLITCH_TIME, ease=linear, blocking=False))
+            self.glitch = self.anim.add(Tween(GLITCH_TIME, ease=linear, blocking=False,
+                                              on_start=self._sound_callback("chaos_glitch")))
+        elif n.kind == NoticeKind.ITEM_USED:
+            self._sound("item_use")
 
     def _diff_cards(self, prev: GameView, new: GameView) -> None:
         hands = {"player": (prev.player_cards, new.player_cards), "dealer": (prev.dealer_cards, new.dealer_cards)}
@@ -106,11 +137,16 @@ class TableFx:
                 if i >= len(old):
                     dealt.append((name, i))
                 elif not old[i].face_up and card.face_up:
-                    self.cards[(name, i)] = CardFx("flip", self.anim.add(Tween(FLIP_TIME, ease=linear)))
+                    self.cards[(name, i)] = CardFx("flip", self.anim.add(Tween(FLIP_TIME, ease=linear)), flip_at=0.5)
         # Deal in table order: player, dealer, player, dealer ...
         dealt.sort(key=lambda k: (k[1], HANDS.index(k[0])))
         for n, key in enumerate(dealt):
-            self.cards[key] = CardFx("deal", self.anim.add(Tween(DEAL_TIME, ease=linear, delay=n * DEAL_GAP)))
+            card = hands[key[0]][1][key[1]]
+            self.cards[key] = CardFx(
+                "deal", self.anim.add(Tween(DEAL_TIME, ease=linear, delay=n * DEAL_GAP,
+                                            on_start=self._sound_callback("card_deal"))),
+                flip_at=FLY_SHARE + (1 - FLY_SHARE) * 0.5 if card.face_up else None,
+            )
 
     # ------------------------------------------------------------ queries
 

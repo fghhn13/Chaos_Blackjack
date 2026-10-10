@@ -154,13 +154,15 @@ Public player observations continue to hide private cards. Run-local memory is
 implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
 no history is collected, included in prompts, or written to saves. A future opt-in
 can retain at most `chaos_memory_limit` events (default 32) across save/load.
-**Sound**: bundled [Kenney Casino Audio](https://kenney.nl/assets/casino-audio) (CC0)
-provides deal, chips, win, lose and successful Chaos cues. Master volume defaults
-to 40%. Use the main-menu Sound button or **M** to mute; **+/-** adjusts volume
-by 10 percentage points. Start with `--volume 0.3` or `--mute`. Missing audio
-devices degrade to silence. [Audio integration and agent handoff](docs/AUDIO_GUIDE.md)
-documents cue ids, interfaces, original licenses and the offline
-`python -m chaos_blackjack.audio validate` command.
+**Sound:** Kenney Casino Audio and Interface Sounds (CC0) provide sixteen GUI
+cues synchronized to card, chip, banner and glitch animations. Master volume
+defaults to 40%; **M** toggles mute, **+/-** changes it by 10 percentage points,
+and **F5** reloads sound files as well as images. Preferences last for the
+current process. Missing clips, mixer failure and SDL dummy audio are silent.
+[Sound interface and timing](assets/sounds/README.md) ·
+[Source credits](assets/CREDITS.md) · [Clip report](assets/sounds/REPORT.md).
+
+The standalone casino audio library and offline validator remain available: `python -m chaos_blackjack.audio validate`.
 
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 

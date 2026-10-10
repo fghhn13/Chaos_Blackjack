@@ -113,12 +113,12 @@ class TableScene(Scene):
         self._poke_pending = False
         self._ending_opened = False
         self.view: GameView = self.controller.view()
-        self.fx = TableFx(self.view, bankroll_anchor=(136, 24), dealer_anchor=(W // 2, DEALER_Y - 40))
+        self.fx = TableFx(self.view, bankroll_anchor=(136, 24), dealer_anchor=(W // 2, DEALER_Y - 40),
+                          audio=self.app.audio)
         self._handlers: dict[str, list[NoticeHandler]] = {}
         self.subscribe("*", self._feed_notice)
         self.subscribe("*", self.chaos_panel.react)
         self.subscribe("*", self.fx.react)
-        self.subscribe("*", self.app.audio.handle_notice)
         self._sync_widgets()
 
     def on_exit(self) -> None:
@@ -126,7 +126,9 @@ class TableScene(Scene):
         # against its old controller without touching this scene or delaying exit.
         self._closed = True
         self._chaos_future = None
-        self.app.audio.stop()
+        stop = getattr(self.app.audio, "stop", None)
+        if stop is not None:
+            stop()
 
     # ----------------------------------------------------------- notices
 

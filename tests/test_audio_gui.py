@@ -102,11 +102,17 @@ def test_table_fans_notices_to_audio_once_without_consuming_feed(tmp_path):
         app.scenes.apply_pending()
         table = app.scenes.top
         table._deal(10)
-        assert cues == ["chips", "deal", "deal", "deal", "deal", "win"]
+        assert cues == ["card_deal"]
+        table.fx.update(2)
+        assert cues.count("card_deal") == 4
+        assert cues.count("chip_stack") == 1
+        assert cues.count("blackjack") == 1
         assert table.view.last_result.outcome == "blackjack"
         assert table.feed.lines  # audio did not steal the existing event stream
         table._pump_notices()
-        assert len(cues) == 6
+        played = list(cues)
+        table.fx.update(2)
+        assert cues == played
         app.scenes.reset("menu")
         app.scenes.apply_pending()
         assert type(app.scenes.top).__name__ == "MainMenuScene"

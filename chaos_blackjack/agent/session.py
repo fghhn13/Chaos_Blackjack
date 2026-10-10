@@ -57,24 +57,6 @@ class LlmUnavailable(RuntimeError):
     pass
 
 
-def _make_loop_factory(use_llm: bool):
-    """GameLoop with an explicit chaos backend: the offline stub unless the
-    caller opted into the real relay (never decided by .env alone)."""
-
-    def make(dispatcher):
-        from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
-        from chaos_blackjack.ai.pipeline import ChaosPipeline, OfflineChaosStub
-        from chaos_blackjack.core.game_loop import GameLoop
-
-        backend = try_create_gptsapi_llm() if use_llm else OfflineChaosStub()
-        if backend is None:
-            raise LlmUnavailable("Real LLM requested but GPTSAPI_API_KEY is not configured")
-        pipeline = ChaosPipeline.from_profile_name("easy", "chaotic", backend)
-        return GameLoop(dispatcher=dispatcher, pipeline=pipeline)
-
-    return make
-
-
 class AgentSession:
     def __init__(
         self,

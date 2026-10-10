@@ -59,8 +59,10 @@ class MainMenuScene(Scene):
         audio = self.app.audio
         status = "muted" if audio.muted else f"{audio.volume:.0%}"
         if not audio.available:
-            status = "unavailable"
+            status += " (unavailable)"
         self.sound_button.text = f"Sound: {status}  M"
         self.ui.draw(surface)
-        hint = a.font(theme.FONT_SMALL).render("M mute   +/- volume   F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
+        state = "muted" if self.app.prefs.muted else f"{self.app.prefs.master_volume:.0%}"
+        hint = a.font(theme.FONT_SMALL).render(
+            f"Sound {state}   M mute   +/- volume   F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
         surface.blit(hint, hint.get_rect(bottomright=(W - 20, H - 14)))

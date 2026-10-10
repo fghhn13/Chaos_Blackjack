@@ -17,3 +17,18 @@ Licence: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Fetched throu
 | reverse_bust | anticlockwise-rotation | delapouite | https://game-icons.net/1x1/delapouite/anticlockwise-rotation.html |
 | suit_power | spades | skoll | https://game-icons.net/1x1/skoll/spades.html |
 | tiebreaker_shift | scales | lorc | https://game-icons.net/1x1/lorc/scales.html |
+
+## Sound effects by Kenney
+
+| Source | Version | License | Used for |
+| --- | --- | --- | --- |
+| [Kenney Casino Audio](https://kenney.nl/assets/casino-audio) | 1.1 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Card and chip foley |
+| [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) | 1.0 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Buttons, item use, glitch and result / ending prompts |
+
+Author: Kenney (https://kenney.nl). CC0 attribution is optional; it is preserved
+here for traceability. Source archives and per-id choices were approved on
+2026-10-10. Original OGG clips are copied byte-for-byte, renamed to semantic ids;
+no audio was synthesized and no normalization was applied. Runtime per-cue
+gains and master volume control playback levels. Both original licenses ship
+in `sounds/licenses/`. Exact filenames, source links, duration, size and SHA-256
+hashes are in `sounds/manifest.json`; [delivery table](sounds/REPORT.md).

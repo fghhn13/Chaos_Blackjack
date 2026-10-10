@@ -35,6 +35,8 @@ class ChipButton(Widget):
         if event.type == pygame.MOUSEMOTION:
             self.hovered = self.rect.collidepoint(event.pos)
         elif event.type == pygame.MOUSEBUTTONUP and self.enabled and self.rect.collidepoint(event.pos):
+            if event.button in (1, 3) and self.assets.audio is not None:
+                self.assets.audio.play("chip_place")
             if event.button == 1:
                 self.on_change(self.value)
                 return True

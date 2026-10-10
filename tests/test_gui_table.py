@@ -21,6 +21,7 @@ from chaos_blackjack.app.notices import NoticeKind  # noqa: E402
 from chaos_blackjack.app.view import Action, TablePhase  # noqa: E402
 from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank  # noqa: E402
 from chaos_blackjack.gui.app import App  # noqa: E402
+from chaos_blackjack.gui.components.table_fx import DEAL_TIME, DEAL_GAP
 from chaos_blackjack.gui.components.bet_panel import BetPanel  # noqa: E402
 from chaos_blackjack.gui.settings import GuiSettings  # noqa: E402
 from chaos_blackjack.gui.scenes.table import CHAOS_DELAY, CHAOS_ERROR, ACTION_Y, W  # noqa: E402
@@ -183,7 +184,7 @@ def test_poke_at_player_turn_and_round_result_restores_controls(app, monkeypatch
                     deal=([_c("9"), _c("7")], [_c("K"), _c("8")], [_c("K"), _c("2")]))
     monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: False)
     t._deal(10)
-    _tick(app, CHAOS_DELAY)
+    _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     t._chaos_future.result(timeout=3)
     _tick(app, .01)
     if settled:
@@ -333,7 +334,7 @@ def _start_chaos(app, monkeypatch, llm, *, natural=False, backend=None):
     monkeypatch.setattr(t.controller.loop.pipeline, "llm", backend or llm)
     monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
     t._deal(10)
-    _tick(app, CHAOS_DELAY)
+    _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     assert llm.started.wait(timeout=1)
     assert t._chaos_future is not None and not t._chaos_future.done()
     return t
@@ -473,7 +474,7 @@ def test_shop_purchase_survives_chaos_and_shield_dispels_result(app, monkeypatch
     assert app.scenes.top is t
     assert t.view.money == 90 and t.view.items[0].id == "shield"
     t._deal(10)
-    _tick(app, CHAOS_DELAY)
+    _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     assert slow_llm.started.wait(timeout=1)
     cached = t.view
     t._use_item("shield")
@@ -539,7 +540,7 @@ def test_chaos_natural_settles_and_next_round_starts_another_worker(app, monkeyp
     slow_llm.release.clear()
     slow_llm.started.clear()
     t._deal(10)
-    _tick(app, CHAOS_DELAY)
+    _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     assert slow_llm.started.wait(timeout=1)
     assert slow_llm.calls == 2
     slow_llm.release.set()
