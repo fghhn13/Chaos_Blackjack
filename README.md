@@ -72,9 +72,21 @@ elsewhere).
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
   whenever that file changes; change shipped values there.
-- To experiment, copy it into a new profile and edit that one, e.g. with
-  DB Browser for SQLite or `clone_profile()` from `chaos_blackjack.data`; values
-  are validated (type, min / max, no unknown keys) when a run starts.
+- To experiment, copy it into a new profile and edit that one. Every edit is
+  validated (type, min / max, JSON params, no unknown keys) and rolled back if
+  invalid; DB Browser for SQLite works too (checked when a run starts):
+
+  ```bash
+  python -m chaos_blackjack.data clone default tune-a
+  python -m chaos_blackjack.data set tune-a item.peek.price 6
+  python -m chaos_blackjack.data set tune-a rule.great_crash.params '{"ten_value": 5}'
+  python -m chaos_blackjack.data diff default tune-a
+  python -m chaos_blackjack.data export tune-a -o chaos_blackjack/data/seed/default.sql   # ship it
+  ```
+
+  Keys: settings (`run.start_money`, `bet.max_fraction`, ...), `item.<id>.<field>`
+  and `rule.<id>.<field>`; `python -m chaos_blackjack.data --help` lists them.
+  Compare profiles in the balance simulator with `python -m bjsim --profile tune-a ...`.
 - Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
   A run keeps the numbers it started with.
 - Schema changes go in new `chaos_blackjack/data/migrations/NNNN_*.sql` files.

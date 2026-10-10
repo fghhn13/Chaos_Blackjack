@@ -14,6 +14,7 @@ from chaos_blackjack.data.balance import (
     default_balance,
     load_balance,
 )
+from chaos_blackjack.data import admin
 from chaos_blackjack.data.db import connect, db_path
 from chaos_blackjack.data.prefs import get_pref, set_pref
 from chaos_blackjack.data.saves import SaveNotFound, delete_run, import_json_saves, list_runs, load_run, save_run
