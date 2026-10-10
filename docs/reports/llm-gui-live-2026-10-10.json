@@ -1,0 +1,712 @@
+{
+  "started_at": "2026-10-10T21:20:37.413012+08:00",
+  "tested_commit": "ba779d5eeff9c05b6ab7d2a50122f378f35eadf6",
+  "python": "3.12.7",
+  "pygame": "2.6.1",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "video_driver": "dummy",
+  "target_fps": 60,
+  "model": "gpt-6-luna",
+  "base_url": "https://api2.gptsapi.net/v1",
+  "timeout_s": 45.0,
+  "max_tokens": 256,
+  "request_cap": 16,
+  "scenarios": [
+    {
+      "name": "synchronous_control",
+      "blocked_main_thread_ms": 16179.101,
+      "llm_error": null,
+      "decisions": [
+        "hit"
+      ],
+      "result": {
+        "round": 1,
+        "outcome": "dealer",
+        "player_total": 22,
+        "dealer_total": 14,
+        "player_bust": true,
+        "bet": 5,
+        "delta": -5,
+        "money_after": 95,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_1",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 40,
+        "median_ms": 0.021,
+        "p95_ms": 0.057,
+        "max_ms": 0.118,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 40,
+        "median_ms": 2.83,
+        "p95_ms": 4.272,
+        "max_ms": 7.828,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 40,
+        "median_ms": 17.0,
+        "p95_ms": 17.0,
+        "max_ms": 18.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.02,
+        "max_ms": 0.02,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit"
+      ],
+      "result": {
+        "round": 1,
+        "outcome": "dealer",
+        "player_total": 22,
+        "dealer_total": 14,
+        "player_bust": true,
+        "bet": 5,
+        "delta": -5,
+        "money_after": 95,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_2",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 47,
+        "median_ms": 0.02,
+        "p95_ms": 0.034,
+        "max_ms": 0.142,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 47,
+        "median_ms": 3.765,
+        "p95_ms": 4.578,
+        "max_ms": 6.376,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 47,
+        "median_ms": 16.0,
+        "p95_ms": 17.0,
+        "max_ms": 17.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.013,
+        "max_ms": 0.013,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "stand"
+      ],
+      "result": {
+        "round": 2,
+        "outcome": "player",
+        "player_total": 18,
+        "dealer_total": 17,
+        "player_bust": false,
+        "bet": 5,
+        "delta": 5,
+        "money_after": 100,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_3",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 35,
+        "median_ms": 0.023,
+        "p95_ms": 0.069,
+        "max_ms": 0.115,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 35,
+        "median_ms": 5.184,
+        "p95_ms": 6.753,
+        "max_ms": 7.757,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 35,
+        "median_ms": 17.0,
+        "p95_ms": 17.0,
+        "max_ms": 17.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.015,
+        "max_ms": 0.015,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": [
+        0.0335000004270114,
+        0.025000001187436283
+      ],
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit",
+        "stand"
+      ],
+      "result": {
+        "round": 3,
+        "outcome": "push",
+        "player_total": 20,
+        "dealer_total": 20,
+        "player_bust": false,
+        "bet": 5,
+        "delta": 0,
+        "money_after": 100,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_4",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 31,
+        "median_ms": 0.022,
+        "p95_ms": 0.045,
+        "max_ms": 0.122,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 31,
+        "median_ms": 4.863,
+        "p95_ms": 6.794,
+        "max_ms": 7.683,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 31,
+        "median_ms": 17.0,
+        "p95_ms": 17.0,
+        "max_ms": 17.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.013,
+        "max_ms": 0.013,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit"
+      ],
+      "result": {
+        "round": 4,
+        "outcome": "dealer",
+        "player_total": 26,
+        "dealer_total": 12,
+        "player_bust": true,
+        "bet": 5,
+        "delta": -5,
+        "money_after": 95,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_5",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 41,
+        "median_ms": 0.018,
+        "p95_ms": 0.044,
+        "max_ms": 0.15,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 41,
+        "median_ms": 4.705,
+        "p95_ms": 7.105,
+        "max_ms": 7.683,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 41,
+        "median_ms": 16.0,
+        "p95_ms": 17.0,
+        "max_ms": 17.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.014,
+        "max_ms": 0.014,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "stand"
+      ],
+      "result": {
+        "round": 5,
+        "outcome": "player",
+        "player_total": 20,
+        "dealer_total": 24,
+        "player_bust": false,
+        "bet": 5,
+        "delta": 5,
+        "money_after": 100,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_6",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 27,
+        "median_ms": 0.019,
+        "p95_ms": 0.05,
+        "max_ms": 0.143,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 27,
+        "median_ms": 4.496,
+        "p95_ms": 5.662,
+        "max_ms": 6.549,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 27,
+        "median_ms": 17.0,
+        "p95_ms": 17.0,
+        "max_ms": 17.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.004,
+        "p95_ms": 0.025,
+        "max_ms": 0.025,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit",
+        "stand"
+      ],
+      "result": {
+        "round": 6,
+        "outcome": "player",
+        "player_total": 21,
+        "dealer_total": 24,
+        "player_bust": false,
+        "bet": 5,
+        "delta": 5,
+        "money_after": 105,
+        "reward": "shield",
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_7",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 1094,
+        "median_ms": 0.018,
+        "p95_ms": 0.034,
+        "max_ms": 0.277,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 1094,
+        "median_ms": 3.362,
+        "p95_ms": 5.462,
+        "max_ms": 8.013,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 1094,
+        "median_ms": 16.0,
+        "p95_ms": 17.0,
+        "max_ms": 18.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.017,
+        "max_ms": 0.017,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit",
+        "hit"
+      ],
+      "result": {
+        "round": 7,
+        "outcome": "dealer",
+        "player_total": 26,
+        "dealer_total": 14,
+        "player_bust": true,
+        "bet": 5,
+        "delta": -5,
+        "money_after": 100,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "async_round_8",
+      "requests": 1,
+      "llm_error": null,
+      "update": {
+        "samples": 42,
+        "median_ms": 0.019,
+        "p95_ms": 0.03,
+        "max_ms": 0.109,
+        "over_100ms": 0
+      },
+      "render": {
+        "samples": 42,
+        "median_ms": 5.432,
+        "p95_ms": 6.623,
+        "max_ms": 8.971,
+        "over_100ms": 0
+      },
+      "interval": {
+        "samples": 42,
+        "median_ms": 17.0,
+        "p95_ms": 17.0,
+        "max_ms": 18.0,
+        "over_100ms": 0
+      },
+      "animation_states": 4,
+      "controls": {
+        "samples": 5,
+        "median_ms": 0.002,
+        "p95_ms": 0.016,
+        "max_ms": 0.016,
+        "over_100ms": 0
+      },
+      "modal_open_close_ms": null,
+      "rules": [
+        "odd_even_chaos"
+      ],
+      "decisions": [
+        "hit"
+      ],
+      "result": {
+        "round": 8,
+        "outcome": "dealer",
+        "player_total": 24,
+        "dealer_total": 6,
+        "player_bust": true,
+        "bet": 5,
+        "delta": -5,
+        "money_after": 95,
+        "reward": null,
+        "doubled": false,
+        "dealer_blackjack": false
+      }
+    },
+    {
+      "name": "return_to_menu_in_flight",
+      "dialog_open_ms": 0.036699999327538535,
+      "exit_ms": 0.044,
+      "request_finished_at_exit": false,
+      "late_result_ignored": true,
+      "llm_error": null
+    },
+    {
+      "name": "window_quit_in_flight",
+      "dialog_open_ms": null,
+      "exit_ms": 0.007,
+      "request_finished_at_exit": false,
+      "late_result_ignored": true,
+      "llm_error": null
+    }
+  ],
+  "requests": [
+    {
+      "request": 1,
+      "scenario": "synchronous_control",
+      "main_thread": true,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 16.1786
+    },
+    {
+      "request": 2,
+      "scenario": "async_round_1",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.663
+    },
+    {
+      "request": 3,
+      "scenario": "async_round_2",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.7641
+    },
+    {
+      "request": 4,
+      "scenario": "async_round_3",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.6627
+    },
+    {
+      "request": 5,
+      "scenario": "async_round_4",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.521
+    },
+    {
+      "request": 6,
+      "scenario": "async_round_5",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.6779
+    },
+    {
+      "request": 7,
+      "scenario": "async_round_6",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.4474
+    },
+    {
+      "request": 8,
+      "scenario": "async_round_7",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 269,
+        "completion_tokens": 104,
+        "total_tokens": 373
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 18.0329
+    },
+    {
+      "request": 9,
+      "scenario": "async_round_8",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 269,
+        "completion_tokens": 104,
+        "total_tokens": 373
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.7008
+    },
+    {
+      "request": 10,
+      "scenario": "return_to_menu_in_flight",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.3869
+    },
+    {
+      "request": 11,
+      "scenario": "window_quit_in_flight",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 267,
+        "completion_tokens": 110,
+        "total_tokens": 377
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "odd_even_chaos"
+      },
+      "duration_s": 0.3773
+    }
+  ],
+  "passed": true,
+  "notice_callbacks_on_main_thread": true,
+  "rejected_chaos_actions": 0,
+  "finished_at": "2026-10-10T21:21:27.122895+08:00",
+  "request_count": 11,
+  "usage_totals": {
+    "prompt_tokens": 2941,
+    "completion_tokens": 1198,
+    "total_tokens": 4139
+  }
+}
