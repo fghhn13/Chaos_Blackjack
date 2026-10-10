@@ -35,6 +35,7 @@ class AssetManager:
     def __init__(self, asset_dirs: Iterable[Path], manifest: dict[str, AssetSpec] | None = None) -> None:
         self.asset_dirs = tuple(Path(d) for d in asset_dirs)
         self.manifest = MANIFEST if manifest is None else manifest
+        self.audio = None  # App binds its SoundManager; standalone widgets stay silent.
         self._files: dict[str, Path] = {}
         self._font_files: dict[str, Path] = {}  # role (or "any") -> file
         self._images: dict[tuple[str, tuple[int, int] | None], pygame.Surface] = {}

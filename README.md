@@ -78,6 +78,14 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene gallery
 
 The window scales a fixed 1280×720 canvas with letterboxing. Toggle **Chaos Mode** on the main menu.
 
+**Sound:** Kenney Casino Audio and Interface Sounds (CC0) provide sixteen GUI
+cues synchronized to card, chip, banner and glitch animations. Master volume
+defaults to 40%; **M** toggles mute, **+/-** changes it by 10 percentage points,
+and **F5** reloads sound files as well as images. Preferences last for the
+current process. Missing clips, mixer failure and SDL dummy audio are silent.
+[Sound interface and timing](assets/sounds/README.md) ·
+[Source credits](assets/CREDITS.md) · [Clip report](assets/sounds/REPORT.md).
+
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
 ### Text CLI

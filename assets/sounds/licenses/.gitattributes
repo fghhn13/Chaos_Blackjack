@@ -1,0 +1,2 @@
+# Keep the source packs' license bytes intact, including their line endings.
+*.txt -text -diff
