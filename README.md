@@ -78,6 +78,12 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene gallery
 
 The window scales a fixed 1280×720 canvas with letterboxing. Toggle **Chaos Mode** on the main menu.
 
+Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
+indicator appears while the table waits; gameplay controls stay disabled, and Esc,
+fullscreen and window events remain responsive. Returning to the menu discards the
+old table's result without waiting for an in-flight request. No additional art is
+needed for the procedural indicator.
+
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
 ### Text CLI

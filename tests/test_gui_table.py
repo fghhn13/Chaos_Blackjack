@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from threading import Event, current_thread
+from types import SimpleNamespace
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -12,12 +14,15 @@ import pytest
 pygame = pytest.importorskip("pygame")
 
 from chaos_blackjack.app.config import RunConfig  # noqa: E402
+from chaos_blackjack.ai.gptsapi_llm import GptsApiLLM  # noqa: E402
 from chaos_blackjack.app.controller import GameController  # noqa: E402
+from chaos_blackjack.app.notices import NoticeKind  # noqa: E402
 from chaos_blackjack.app.view import Action, TablePhase  # noqa: E402
 from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank  # noqa: E402
 from chaos_blackjack.gui.app import App  # noqa: E402
 from chaos_blackjack.gui.components.bet_panel import BetPanel  # noqa: E402
 from chaos_blackjack.gui.settings import GuiSettings  # noqa: E402
+from chaos_blackjack.gui.scenes.table import CHAOS_DELAY, CHAOS_ERROR, ACTION_Y, W  # noqa: E402
 
 
 def _c(r: str, s: str = "♠") -> Card:
@@ -113,7 +118,198 @@ def test_chaos_resolves_after_delay(app: App) -> None:
         _tick(app, 0.01)
         assert t.view.phase == TablePhase.CHAOS
         _tick(app, 1.0)
+        t._chaos_future.result(timeout=3)
+        _tick(app, 0.01)
     assert t.view.phase != TablePhase.CHAOS
+
+
+class _SlowLLM:
+    def __init__(self, response='{"action":"noop","narration":"Your move."}', *, fail=False):
+        self.started = Event()
+        self.release = Event()
+        self.response = response
+        self.fail = fail
+        self.calls = 0
+        self.thread = None
+
+    def complete(self, system_prompt, user_prompt):
+        self.calls += 1
+        self.thread = current_thread()
+        self.started.set()
+        if not self.release.wait(timeout=3):
+            raise TimeoutError("Test did not release the simulated LLM")
+        if self.fail:
+            raise RuntimeError("Simulated backend failure")
+        return self.response
+
+
+@pytest.fixture()
+def slow_llm():
+    llm = _SlowLLM()
+    yield llm
+    llm.release.set()
+
+
+def _start_chaos(app, monkeypatch, llm, *, natural=False, backend=None):
+    player = [_c("A"), _c("K")] if natural else [_c("10"), _c("8")]
+    t = _open_table(app, enable_chaos=True,
+                    deal=(player, [_c("10"), _c("7")], []))
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", backend or llm)
+    monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
+    t._deal(10)
+    _tick(app, CHAOS_DELAY)
+    assert llm.started.wait(timeout=1)
+    assert t._chaos_future is not None and not t._chaos_future.done()
+    return t
+
+
+def test_slow_chaos_keeps_rendering_and_completes_on_main_thread(app, monkeypatch, slow_llm):
+    slow_llm.response = ('{"action":"apply_rule","rule_id":"modify_card_value",'
+                         '"params":{"delta":-1},"narration":"Your move."}')
+    t = _start_chaos(app, monkeypatch, slow_llm)
+    cached = t.view
+    main_thread = current_thread()
+    delivered = []
+    t.subscribe("*", lambda n: delivered.append((n.kind, current_thread())))
+    view, drain = t.controller.view, t.controller.drain_notices
+
+    def checked_read(method):
+        def read():
+            assert slow_llm.release.is_set(), "Controller read while worker owns it"
+            assert current_thread() is main_thread
+            return method()
+        return read
+
+    monkeypatch.setattr(t.controller, "view", checked_read(view))
+    monkeypatch.setattr(t.controller, "drain_notices", checked_read(drain))
+    before = pygame.image.tostring(app.canvas.subsurface((W // 2 - 30, ACTION_Y + 34, 60, 16)), "RGB")
+    _tick(app, 0.25)
+    after = pygame.image.tostring(app.canvas.subsurface((W // 2 - 30, ACTION_Y + 34, 60, 16)), "RGB")
+    assert before != after  # the placeholder dots animate while the call is blocked
+    _tick(app, 0.25, times=3)
+    for key in (pygame.K_h, pygame.K_s, pygame.K_d, pygame.K_r, pygame.K_RETURN):
+        _key(app, key)
+    t._command("hit")()
+    t._deal(10)
+    t._use_item("peek")
+    assert t.view is cached and t.view.dealer_total is None
+    assert all(not b.enabled for b in t.action_buttons.values())
+    assert not delivered and slow_llm.calls == 1
+    assert slow_llm.thread is not main_thread and slow_llm.thread.daemon
+
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view.phase == TablePhase.PLAYER_TURN
+    assert t.view.player_total == 16 and t.view.active_rules
+    assert t.view.dealer_total is None
+    assert t.action_buttons[Action.HIT].enabled
+    assert NoticeKind.CHAOS_NARRATION in [kind for kind, _ in delivered]
+    assert all(thread is main_thread for _, thread in delivered)
+    _key(app, pygame.K_s)
+    _tick(app, 1.0)
+    assert t.view.phase == TablePhase.ROUND_OVER
+
+
+def test_chaos_worker_failure_is_shown_once_without_retry(app, monkeypatch, slow_llm):
+    slow_llm.fail = True
+    t = _start_chaos(app, monkeypatch, slow_llm)
+    slow_llm.release.set()
+    with pytest.raises(RuntimeError, match="Simulated backend failure"):
+        t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    _tick(app, 1.0, times=4)
+    assert t._chaos_future is None and t._chaos_failed
+    assert slow_llm.calls == 1
+    assert sum(line.text == CHAOS_ERROR for line in t.feed.lines) == 1
+    _key(app, pygame.K_ESCAPE)
+    _key(app, pygame.K_RETURN)
+    assert type(app.scenes.top).__name__ == "MainMenuScene"
+
+
+def test_llm_network_failure_preserves_noop_fallback(app, monkeypatch, slow_llm):
+    def chat(*args):
+        slow_llm.complete("", "")
+        raise RuntimeError("Network error: timed out")
+
+    backend = GptsApiLLM(SimpleNamespace(chat=chat))
+    t = _start_chaos(app, monkeypatch, slow_llm, backend=backend)
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert backend.last_error == "Network error: timed out"
+    assert t.view.phase == TablePhase.PLAYER_TURN
+    assert not t._chaos_failed and not t.view.active_rules
+    assert t.action_buttons[Action.HIT].enabled
+    assert slow_llm.calls == 1
+
+
+def test_chaos_completion_waits_for_modal_to_close(app, monkeypatch, slow_llm):
+    t = _start_chaos(app, monkeypatch, slow_llm)
+    cached = t.view
+    _key(app, pygame.K_ESCAPE)
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view is cached
+    _key(app, pygame.K_ESCAPE)
+    _tick(app, 0.01)
+    assert t.view.phase == TablePhase.PLAYER_TURN
+    assert t.action_buttons[Action.HIT].enabled
+
+
+def test_window_quit_does_not_wait_for_chaos(app, monkeypatch, slow_llm):
+    t = _start_chaos(app, monkeypatch, slow_llm)
+    result = t._chaos_future
+    app.running = True
+    app._dispatch(pygame.event.Event(pygame.QUIT))
+    assert not app.running and not result.done()
+    slow_llm.release.set()
+    result.result(timeout=3)
+
+
+def test_exit_during_chaos_ignores_late_result_and_new_table_still_works(app, monkeypatch, slow_llm):
+    old = _start_chaos(app, monkeypatch, slow_llm)
+    result = old._chaos_future
+    cached = old.view
+    delivered = []
+    old.subscribe("*", delivered.append)
+    _key(app, pygame.K_ESCAPE)
+    _key(app, pygame.K_RETURN)
+    assert type(app.scenes.top).__name__ == "MainMenuScene"
+    assert old._closed and old._chaos_future is None
+    new = _open_table(app)
+    slow_llm.release.set()
+    result.result(timeout=3)
+    old.update(1.0)
+    old._command("stand")()
+    _tick(app, 0.01)
+    assert old.view is cached and not delivered
+    assert new.view.phase == TablePhase.BETTING
+    assert not new.feed.lines
+    _key(app, pygame.K_RETURN)
+    assert new.view.phase == TablePhase.PLAYER_TURN
+
+
+def test_chaos_natural_settles_and_next_round_starts_another_worker(app, monkeypatch, slow_llm):
+    t = _start_chaos(app, monkeypatch, slow_llm, natural=True)
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view.phase == TablePhase.ROUND_OVER
+    assert t.view.last_result.outcome == "blackjack"
+    _key(app, pygame.K_RETURN)
+    assert t.view.phase == TablePhase.BETTING
+    slow_llm.release.clear()
+    slow_llm.started.clear()
+    t._deal(10)
+    _tick(app, CHAOS_DELAY)
+    assert slow_llm.started.wait(timeout=1)
+    assert slow_llm.calls == 2
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view.phase == TablePhase.ROUND_OVER
 
 
 def test_run_end_opens_ending(app: App) -> None:
