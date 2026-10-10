@@ -4,6 +4,8 @@
 
 *Blackjack where a sandboxed Chaos AI bends the rules — playable in a Pygame GUI, a text CLI, or by LLM agents through the shell.*
 
+📖 **How to play**: [玩家指南（中文）](docs/PLAYER_GUIDE.zh-CN.md) · [Agent player guide (English)](docs/AGENT_GUIDE.md) · [AGENTS.md quick reference](AGENTS.md)
+
 ---
 
 ## Overview
@@ -98,7 +100,7 @@ python -m chaos_blackjack.agent --brief bet 20
 python -m chaos_blackjack.agent --brief act double     # hit | stand | double | surrender | use_item <id>
 ```
 
-A streaming JSON-lines mode (`play`) and a Python API (`AgentSession`) are also available. Full protocol: **[AGENTS.md](AGENTS.md)**.
+A streaming JSON-lines mode (`play`) and a Python API (`AgentSession`) are also available. Quick reference: **[AGENTS.md](AGENTS.md)**; full guide with rule/item catalogs, transcripts and strategy: **[docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md)**.
 
 ---
 
@@ -182,7 +184,8 @@ Black_jack/
 ├── scripts/                  # debug_smoke.py, debug_llm.py
 ├── tests/
 ├── .github/workflows/ci.yml
-├── AGENTS.md                 # agent-player protocol + repo notes
+├── docs/                     # PLAYER_GUIDE.zh-CN.md (players), AGENT_GUIDE.md (agents)
+├── AGENTS.md                 # agent-player quick reference + repo notes
 ├── UX_design.md              # text CLI UX spec
 ├── pyproject.toml  environment.yml  .env.example
 └── README.md

@@ -5,6 +5,9 @@ file tells an agent how to **play the game through the command line** (no GUI,
 no screenshots) and how to work in the repo safely. Python 3.10+, no extra
 packages needed to play.
 
+**Full guide** (turn lifecycle, every observation field, chaos rule and item
+catalog, worked transcripts, strategy, reporting): [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md).
+
 ## Play as an agent
 
 Each command is one shell call. The run is saved to a state file between calls
@@ -121,7 +124,7 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 
 ## Working in the repo
 
-- Repository content is English (UI strings, comments, docs, commits).
+- Repository content is English (UI strings, comments, docs, commits), except the intentionally Chinese player guide `docs/PLAYER_GUIDE.zh-CN.md`. Keep both guides in sync when rules change.
 - Run tests with `python -m pytest`. Tests force `CHAOS_USE_LLM=0`; never make billed API calls in tests or CI.
 - Credentials live only in the git-ignored `.env` (names in `.env.example`). Never print, commit or copy a real key. `python scripts/debug_llm.py models` checks the relay without billing a completion.
 - Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController`, `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.
