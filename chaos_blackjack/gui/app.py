@@ -4,7 +4,7 @@ Scenes draw on a fixed 1280x720 canvas (`settings.LOGICAL_SIZE`). The App
 scales it into the real window with letterboxing and converts mouse
 positions back, so scenes only ever see canvas coordinates.
 
-Global keys: F11 fullscreen, F5 rescan asset folders.
+Global keys: F11 fullscreen, F5 rescan assets, M mute, +/- master volume.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from chaos_blackjack.gui.assets import AssetManager
 from chaos_blackjack.gui.scene import SceneManager
 from chaos_blackjack.gui.settings import LOGICAL_SIZE, GuiSettings
 from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.audio import AudioManager
+from chaos_blackjack.audio.pygame_backend import PygameAudioBackend
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
 
@@ -40,6 +42,8 @@ class App:
         self.canvas = pygame.Surface(LOGICAL_SIZE).convert()
         self.clock = pygame.time.Clock()
         self.assets = AssetManager(self.settings.asset_dirs)
+        self.audio = AudioManager(PygameAudioBackend(), volume=self.settings.master_volume,
+                                  muted=self.settings.audio_muted)
         self.prefs = Preferences(enable_chaos=self.run_config.enable_chaos)
         self.scenes = SceneManager(self)
         self.running = False
@@ -55,17 +59,21 @@ class App:
         self.scenes.apply_pending()
         self.running = True
         frames = 0
-        while self.running and self.scenes.top is not None:
-            dt = self.clock.tick(self.settings.fps) / 1000.0
-            for event in pygame.event.get():
-                self._dispatch(event)
-            self.scenes.update(dt)
-            self.scenes.apply_pending()
-            self._render()
-            frames += 1
-            if max_frames is not None and frames >= max_frames:
-                break
-        pygame.quit()
+        try:
+            while self.running and self.scenes.top is not None:
+                dt = self.clock.tick(self.settings.fps) / 1000.0
+                for event in pygame.event.get():
+                    self._dispatch(event)
+                self.scenes.update(dt)
+                self.scenes.apply_pending()
+                self.audio.update(dt)
+                self._render()
+                frames += 1
+                if max_frames is not None and frames >= max_frames:
+                    break
+        finally:
+            self.audio.close()
+            pygame.quit()
 
     def quit(self) -> None:
         self.running = False
@@ -85,9 +93,21 @@ class App:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             self.assets.refresh()
             return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+            self.audio.toggle_mute()
+            return
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.adjust_volume(-0.1)
+            return
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+            self.adjust_volume(0.1)
+            return
         if event.type in _MOUSE_EVENTS:
             event = pygame.event.Event(event.type, {**event.dict, "pos": self.to_canvas(event.pos)})
         self.scenes.handle_event(event)
+
+    def adjust_volume(self, delta: float) -> None:
+        self.audio.set_volume(round(min(1.0, max(0.0, self.audio.volume + delta)), 2))
 
     def to_canvas(self, pos: tuple[int, int]) -> tuple[int, int]:
         vp = self._viewport
