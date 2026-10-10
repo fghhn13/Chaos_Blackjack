@@ -253,3 +253,15 @@ def test_data_cli_players(tmp_path, monkeypatch, capsys) -> None:
     assert data_cli(["history", "1"]) == 1
     out = capsys.readouterr()
     assert "Cli: 40 tokens" in out.out and "slot 1: (empty)" in out.out and "Slot 1 is empty" in out.err
+
+
+def test_pure_helpers_match_the_service(svc) -> None:
+    b = default_balance()
+    cfg, applied = meta.build_run_config(b, get_mode("chaos"), {"start_money": 1, "start_peek": 2}, ["start_peek"],
+                                         seed=9)
+    assert cfg.enable_chaos and cfg.start_money == RunConfig().start_money + 10 and cfg.starting_items == ("peek",)
+    assert applied == {"start_money": 1, "start_peek": 1}
+    with pytest.raises(MetaError):
+        meta.build_run_config(b, get_mode("normal"), {}, ["start_peek"])
+    assert meta.reward_tokens(b, "victory", 3, 100, 400) == [("Victory", b.meta_win_tokens)]
+    assert meta.reward_tokens(b, "defeat", 10, 100, 100) == meta.consolation_tokens(b, 10, 100, 100)
