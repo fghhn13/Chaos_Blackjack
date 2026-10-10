@@ -65,19 +65,38 @@ elsewhere).
 
 | Table | Holds |
 | ----- | ----- |
-| `setting` | bankroll and target, payout ratio, dealer stand total, double / surrender, bet range (`bet.min`, `bet.max_fraction`), shop slots and restock interval |
+| `setting` | bankroll and target, payout ratio, dealer stand total, double / surrender, bet range (`bet.min`, `bet.max_fraction`), shop slots/restocking, portrait guidance probability and memory controls |
 | `shop_item` | price, on sale or not, item tuning (`params`, e.g. Fate Oracle `{"cards": 3}`) |
 | `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
 
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
   whenever that file changes; change shipped values there.
-- To experiment, copy it into a new profile and edit that one, e.g. with
-  DB Browser for SQLite or `clone_profile()` from `chaos_blackjack.data`; values
-  are validated (type, min / max, no unknown keys) when a run starts.
+- To experiment, copy it into a new profile and edit that one. Every edit is
+  validated (type, min / max, JSON params, no unknown keys) and rolled back if
+  invalid; DB Browser for SQLite works too (checked when a run starts):
+
+  ```bash
+  python -m chaos_blackjack.data clone default tune-a
+  python -m chaos_blackjack.data set tune-a item.peek.price 6
+  python -m chaos_blackjack.data set tune-a rule.great_crash.params '{"ten_value": 5}'
+  python -m chaos_blackjack.data diff default tune-a
+  python -m chaos_blackjack.data export tune-a -o chaos_blackjack/data/seed/default.sql   # ship it
+  ```
+
+  Keys: settings (`run.start_money`, `bet.max_fraction`, ...), `item.<id>.<field>`
+  and `rule.<id>.<field>`; `python -m chaos_blackjack.data --help` lists them.
+  Compare profiles in the balance simulator with `python -m bjsim --profile tune-a ...`.
 - Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
   A run keeps the numbers it started with.
 - Schema changes go in new `chaos_blackjack/data/migrations/NNNN_*.sql` files.
+
+Portrait settings also come from the profile: `chaos.guidance_probability` (float
+0..1, default 0.5), `chaos.memory_enabled` (bool, default false), and
+`chaos.memory_limit` (integer >=1, default 32). For example, enable memory on an
+editable profile with `python -m chaos_blackjack.data set tune-a chaos.memory_enabled 1`.
+An upgrade fills these three settings into existing profiles while preserving
+their other tuning. Saves keep every configuration field and enabled memory.
 
 The same database keeps **saves** (`run_save`: the run's JSON, including the
 numbers it was played with, so a save restores them even after its profile
@@ -119,7 +138,7 @@ or reviewing a round result to ask for a suggestion. The portrait also works whi
 the shop is open. A modal banner animates while the reply is generated and blocks
 repeated clicks and gameplay; click **Continue** or press Enter after the reply.
 While waiting, Esc opens the return-to-menu confirmation. Each interaction chooses
-guidance or misdirection with **50% probability each**, without revealing which.
+guidance or misdirection with **50% probability each by default**, without revealing which.
 These are intent probabilities, not a guarantee of the model's advice accuracy.
 The offline backend gives local suggestions; with a real LLM each poke makes one
 billed completion, with no repair or automatic retry.
@@ -129,6 +148,8 @@ effective totals and rules, bankroll, inventory, and shop stock/prices/restockin
 Replies only provide text; they cannot buy items, play cards, or change rules.
 The reply parser accepts the requested `{"reply": "..."}` object or plain prose
 from a backend, without an extra repair request; gameplay-action JSON is rejected.
+The context uses the selected profile's bet limits and shop affordability, filters
+disabled rule choices, and supplies fixed rule/item tuning and rule descriptions.
 Public player observations continue to hide private cards. Run-local memory is
 implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
 no history is collected, included in prompts, or written to saves. A future opt-in

@@ -51,6 +51,7 @@ class ChaosPipeline:
     # params) and rules switched off for this run.
     rule_params: dict[str, dict[str, Any]] = field(default_factory=dict)
     disabled_rules: frozenset[str] = frozenset()
+    item_params: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.registry is None:
@@ -210,6 +211,7 @@ class ChaosPipeline:
                 state=obs.state,
                 emit_event=lambda e: emit(e),
                 peek_next_card_rank=peek_next_card_rank,
+                params=self.item_params.get(iid),
             )
             inst = cls()
             result = inst.use(ctx)

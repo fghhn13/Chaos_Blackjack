@@ -250,3 +250,18 @@ def test_model_rule_choices_and_descriptions_follow_profile_tuning(monkeypatch):
     assert c.loop.modifiers.items[0].bust_limit == 19
     active = json.loads(build_chaos_context(c))["chaos"]["rules"][0]
     assert active["params"] == {"bust_limit": 19} and "reduced to 19" in active["help"]
+
+
+def test_model_item_use_honors_tuning_advertised_in_context(monkeypatch):
+    c = controller(item_params={"fate_oracle": {"cards": 2}})
+    c.run.items = ("fate_oracle",)
+    rig(c, TablePhase.CHAOS)
+    c.state = c.state.with_deck(c.state.deck + (Card(Rank("3"), "♠"),))
+    llm = FakeLLM('{"action":"use_item","item_id":"fate_oracle"}')
+    c.loop.pipeline.llm = llm
+    monkeypatch.setattr(c.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
+    c.resolve_chaos()
+    used = next(n for n in c.drain_notices() if n.kind == NoticeKind.ITEM_USED)
+    assert len(used.data["peeked_ranks"]) == 2 and not c.state.inventory
+    context = json.loads(llm.calls[0][1].split("\n")[1])
+    assert context["item_params"] == {"fate_oracle": {"cards": 2}}

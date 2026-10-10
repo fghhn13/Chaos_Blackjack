@@ -136,6 +136,13 @@ A rejected command changes nothing (no step is counted). Read `error.legal_actio
 
 ## 6. Rules
 
+The numbers below describe the shipped `default` profile. Other profiles can
+change bet limits, payouts, shop prices and rule/item parameters. Trust
+`obs.bet_range`, each offer's `affordable` flag, effective totals and active-rule
+descriptions. For example, a 40-chip run with `bet.min=5` and
+`bet.max_fraction=0.25` allows bets from 5 to 10; a purchase must leave at least
+20 chips to support the next minimum bet.
+
 Economy
 
 - Start with 100, win at 400 (bankroll `>=` target), lose at 0 or when you cannot place a legal bet (you need at least 2 to bet 1).
@@ -172,8 +179,8 @@ The GUI also supports asking Chaos for advice by clicking its portrait at a
 player decision point (betting, player turn, or round result), including while
 the shop is open. A modal thinking banner blocks repeated clicks and gameplay;
 Continue/Enter dismisses a completed reply, and Esc while waiting offers a return
-to the menu. Each poke independently chooses guidance or misdirection with 50%
-probability each; the intent is hidden, and this does not guarantee advice accuracy.
+to the menu. By default, each poke independently chooses guidance or misdirection
+with 50% probability each; the intent is hidden, and this does not guarantee advice accuracy.
 Replies are text only and cannot execute gameplay actions. The real backend makes
 one billed request per poke without retries; the stub gives local suggestions.
 This interaction currently has no agent command.
@@ -184,6 +191,11 @@ restricted to table-visible information. Run-local memory is prepared but disabl
 by default: no collected history, prompt history, or memory save field. Explicit
 Python configuration can opt into a bounded history via
 `RunConfig(chaos_memory_enabled=True, chaos_memory_limit=32)`.
+Profiles provide the same controls through `chaos.guidance_probability`,
+`chaos.memory_enabled`, and `chaos.memory_limit`. Saves restore those controls
+with the rest of the run configuration. Model context uses profile-aware bet
+limits and affordable offers, excludes disabled rule choices, and includes
+fixed rule parameters and descriptions of their tuned effects.
 
 With `--chaos`, after every deal the Chaos AI gets **one** chance to act, before the naturals check and before your first decision. It can:
 
@@ -191,7 +203,7 @@ With `--chaos`, after every deal the Chaos AI gets **one** chance to act, before
 - **use one of your items** (it is consumed — yes, it can burn your items), or
 - do nothing.
 
-At most one rule is active at a time; rules are cleared when the next round is dealt. Every action is checked against a permission profile; blocked actions show up as events and have no effect. With the offline stub the AI always applies "values −1"; with `--llm` a real model chooses (and may add a line of narration).
+At most one rule is active at a time; rules are cleared when the next round is dealt. Every action is checked against a permission profile; blocked actions show up as events and have no effect. The default profile's offline stub applies "values −1"; other profiles can change its rule weights and parameters. With `--llm` a real model chooses (and may add a line of narration).
 
 | Rule id | Effect | Implications |
 | ------- | ------ | ------------ |
