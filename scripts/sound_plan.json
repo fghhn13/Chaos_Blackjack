@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "selection_approved": "2026-10-10",
+  "packs": {
+    "casino": {
+      "folder": "kenney-casino-audio-1.1-sound-20261010",
+      "name": "Kenney Casino Audio 1.1",
+      "url": "https://kenney.nl/assets/casino-audio",
+      "license": "CC0-1.0"
+    },
+    "interface": {
+      "folder": "kenney-interface-sounds-1.0-sound-20261010",
+      "name": "Kenney Interface Sounds 1.0",
+      "url": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0-1.0"
+    }
+  },
+  "cues": {
+    "card_deal": {
+      "pack": "casino",
+      "files": [
+        "Audio/card-place-1.ogg",
+        "Audio/card-place-2.ogg",
+        "Audio/card-place-3.ogg"
+      ]
+    },
+    "card_flip": {
+      "pack": "casino",
+      "files": [
+        "Audio/card-fan-1.ogg"
+      ]
+    },
+    "chip_place": {
+      "pack": "casino",
+      "files": [
+        "Audio/chip-lay-1.ogg",
+        "Audio/chip-lay-2.ogg",
+        "Audio/chip-lay-3.ogg"
+      ]
+    },
+    "chip_stack": {
+      "pack": "casino",
+      "files": [
+        "Audio/chips-stack-1.ogg"
+      ]
+    },
+    "chips_win": {
+      "pack": "casino",
+      "files": [
+        "Audio/chips-stack-4.ogg"
+      ]
+    },
+    "chips_lose": {
+      "pack": "casino",
+      "files": [
+        "Audio/chips-handle-4.ogg"
+      ]
+    },
+    "round_win": {
+      "pack": "interface",
+      "files": [
+        "Audio/confirmation_002.ogg"
+      ]
+    },
+    "round_lose": {
+      "pack": "interface",
+      "files": [
+        "Audio/error_002.ogg"
+      ]
+    },
+    "blackjack": {
+      "pack": "interface",
+      "files": [
+        "Audio/confirmation_004.ogg"
+      ]
+    },
+    "bust": {
+      "pack": "interface",
+      "files": [
+        "Audio/error_004.ogg"
+      ]
+    },
+    "push": {
+      "pack": "interface",
+      "files": [
+        "Audio/tick_001.ogg"
+      ]
+    },
+    "chaos_glitch": {
+      "pack": "interface",
+      "files": [
+        "Audio/glitch_001.ogg",
+        "Audio/glitch_002.ogg",
+        "Audio/glitch_003.ogg"
+      ]
+    },
+    "item_use": {
+      "pack": "interface",
+      "files": [
+        "Audio/select_002.ogg"
+      ]
+    },
+    "button_click": {
+      "pack": "interface",
+      "files": [
+        "Audio/click_001.ogg",
+        "Audio/click_002.ogg",
+        "Audio/click_003.ogg"
+      ]
+    },
+    "ending_victory": {
+      "pack": "interface",
+      "files": [
+        "Audio/confirmation_003.ogg"
+      ]
+    },
+    "ending_bankrupt": {
+      "pack": "interface",
+      "files": [
+        "Audio/error_007.ogg"
+      ]
+    }
+  }
+}

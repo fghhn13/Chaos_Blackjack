@@ -70,7 +70,9 @@ class Tween:
     # until they finish; they never block player input.
     blocking: bool = True
     tag: str = ""
+    on_start: Callable[[], None] | None = None
     elapsed: float = field(default=0.0, init=False)
+    _start_called: bool = field(default=False, init=False, repr=False)
 
     @property
     def started(self) -> bool:
@@ -102,11 +104,20 @@ class Animator:
 
     def add(self, tween: Tween) -> Tween:
         self.tweens.append(tween)
+        self._start(tween)
         return tween
+
+    @staticmethod
+    def _start(tween: Tween) -> None:
+        if tween.started and not tween._start_called:
+            tween._start_called = True
+            if tween.on_start is not None:
+                tween.on_start()
 
     def update(self, dt: float) -> None:
         for t in list(self.tweens):
             t.elapsed += dt
+            self._start(t)
             if t.done:
                 self.tweens.remove(t)
                 if t.on_done is not None:

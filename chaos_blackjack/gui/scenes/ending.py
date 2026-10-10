@@ -19,6 +19,7 @@ class EndingScene(Scene):
         self.kind = kind
         self.money = money
         self.rounds = rounds
+        self.app.audio.play("ending_victory" if kind == "victory" else "ending_bankrupt")
         a = self.app.assets
         self.ui = WidgetGroup(
             Button(a, (W // 2 - 230, H - 150, 210, 58), "Play Again", lambda: self.app.scenes.reset("table"),

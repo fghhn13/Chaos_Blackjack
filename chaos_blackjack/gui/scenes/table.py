@@ -93,7 +93,8 @@ class TableScene(Scene):
         self._timer = 0.0
         self._ending_opened = False
         self.view: GameView = self.controller.view()
-        self.fx = TableFx(self.view, bankroll_anchor=(136, 24), dealer_anchor=(W // 2, DEALER_Y - 40))
+        self.fx = TableFx(self.view, bankroll_anchor=(136, 24), dealer_anchor=(W // 2, DEALER_Y - 40),
+                          audio=self.app.audio)
         self._handlers: dict[str, list[NoticeHandler]] = {}
         self.subscribe("*", self._feed_notice)
         self.subscribe("*", self.chaos_panel.react)

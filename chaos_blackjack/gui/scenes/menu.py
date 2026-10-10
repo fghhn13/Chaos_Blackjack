@@ -51,5 +51,7 @@ class MainMenuScene(Scene):
         portrait = a.image_fit(face, (420, 420))
         surface.blit(portrait, portrait.get_rect(center=(int(W * 0.74), int(H * 0.55))))
         self.ui.draw(surface)
-        hint = a.font(theme.FONT_SMALL).render("F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
+        state = "muted" if self.app.prefs.muted else f"{self.app.prefs.master_volume:.0%}"
+        hint = a.font(theme.FONT_SMALL).render(
+            f"Sound {state}   M mute   +/- volume   F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
         surface.blit(hint, hint.get_rect(bottomright=(W - 20, H - 14)))

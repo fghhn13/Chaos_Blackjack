@@ -19,6 +19,7 @@ Tools (all run from the repo root):
 | `scripts/validate_assets.py` | pygame | Size / alpha / naming / outline table |
 | `scripts/preview_assets.py` | pygame | Headless screenshots and check sheets |
 | `scripts/fetch_icons.py sheet` / `export` | pygame | Stand-in icons from game-icons.net (Iconify API, no key) and their CREDITS |
+| `scripts/export_sounds.py` | pygame | Copy approved CC0 / CC BY audio, report duration / size, optionally normalize existing clips |
 
 Install: `python -m pip install -e ".[art,dev]"`.
 
@@ -36,8 +37,9 @@ Install: `python -m pip install -e ".[art,dev]"`.
   Do not change game logic.
 - Repo content is English (code, comments, docs, commits, PR). Chat in the user's
   language.
-- Do not commit `black-jack-assets/` or `output/`. Only final PNGs in `assets/` plus
-  any tooling changes go into the game repo.
+- Do not commit `black-jack-assets/` or `output/`. Only final PNGs and approved
+  sound clips in `assets/`, their licenses/credits, and tooling changes go into
+  the game repo.
 
 ## Workflow
 
@@ -184,7 +186,54 @@ credits to ship, so commit `assets/CREDITS.md` with the icons. Requests are
 throttled; on HTTP 429 wait a minute (downloads are cached). Set
 `CHAOS_ART_REPO` when working from a worktree without `black-jack-assets/`.
 
-## Troubleshooting
+## Sound workflow
+
+Sound ids, variants and gains are defined in
+`chaos_blackjack/gui/assets/sound_manifest.py`. Final clips go in
+`assets/sounds/<id>.ogg` or `.wav`; variants use `<id>_1..3.ogg`. The SoundManager
+looks in `sounds/` subfolders under the same ordered directories as images.
+F5 refreshes both. Missing clips or unavailable/dummy audio are silent.
+
+Before downloading, show the filename, source URL, download size and license
+and wait for the user's confirmation. Use only CC0 or CC BY and preserve the
+license and attribution in `assets/CREDITS.md`. After download, list candidates
+per id and wait for approval before choosing. No generated or synthesized audio.
+Keep raw archives, extracted clips, licenses and provenance in a new folder
+under `black-jack-assets/source/sounds/`; never overwrite or delete originals.
+These download and selection confirmations are separate from permission to
+change implementation code.
+
+`scripts/sound_plan.json` contains the approved selection. From a worktree, set
+`CHAOS_ART_REPO` or provide `--source-root`:
+
+```bash
+python scripts/export_sounds.py --source-root "../Black_jack/black-jack-assets/source/sounds" --dry-run
+python scripts/export_sounds.py --source-root "../Black_jack/black-jack-assets/source/sounds"
+python scripts/export_sounds.py --verify
+```
+
+The script uses only pygame and the standard library. It never plays sound,
+copies original OGG/WAV by default, refuses existing outputs, and reports
+`id -> source file -> seconds -> bytes` plus missing ids. `--verify` needs only
+delivered clips and checks hashes and decoding without changing files.
+Optional `--normalize 0.8` converts an existing clip to peak-normalized WAV;
+write that candidate to a new `--out` directory first. Keep clips below 200 KiB
+when possible. No normalization was applied to the current Kenney delivery.
+Commit final clips, their licenses, provenance manifest, report, credits and
+tooling; keep the raw art repository out of the game commit.
+
+Audio is a GUI presentation service. Card sounds belong at Tween start / flip
+midpoint in `TableFx`, settlement sounds belong at chip motion / banner start,
+and glitch sounds belong at glitch start. Preserve durations, delays and input
+behavior. Button.click owns the shared UI click cue (`sound=False` opts out).
+Master volume defaults to 40%; mute and volume are in-memory App preferences.
+Use fake audio to test timing; keep SDL dummy silent and tests free of billed
+model calls. For this stacked task, push `feat/sound` and target
+`feat/animations` in its PR, as explicitly requested by the user.
+
+See `assets/sounds/README.md` for the public interface and all sixteen cue ids.
+
+## Art troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
