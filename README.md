@@ -15,6 +15,10 @@
 - **Three front-ends** on one UI-agnostic `GameController`: a Pygame GUI, the original text CLI, and a JSON command interface for agent players.
 - **Plugins**: chaos rules (`rules/plugins/`) and items (`items/`) self-register; prompts (`ai/prompts/*.txt`) and permission profiles (`ai/permissions/*.json`) are data files.
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
+- **Player progression**: three named slots, Classic/Chaos modes, token rewards, permanent upgrades, starting consumables, checkpoints and run history.
+- **Codex**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
+- **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
+- **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
 
 ---
 
@@ -23,6 +27,15 @@
 ```bash
 pip install -e ".[gui]"            # Python 3.10+
 python -m chaos_blackjack.gui      # play in a window
+```
+
+Choose **Players** to create or continue a player, then start a run from the hub.
+**New Game** starts quick play without tokens or player progression. Offline
+Chaos mode is available without an API key:
+
+```bash
+python -m chaos_blackjack.gui --chaos
+python -m chaos_blackjack.gui --scene codex
 ```
 
 Other ways to play:
@@ -52,10 +65,13 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 - **Natural blackjack** (first two cards = 21) pays **3:2**, rounded down. A dealer natural wins before the player acts; two naturals push.
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
-- **Shop** (between rounds): spend bankroll on items. It shows 3 different items, each can be bought once, and it restocks every 2 rounds. A purchase must leave you enough to bet (at least 2). Prices are placeholders for now.
+- **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
 - **Chaos mode**: before each player turn the Chaos AI may apply one rule — e.g. card values −1, ties go to the dealer, bust above 18. Totals shown always include active rules.
 
-Natural blackjack, double down, surrender and the shop are implemented in `GameController` (GUI and agent interface); the text CLI still runs the original hit / stand loop with the old streak reward.
+These are the default profile's values; a balance profile, game mode or player
+upgrade can change them. Natural blackjack, double down, surrender and the shop
+are implemented in `GameController` (GUI and agent interface); the text CLI
+still runs the original hit / stand loop with the old streak reward.
 
 ### Balance profiles (SQLite)
 
@@ -68,6 +84,7 @@ elsewhere).
 | `setting` | bankroll and target, payout ratio, dealer stand total, double / surrender, bet range (`bet.min`, `bet.max_fraction`), shop slots/restocking, portrait guidance probability and memory controls |
 | `shop_item` | price, on sale or not, item tuning (`params`, e.g. Fate Oracle `{"cards": 3}`) |
 | `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
+| `meta_upgrade` | permanent and consumable upgrade effects, prices, cost increases, level limits and prerequisites |
 
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
@@ -104,6 +121,10 @@ changes) and **preferences** (`preference`, e.g. the GUI's Chaos Mode switch).
 Saves from older versions (JSON files in `chaos_blackjack/saves/`) are imported
 once with `python -m chaos_blackjack.data import-saves`; `python -m
 chaos_blackjack.data saves` lists what is stored.
+
+Player slots, owned upgrades, completed/abandoned runs and encountered codex
+entries live in `player`, `player_upgrade`, `run_history` and `codex_seen`.
+The profile's `meta.*` settings determine victory and consolation rewards.
 
 **Meta progression** (player slots, tokens, upgrades, run history) also lives
 there; see [docs/design/META_PROGRESSION.md](docs/design/META_PROGRESSION.md).
@@ -158,8 +179,10 @@ The context uses the selected profile's bet limits and shop affordability, filte
 disabled rule choices, and supplies fixed rule/item tuning and rule descriptions.
 Public player observations continue to hide private cards. Run-local memory is
 implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
-no history is collected, included in prompts, or written to saves. A future opt-in
-can retain at most `chaos_memory_limit` events (default 32) across save/load.
+no history is collected, included in prompts, or written to saves. Enable it
+through `chaos.memory_enabled` on an editable balance profile to retain at most
+`chaos_memory_limit` events (default 32) across save/load. This is memory for
+the current run; player progression is stored separately.
 **Sound:** Kenney Casino Audio and Interface Sounds (CC0) provide sixteen GUI
 cues synchronized to card, chip, banner and glitch animations. Master volume
 defaults to 40%; **M** toggles mute, **+/-** changes it by 10 percentage points,
@@ -169,6 +192,38 @@ current process. Missing clips, mixer failure and SDL dummy audio are silent.
 [Source credits](assets/CREDITS.md) · [Clip report](assets/sounds/REPORT.md).
 
 The standalone casino audio library and offline validator remain available: `python -m chaos_blackjack.audio validate`.
+
+#### Player progression and codex
+
+**Players** opens three named slots with create, continue, rename and confirmed
+delete actions. The hub selects **Classic** or **Chaos**, lets you bring one
+copy of each selected consumable, and opens the meta shop, history, codex and
+settings. Tokens persist between runs; bankroll belongs to the current run.
+
+The **meta shop** uses tokens for permanent starting-bankroll, shop-slot and
+discount upgrades, plus consumable starting items. The table's between-round
+shop uses bankroll. Victory earns the profile's win reward; defeat earns capped
+consolation based on rounds and peak bankroll. Abandoning earns no tokens and
+does not return consumed starting items. The result screen settles each run
+once and shows the token breakdown.
+
+Player runs checkpoint at safe table phases. Closing the window preserves the
+last checkpoint for **Continue saved run**; confirming a return to the hub
+abandons the run. Replacing an unfinished run also asks for confirmation.
+History shows outcomes, bankroll, tokens, applied upgrades and encounter counts.
+
+The **codex** is available from the hub or `--scene codex`. Its rule, item, mode
+and AI tabs show every entry. Detail pages use the selected profile's numbers;
+card demonstrations run on a real controller with fixed deals and an offline
+backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
+**Page Up/Page Down** scrolls descriptions. Selected content packs appear in
+the codex. Browsing and demonstrations never spend tokens or call a paid model.
+
+The agent CLI and quick play stay independent of player upgrades. Development
+tools include `python -m chaos_blackjack.data players`, `history SLOT` and
+`grant SLOT TOKENS`. See [Player GUI guide](docs/META_GUI.md),
+[Meta API contract](docs/design/META_PROGRESSION.md) and
+[Codex API and replay guide](docs/design/CODEX.md).
 
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
@@ -207,6 +262,7 @@ cp .env.example .env
 python scripts/debug_llm.py models   # list model ids (no completion billed)
 python scripts/debug_llm.py smoke    # one billed request, max 16 output tokens
 python scripts/debug_llm.py chaos    # one billed request with the real Chaos AI prompt
+python -m chaos_blackjack.gui --chaos --llm  # billed Chaos turns and portrait interactions
 ```
 
 | Variable | Default | |
@@ -222,7 +278,7 @@ Notes:
 - Each chaos phase is one chat request (plus at most one repair request if the model returns invalid JSON). A failed request becomes a no-op; the game keeps going.
 - The client (`chaos_blackjack/ai/gptsapi_llm.py`, stdlib only) rejects redirects, keeps TLS verification, redacts the key from every error and never retries automatically.
 - The agent interface ignores `CHAOS_USE_LLM`; it uses the relay only with an explicit `new --llm`.
-- Calls currently run on the GUI thread, so the window pauses while the model answers.
+- GUI model calls run in a background thread with animated waiting banners; the window remains responsive.
 
 ---
 
@@ -253,6 +309,9 @@ Notes:
 | `events/` | `Event` / `EventDispatcher` |
 | `app/` | `GameController` state machine (betting → chaos → player turn → dealer → round over → run over), `GameView`, `Notice` stream, `RunConfig` |
 | `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader, saves, preferences |
+| `meta/`, `modes/` | Player slots, upgrade effects, rewards, tracked runs/history, selectable game modes |
+| `codex/` | Registered reference providers and deterministic controller demonstrations; no GUI dependency |
+| `content/`, `audio/` | Scoped content packs and the licensed casino sound catalog |
 | `meta/` | Meta progression: players, meta shop, upgrade effects, run tracking and rewards |
 | `modes/` | Game mode registry (`normal`, `chaos`) |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
@@ -272,11 +331,14 @@ Black_jack/
 │   ├── ai/                   # pipeline, prompts/, permissions/, gptsapi_llm.py
 │   ├── app/                  # GameController, views, notices, config
 │   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
+│   ├── meta/  modes/          # players, upgrades, run tracking, rewards and mode registry
+│   ├── codex/                 # providers, live descriptions and controller demos
+│   ├── content/  audio/       # content packs and casino sound catalog
 │   ├── agent/                # agent-player interface
 │   ├── gui/                  # Pygame client (assets/, components/, scenes/)
 │   ├── ui/                   # text CLI session
 ├── assets/                   # drop final art here (see assets/README.md)
-├── data/game.db              # local database: profiles, saves, prefs (git-ignored)
+├── data/game.db              # profiles, players, saves, history and prefs (git-ignored)
 ├── cli/main.py
 ├── scripts/                  # debug_smoke.py, debug_llm.py
 ├── tests/
@@ -293,14 +355,33 @@ Black_jack/
 ## Development
 
 ```bash
-pip install -e ".[dev,gui]"
+pip install -e ".[dev,gui,art]"
 python -m pytest                   # GUI tests run headless (SDL dummy driver)
 python scripts/debug_smoke.py      # registry + stub pipeline, no API key
+python scripts/ci_smoke.py --gui   # integrated meta, codex, resources and headless GUI
+python -m chaos_blackjack.content validate example
+python -m chaos_blackjack.audio validate
+python scripts/export_sounds.py --verify
 ```
 
-Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed requests.
+Tests force `CHAOS_USE_LLM=0` and `CHAOS_DB=:memory:` and use fake transports or
+temporary databases, so they never make billed requests or touch player saves.
 
-**CI** (`.github/workflows/ci.yml`) runs on every push and on pull requests to `main`: pytest on Ubuntu (Python 3.10, 3.12) and Windows (3.12), plus offline smoke runs of the CLI demo, `debug_smoke.py` and the agent CLI. CI never calls the LLM relay and needs no secrets.
+**CI** ([workflow](.github/workflows/ci.yml)) runs on every push, pull requests
+to `main` and manual dispatch: the full suite on Ubuntu (Python 3.10, 3.12) and
+Windows (3.12), application/GUI and CLI smoke checks, content-pack validation
+and sound verification. A separate job builds the source distribution and wheel,
+installs the wheel, then checks its migrations, seeded values, prompts, sounds,
+meta lifecycle and real hub-to-codex navigation from outside the checkout.
+Distribution files are uploaded as a workflow artifact. All runtime checks
+disable billed calls and need no API secrets.
+
+The optional [balance simulator](black-jack-sim/README.md) is a separate,
+git-ignored repository. In its directory, run `python -m bjsim check --jobs 4`
+with `PYTHONPATH` and `CHAOS_BLACKJACK_ROOT` set to the game checkout under test.
+Its `upgrades` and `career` commands measure upgrade payback and token economy
+using the same `build_run_config` and `reward_tokens` helpers as player runs.
+The simulator is validated locally; it is not downloaded by the game CI.
 
 ---
 
@@ -341,19 +422,10 @@ Pack items are sold only when their plugin is loaded; win streaks grant no items
 
 ## Roadmap
 
-- GUI: item tray, Chaos AI panel and narration, save / load, LLM calls off the render thread.
-- Animations, sound and music; final art from the asset repo.
+- Background music and more final art from the asset repo.
 - Agent interface: scenario files (rigged decks), replay, benchmark runner with baseline policies, MCP server.
 - Split hands; move the text CLI onto `GameController`.
 
 ---
 
 Made with controlled chaos.
-
-## Player progression GUI
-
-Open **Players** from the menu to create or continue one of three named slots.
-The hub selects Classic/Chaos mode and consumables, and opens the token shop,
-history and settings. Player runs use the meta API for upgrades and rewards;
-Quick play remains available through **New Game** without player progression.
-See [GUI operation and agent handoff](docs/META_GUI.md).

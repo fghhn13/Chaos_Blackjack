@@ -16,6 +16,7 @@ permissions:
 env:
   # Never call the paid LLM relay from CI; GUI tests run headless.
   CHAOS_USE_LLM: "0"
+  CHAOS_DB: ":memory:"
   SDL_VIDEODRIVER: dummy
   SDL_AUDIODRIVER: dummy
   PYTHONUTF8: "1"
@@ -43,10 +44,19 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install
-        run: python -m pip install -e ".[dev,gui]"
+        run: python -m pip install -e ".[dev,gui,art]"
 
       - name: Tests
         run: python -m pytest
+
+      - name: Integrated application smoke (offline)
+        run: python scripts/ci_smoke.py --gui
+
+      - name: Content and sound assets
+        run: |
+          python -m chaos_blackjack.content validate example
+          python -m chaos_blackjack.audio validate
+          python scripts/export_sounds.py --verify
 
       - name: CLI smoke (offline)
         shell: bash
@@ -57,3 +67,29 @@ jobs:
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief bet 10
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief act stand
           CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data saves
+
+  package:
+    name: Installed wheel (offline runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build distribution
+        run: |
+          python -m pip install build
+          python -m build
+      - name: Install wheel with GUI support
+        run: python -m pip install dist/*.whl pygame
+      - name: Check installation outside the checkout
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/scripts/ci_smoke.py" --installed --gui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error

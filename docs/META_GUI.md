@@ -48,9 +48,9 @@ the ordinary ending. `meta_screen.py` supplies common drawing, name entry and a
 settings overlay; the five main screens retain their own modules.
 
 C's Codex handoff is `app.scenes.push("codex", player_id=..., config=...)`.
-The hub enables that button when the `codex` scene is registered. C's current
-`CodexScene.on_enter(config=None, **params)` accepts this handoff. Its branch is
-not merged as part of B's M3 implementation.
+The integrated build registers both codex scenes. `CodexScene.on_enter(config=None,
+**params)` accepts this handoff and opens the real gallery with the selected
+balance configuration. CI exercises the hub-to-codex-to-detail return path.
 
 Implementation changes are confined to the B-owned scenes, new components,
 `tests/test_gui_meta_*`, append-only scene imports and documentation. A's core
