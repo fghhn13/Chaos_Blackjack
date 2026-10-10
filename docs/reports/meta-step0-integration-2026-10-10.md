@@ -50,3 +50,9 @@ Validation:
 
 Local `main` can be fast-forwarded to this verified integration. No remote push,
 paid model call or change to another agent's uncommitted work is part of step 0.
+
+Follow-up after connecting the meta API: filter unloaded item ids inside
+`_roll_shop`, retaining the original immutable config. This preserves the config
+fingerprint recorded at run creation and carried by checkpoints. The stock input
+and all prices remain identical to the gate above. The full suite passed again:
+**326 passed in 14.79s**.

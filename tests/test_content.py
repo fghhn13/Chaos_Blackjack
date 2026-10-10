@@ -109,7 +109,9 @@ def test_pack_shop_uses_balance_prices_and_resume_keeps_them():
     assert restored.observe() == s.observe()
     assert restored.controller.run.money == 83
     assert restored.controller.run.items.count("example_trim") == 2
-    assert "example_trim" not in GameController().config.shop_prices
+    plain = GameController()
+    assert "example_trim" not in {offer.item for offer in plain.shop.offers}
+    assert plain.config == RunConfig()
 
 
 def test_generated_shop_install_is_profile_scoped(tmp_path):

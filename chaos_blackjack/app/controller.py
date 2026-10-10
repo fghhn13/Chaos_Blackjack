@@ -114,10 +114,6 @@ class GameController:
 
         content = load_content_packs(self.config.content_packs)
         self.registry = content.registry
-        self.config = replace(self.config, shop_prices={
-            item: price for item, price in self.config.shop_prices.items()
-            if self.registry.resolve_item(item) is not None
-        })
         if self.config.ai_id not in self.registry.ai_ids():
             raise ValueError(f"Unknown AI id: {self.config.ai_id}")
         for item_id in (*self.config.starting_items, *content.starting_items):
@@ -584,7 +580,9 @@ class GameController:
             pipeline.llm.choices = tuple(self.config.chaos_stub)
 
     def _roll_shop(self) -> ShopState:
-        return roll_stock(self.shop_seed, self.run.round, self.config.shop_prices, self.config.shop_slots)
+        prices = {item: price for item, price in self.config.shop_prices.items()
+                  if self.registry.resolve_item(item) is not None}
+        return roll_stock(self.shop_seed, self.run.round, prices, self.config.shop_slots)
 
     def _check_can_bet(self) -> None:
         if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):
