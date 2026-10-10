@@ -16,13 +16,49 @@ class Registry:
     def __init__(self) -> None:
         self._items: dict[str, type[ItemProtocol]] = {}
         self._chaos_rules: dict[str, ChaosRuleFactory | type[Any]] = {}
+        self._item_help: dict[str, str] = {}
+        self._ais: dict[str, Any] = {}
 
-    def register_item(self, name: str, cls: type[ItemProtocol]) -> None:
+    def register_item(self, name: str, cls: type[ItemProtocol], *, description: str = "") -> None:
+        if name in self._items:
+            raise ValueError(f"Duplicate item id: {name}")
         self._items[name] = cls
+        self._item_help[name] = description or str(getattr(cls, "description", ""))
 
     def register_rule(self, name: str, factory: ChaosRuleFactory | type[Any]) -> None:
         """Register either a ChaosRulePlugin class with from_params or a callable(params)->RuleModifier."""
+        if name in self._chaos_rules:
+            raise ValueError(f"Duplicate rule id: {name}")
         self._chaos_rules[name] = factory
+
+    def register_ai(self, name: str, profile: Any) -> None:
+        if name == "default" or name in self._ais:
+            raise ValueError(f"Duplicate or reserved AI id: {name}")
+        self._ais[name] = profile
+
+    def resolve_ai(self, name: str) -> Any | None:
+        return self._ais.get(name)
+
+    def describe_item(self, name: str) -> str:
+        return self._item_help.get(name, "")
+
+    def item_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(self._items))
+
+    def rule_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(self._chaos_rules))
+
+    def ai_ids(self) -> tuple[str, ...]:
+        return ("default", *sorted(self._ais))
+
+    def copy(self) -> Registry:
+        """Keep pack registrations local to one controller / validation run."""
+        registry = Registry()
+        registry._items = self._items.copy()
+        registry._chaos_rules = self._chaos_rules.copy()
+        registry._item_help = self._item_help.copy()
+        registry._ais = self._ais.copy()
+        return registry
 
     def resolve_item(self, name: str) -> type[ItemProtocol] | None:
         return self._items.get(name)

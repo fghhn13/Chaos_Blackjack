@@ -9,6 +9,7 @@ from chaos_blackjack.registry import register_item
 
 class Swap:
     name = "swap"
+    description = "Replace your first card with the top card of the deck."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         if not ctx.state.player_hand:

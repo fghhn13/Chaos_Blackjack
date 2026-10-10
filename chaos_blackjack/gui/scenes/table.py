@@ -12,6 +12,7 @@ Extending:
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 
 import pygame
 
@@ -55,7 +56,7 @@ class TableScene(Scene):
     def on_enter(self, controller: GameController | None = None, **params) -> None:
         a = self.app.assets
         self.controller = controller or GameController(
-            RunConfig(enable_chaos=self.app.prefs.enable_chaos)
+            replace(self.app.run_config, enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
         self.feed = EventFeed(a, (24, 330))
@@ -98,6 +99,12 @@ class TableScene(Scene):
 
     # ---------------------------------------------------------- commands
 
+    def _open_items(self) -> None:
+        self.app.scenes.push("items", controller=self.controller)
+
+    def on_resume(self, result=None) -> None:
+        self._after_command()
+
     def _command(self, method: str) -> Callable[[], None]:
         def run() -> None:
             try:
@@ -124,6 +131,10 @@ class TableScene(Scene):
     # ------------------------------------------------------------- frame
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_i
+                and self.view.can(Action.USE_ITEM) and self.view.items):
+            self._open_items()
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.push(
                 "confirm",

@@ -1,0 +1,16 @@
+{
+  "allowed_rules": [
+    "tiebreaker_shift"
+  ],
+  "allowed_items": [
+    "example_trim"
+  ],
+  "attempt_limits": {
+    "max_actions_per_turn": 1,
+    "max_active_effects": 1
+  },
+  "budget": {
+    "chaos_budget": 5,
+    "charge_per_effect": 1
+  }
+}

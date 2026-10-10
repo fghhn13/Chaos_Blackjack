@@ -55,24 +55,6 @@ class LlmUnavailable(RuntimeError):
     pass
 
 
-def _make_loop_factory(use_llm: bool):
-    """GameLoop with an explicit chaos backend: the offline stub unless the
-    caller opted into the real relay (never decided by .env alone)."""
-
-    def make(dispatcher):
-        from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
-        from chaos_blackjack.ai.pipeline import ChaosPipeline, StubLLM
-        from chaos_blackjack.core.game_loop import STUB_CHAOS_RESPONSE, GameLoop
-
-        backend = try_create_gptsapi_llm() if use_llm else StubLLM(response_json=STUB_CHAOS_RESPONSE)
-        if backend is None:
-            raise LlmUnavailable("Real LLM requested but GPTSAPI_API_KEY is not configured")
-        pipeline = ChaosPipeline.from_profile_name("easy", "chaotic", backend)
-        return GameLoop(dispatcher=dispatcher, pipeline=pipeline)
-
-    return make
-
-
 class AgentSession:
     def __init__(
         self,
@@ -106,8 +88,8 @@ class AgentSession:
         """`config` takes any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
-        cfg = RunConfig(enable_chaos=chaos, seed=seed, **config)
-        ctrl = GameController(cfg, loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n)
+        cfg = RunConfig(enable_chaos=chaos, seed=seed, use_llm=use_llm, **config)
+        ctrl = GameController(cfg, save_fn=lambda d, n: n)
         ctrl.drain_notices()
         return cls(ctrl, seed=seed, use_llm=use_llm, max_steps=max_steps)
 
@@ -217,6 +199,7 @@ class AgentSession:
             state=c.state if c.phase == TablePhase.PLAYER_TURN else None,
             loop=c.loop,
             enable_chaos=c.config.enable_chaos,
+            config=c.config,
         )
         hidden = {
             "save": save.to_dict(),
@@ -228,6 +211,9 @@ class AgentSession:
                 "blackjack_pays": list(c.config.blackjack_pays),
                 "allow_double": c.config.allow_double,
                 "allow_surrender": c.config.allow_surrender,
+                "content_packs": list(c.config.content_packs),
+                "ai_id": c.config.ai_id,
+                "starting_items": list(c.config.starting_items),
             },
         }
         return {
@@ -258,11 +244,15 @@ class AgentSession:
             blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
             allow_double=bool(cfg_extra.get("allow_double", True)),
             allow_surrender=bool(cfg_extra.get("allow_surrender", True)),
+            content_packs=tuple(cfg_extra.get("content_packs", ())),
+            ai_id=str(cfg_extra.get("ai_id", "default")),
+            starting_items=tuple(cfg_extra.get("starting_items", ())),
+            use_llm=bool(data.get("use_llm")),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(
             RunSaveData.from_dict(hidden["save"]), cfg,
-            loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n,
+            save_fn=lambda d, n: n,
         )
         ctrl.rng.setstate(_rng_from_json(hidden["rng"]))
         if data.get("run_end"):

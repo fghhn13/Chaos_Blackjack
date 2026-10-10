@@ -157,10 +157,10 @@ class GameLoop:
             peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
         )
         self.last_chaos_narration = effect.narration
-        s = state
+        s = effect.state_after if effect.state_after is not None else state
         if effect.modifier is not None:
             self.modifiers = self.modifiers.with_added(effect.modifier)
-        if effect.consume_item_id:
+        if effect.consume_item_id and effect.state_after is None:
             s = _remove_one_item(s, effect.consume_item_id)
 
         delta = policy.charge_for_effect(effect)

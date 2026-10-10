@@ -9,6 +9,7 @@ from chaos_blackjack.registry import register_item
 
 class Peek:
     name = "peek"
+    description = "Reveal the rank of the next card in the deck."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         rank = ctx.peek_next_card_rank()

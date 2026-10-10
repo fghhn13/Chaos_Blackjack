@@ -295,3 +295,14 @@ s2 = AgentSession.from_state(saved)                # continue later
 - Observations only contain what a player at the table could see. The run file keeps the deck order in a packed field — **do not decode or edit the run file**; use `observe`. Card-revealing items are part of the game and fine to use.
 - Do not modify the game code to play; if something seems wrong, report it (§12).
 - Without `--llm` nothing touches the network and nothing costs money. With `--llm`, every round costs one chat request (sometimes two). Never print or copy the API key.
+
+## 14. Local item and Chaos AI packs
+
+See the [content workflow](CONTENT_WORKFLOW.md) for creation and contract checks.
+Select a pack and AI with `new --pack example --ai example_dealer --chaos`.
+Selected packs add their configured starting items and streak rewards. Item help
+is supplied automatically, and subsequent one-shot commands restore the selection.
+Use `python -m chaos_blackjack.content play example --agent` for a quick stream.
+Pack AIs use their offline strategies unless `--llm` is explicitly supplied.
+Players and Chaos AI apply the same item effects; Swap now also changes the hand
+when used by Chaos AI. Shield remains a placeholder with no blocking effect.

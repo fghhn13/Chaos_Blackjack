@@ -21,6 +21,7 @@ so a GUI can animate between steps and a CLI can just loop.
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from collections.abc import Callable
 
 from chaos_blackjack.app.config import RunConfig
@@ -61,7 +62,6 @@ from chaos_blackjack.logic.run_end_policy import (
     RunEndPolicy,
     RunEndResult,
 )
-from chaos_blackjack.registry import get_registry
 from chaos_blackjack.ui.descriptions import describe_modifier
 
 
@@ -100,13 +100,33 @@ class GameController:
 
         auto_load_plugins()
         self.config = config or RunConfig()
+        from chaos_blackjack.content.loader import load_content_packs
+        from chaos_blackjack.content.ai_profile import build_pipeline
+
+        content = load_content_packs(self.config.content_packs)
+        self.registry = content.registry
+        self.config = replace(
+            self.config,
+            reward_pool=self.config.reward_pool + tuple(
+                item for item in content.reward_items if item not in self.config.reward_pool
+            ),
+        )
+        if self.config.ai_id not in self.registry.ai_ids():
+            raise ValueError(f"Unknown AI id: {self.config.ai_id}")
+        for item_id in (*self.config.starting_items, *content.starting_items, *self.config.reward_pool):
+            if self.registry.resolve_item(item_id) is None:
+                raise ValueError(f"Unknown configured item id: {item_id}")
         self._translator = EventTranslator()
         self._notices: list[Notice] = []
         self._dispatcher = EventDispatcher()
         self._dispatcher.set_default(self._on_core_event)
 
-        factory = loop_factory or (lambda d: GameLoop(dispatcher=d))
+        factory = loop_factory or (lambda d: GameLoop(
+            dispatcher=d,
+            pipeline=build_pipeline(self.config.ai_id, self.registry, use_llm=self.config.use_llm),
+        ))
         self.loop = factory(self._dispatcher)
+        self.loop.pipeline.registry = self.registry
         self.loop.initial_inventory = ()
         self.rng = random.Random(self.config.seed)
         self.run_end_policy = run_end_policy or default_run_end_policy()
@@ -120,7 +140,7 @@ class GameController:
             objective=self.config.objective,
             win_streak=0,
             current_bet=0,
-            items=(),
+            items=(*self.config.starting_items, *content.starting_items),
         )
         self.state: GameState | None = None
         self.phase = TablePhase.BETTING
@@ -139,16 +159,13 @@ class GameController:
         config: RunConfig | None = None,
         **kwargs,
     ) -> "GameController":
-        base = config or RunConfig()
-        cfg = RunConfig(
+        base = config or RunConfig.from_dict(data.run_config)
+        cfg = replace(
+            base,
             start_money=data.start_money,
             target_money=data.target_money,
             objective=data.objective,
-            reward_streak=base.reward_streak,
-            reward_pool=base.reward_pool,
-            dealer_stand_on=base.dealer_stand_on,
             enable_chaos=bool(base.enable_chaos or data.enable_chaos),
-            seed=base.seed,
         )
         c = cls(cfg, **kwargs)
         c.run.money = data.money
@@ -167,7 +184,7 @@ class GameController:
         c.state = snapshot_to_game_state(data.game_state)
         if data.active_modifiers:
             c.loop.modifiers = deserialize_active_modifiers(
-                data.active_modifiers, registry=get_registry()
+                data.active_modifiers, registry=c.registry
             )
         if c.state.phase == GamePhase.PLAYER_TURN:
             c._set_phase(TablePhase.PLAYER_TURN)
@@ -248,6 +265,8 @@ class GameController:
             result.message,
             {"item": item_id, "ok": result.ok},
         )
+        if result.ok:
+            self._settle_if_player_bust()
         return result
 
     def dealer_step(self) -> bool:
@@ -284,6 +303,7 @@ class GameController:
             state=self.state if self.phase == TablePhase.PLAYER_TURN else None,
             loop=self.loop,
             enable_chaos=self.config.enable_chaos,
+            config=self.config,
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})
@@ -330,7 +350,7 @@ class GameController:
             player_total=player_total,
             dealer_total=dealer_total,
             deck_count=len(st.deck) if st is not None else 0,
-            items=tuple(ItemView(i, n) for i, n in inventory_counts(inventory)),
+            items=tuple(ItemView(i, n, self.registry.describe_item(i)) for i, n in inventory_counts(inventory)),
             chaos_enabled=self.config.enable_chaos,
             chaos_budget=st.chaos_budget_remaining if st is not None else self.loop.chaos_budget_initial,
             # Modifiers are only cleared on the next deal; between rounds none apply.
