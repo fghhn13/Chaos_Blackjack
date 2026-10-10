@@ -17,6 +17,8 @@ Licence: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Fetched throu
 | reverse_bust | anticlockwise-rotation | delapouite | https://game-icons.net/1x1/delapouite/anticlockwise-rotation.html |
 | suit_power | spades | skoll | https://game-icons.net/1x1/skoll/spades.html |
 | tiebreaker_shift | scales | lorc | https://game-icons.net/1x1/lorc/scales.html |
+| mode_normal | card-ace-spades | aussiesim | https://game-icons.net/1x1/aussiesim/card-ace-spades.html |
+| mode_chaos | card-joker | delapouite | https://game-icons.net/1x1/delapouite/card-joker.html |
 
 ## Sound effects by Kenney
 

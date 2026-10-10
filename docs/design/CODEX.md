@@ -110,3 +110,52 @@ surrender, invalid scripts, deterministic snapshots, and a subprocess that
 forbids GUI imports while billed-model settings are enabled. Run the separate
 simulator's `python -m bjsim check` with `CHAOS_BLACKJACK_ROOT` pointing at
 this checkout to confirm that the existing balance bands stay unchanged.
+
+## Integrated content packs (step 0 / M4b)
+
+On the integrated base, providers load the packs selected by
+`RunConfig.content_packs` into the same scoped registry as the controller.
+Their items (including registered help text) and AI profiles appear without
+being added to a codex catalog or leaking into other configurations. The AI
+provider uses `Registry.ai_ids()` and `resolve_ai()` when available, retaining
+the default-only behavior on the earlier M4a base. Rule previews use the
+controller's scoped registry so content-pack rules can be demonstrated too.
+
+## GUI scenes (M4b)
+
+Open the gallery with `app.scenes.push("codex", config=config)`; `config` is
+optional and defaults to `app.run_config`. An optional `kind` selects the
+initial tab. Agent B's hub can use this entry point without importing the
+scene class. For development, launch `python -m chaos_blackjack.gui --scene
+codex`. The existing scene package imports register both `codex` and
+`codex_detail`.
+
+The gallery has tabs and an icon/name grid. Every entry is available;
+additional content paginates automatically. Click a tile to open its detail,
+press Tab to change tabs (Shift-Tab goes back), and use Left/Right or the
+mouse wheel to change pages. Back/Escape returns to the caller, retaining
+the gallery's selected category and page.
+
+The detail scene accepts `entry=CodexEntry` and the same optional config.
+It evaluates the detail and demo using that configuration, then retains only
+the resulting frames for playback. Existing `CardRenderer` and `TableFx`
+handle card movement, hole-card flips, rule glitches and bankroll animation;
+no controller action is executed during playback. Demos stop on their last
+frame. Space pauses/plays, R replays, Left/Right steps through snapshots.
+Seeking pauses and shows the selected frame immediately. The right-hand
+description wraps and scrolls with the wheel or Page Up/Page Down. Entries
+without a demo show their large icon and summary. A demo incompatible with
+the selected settings falls back to readable text and disables playback.
+
+Mode icon specs live in the manifest. The final transparent PNGs were fetched
+through `scripts/fetch_icons.py` and exported with `scripts/asset_tools.py`:
+`mode_normal.png` uses game-icons' `card-ace-spades`, and `mode_chaos.png`
+uses `card-joker`. Both are 256 by 256 RGBA and pass asset validation.
+Attribution is appended to `assets/CREDITS.md`. Procedural fallbacks remain
+available when art is not installed. No existing source art was changed.
+
+`tests/test_codex_gui.py` verifies gallery/detail navigation, paging, pause,
+single stepping, replay, the final-frame stop, live numbers in text and
+frames, scroll boundaries, icon fallbacks, text-only entries, content-pack
+isolation, and rendering of every built-in frame. The art pipeline's missing
+background/card/character files continue to use their existing placeholders.

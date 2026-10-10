@@ -128,7 +128,7 @@ def test_ai_details_use_run_tuning():
                     chaos_stub=(("great_crash", {}, 9.0),), disabled_rules=("fragile_bust",))
     detail = codex_entries("ai")[0].detail(cfg)
     assert "75%" in detail and "limit of 12 events" in detail
-    assert "great_crash (weight 9)" in detail and "fragile_bust" not in detail
+    assert "Great Crash (weight 9)" in detail and "Fragile Bust" not in detail
 
 
 def test_fractional_probabilities_and_bet_limits_are_not_rounded():

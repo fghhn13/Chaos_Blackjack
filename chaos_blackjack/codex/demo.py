@@ -138,7 +138,8 @@ def run_demo(script: DemoScript, config: RunConfig) -> list[DemoFrame]:
             else:
                 raise ValueError("apply_rule needs a rule id or {rule_id, params}")
             params = {**rule_params(rid, cfg), **proposed, **cfg.chaos_rule_params.get(rid, {})}
-            modifier = get_registry().build_chaos_rule(rid, params)
+            registry = getattr(controller, "registry", get_registry())
+            modifier = registry.build_chaos_rule(rid, params)
             if modifier is None:
                 raise ValueError(f"Unknown demo rule: {rid!r}")
             controller.loop.modifiers = controller.loop.modifiers.with_added(modifier)

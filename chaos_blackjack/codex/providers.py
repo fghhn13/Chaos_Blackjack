@@ -44,8 +44,18 @@ def _title(entry_id: str) -> str:
     return entry_id.replace("_", " ").title()
 
 
+def _registry(config: RunConfig):
+    auto_load_plugins()
+    packs = getattr(config, "content_packs", ())
+    if packs:
+        from chaos_blackjack.content.loader import load_content_packs
+
+        return load_content_packs(packs).registry
+    return get_registry()
+
+
 def _rule_detail(rule_id: str, config: RunConfig) -> str:
-    modifier = get_registry().build_chaos_rule(rule_id, rule_params(rule_id, config))
+    modifier = _registry(config).build_chaos_rule(rule_id, rule_params(rule_id, config))
     if modifier is None:
         raise ValueError(f"Rule is no longer registered: {rule_id!r}")
     text = describe_modifier(modifier)
@@ -62,7 +72,7 @@ def rule_entries(config: RunConfig) -> list[CodexEntry]:
     auto_load_plugins()
     # Registry has no public enumeration API on the M4a base. Keep the
     # compatibility seam here, rather than changing A's shared files.
-    registry = get_registry()
+    registry = _registry(config)
     return [CodexEntry(
         "rule", rid, getattr(factory, "codex_name", _RULE_NAMES.get(rid, _title(rid))),
         getattr(factory, "codex_icon", rid),
@@ -74,7 +84,9 @@ def rule_entries(config: RunConfig) -> list[CodexEntry]:
 
 
 def _item_detail(item_id: str, config: RunConfig) -> str:
-    text = _ITEM_SUMMARIES.get(item_id, f"Registered item: {_title(item_id)}.")
+    registry = _registry(config)
+    help_fn = getattr(registry, "describe_item", lambda iid: "")
+    text = _ITEM_SUMMARIES.get(item_id, help_fn(item_id) or f"Registered item: {_title(item_id)}.")
     if item_id == "fate_oracle":
         defaults = RunConfig().item_params[item_id]
         count = max(1, int(config.item_params.get(item_id, {}).get("cards", defaults["cards"])))
@@ -97,12 +109,14 @@ def _item_detail(item_id: str, config: RunConfig) -> str:
 
 def item_entries(config: RunConfig) -> list[CodexEntry]:
     auto_load_plugins()
+    registry = _registry(config)
+    help_fn = getattr(registry, "describe_item", lambda iid: "")
     return [CodexEntry(
         "item", iid, getattr(cls, "codex_name", _title(iid)), getattr(cls, "codex_icon", iid),
-        getattr(cls, "codex_summary", _ITEM_SUMMARIES.get(iid, "A registered table item.")),
+        getattr(cls, "codex_summary", _ITEM_SUMMARIES.get(iid, help_fn(iid) or "A registered table item.")),
         getattr(cls, "codex_detail", partial(_item_detail, iid)),
         getattr(cls, "codex_demo", ITEM_DEMOS.get(iid)), getattr(cls, "codex_order", 0),
-    ) for iid, cls in tuple(get_registry()._items.items())]
+    ) for iid, cls in tuple(registry._items.items())]
 
 
 @dataclass(frozen=True)
@@ -155,27 +169,43 @@ def _ai_detail(config: RunConfig) -> str:
 
     allowed = load_permission_profile("easy")["allowed_rules"]
     available = [r for r in allowed if r not in config.disabled_rules]
-    choices = [f"{rid} (weight {weight:g})" for rid, _params, weight in config.chaos_stub
+    name = lambda rid: _RULE_NAMES.get(rid, _title(rid))
+    choices = [f"{name(rid)} (weight {weight:g})" for rid, _params, weight in config.chaos_stub
                if weight > 0 and rid in available]
     return (
         "Chaos proposes structured actions; the permission policy checks them before they affect the table. "
         "The offline AI draws from the balance profile's weighted choices, while the optional model chooses its own action. "
         "Fixed rule parameters always override the proposal. "
-        f"Enabled rule choices: {', '.join(available) or 'none'}. "
+        f"Enabled rule choices: {', '.join(map(name, available)) or 'none'}. "
         f"Offline weighted choices: {', '.join(choices) or 'none'}. "
         f"Portrait advice guides with probability {config.chaos_guidance_probability * 100:g}%; other advice may mislead. "
         f"Run memory is {'enabled' if config.chaos_memory_enabled else 'disabled'}, "
-        f"with a limit of {config.chaos_memory_limit} events. "
-        "Codex demonstrations always run offline."
+        f"with a limit of {config.chaos_memory_limit} events."
     )
 
 
 def ai_entries(config: RunConfig) -> list[CodexEntry]:
-    # This base has one Chaos AI pipeline, not an AI catalog registry. More
-    # personalities/content packs can append providers for the same `ai` kind.
-    return [CodexEntry("ai", "default", "Chaos AI", "chaos_calm",
+    entries = [CodexEntry("ai", "default", "Chaos AI", "chaos_calm",
                        "A sandboxed opponent that bends rules and offers unreliable advice.",
                        _ai_detail, None)]
+    registry = _registry(config)
+    for ai_id in getattr(registry, "ai_ids", lambda: ("default",))():
+        if ai_id == "default":
+            continue
+        profile = registry.resolve_ai(ai_id)
+        entries.append(CodexEntry("ai", ai_id, getattr(profile, "codex_name", _title(ai_id)),
+                                  getattr(profile, "codex_icon", "chaos_calm"), profile.description,
+                                  partial(_pack_ai_detail, ai_id), getattr(profile, "codex_demo", None)))
+    return entries
+
+
+def _pack_ai_detail(ai_id: str, config: RunConfig) -> str:
+    profile = _registry(config).resolve_ai(ai_id)
+    rules = [rid for rid in profile.permissions.get("allowed_rules", ()) if rid not in config.disabled_rules]
+    names = [_RULE_NAMES.get(rid, _title(rid)) for rid in rules]
+    return (f"{profile.description} Allowed rules: {', '.join(names) or 'none'}. "
+            f"Portrait advice guides with probability {config.chaos_guidance_probability * 100:g}%. "
+            "Fixed rule parameters from the selected balance profile override AI proposals.")
 
 
 def install() -> None:

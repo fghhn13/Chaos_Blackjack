@@ -69,6 +69,9 @@ for _spec in (
     AssetSpec("danger_radar", "item", ICON, ph.icon("DR", theme.GOLD), "Danger Radar"),
     AssetSpec("fate_oracle", "item", ICON, ph.icon("FO", theme.GOLD), "Fate Oracle"),
     AssetSpec("hole_card_hacker", "item", ICON, ph.icon("HH", theme.GOLD), "Hole Card Hacker"),
+    # Codex mode icons; final mode_normal.png / mode_chaos.png override these.
+    AssetSpec("mode_normal", "mode", ICON, ph.icon("CL", theme.GOLD), "Classic"),
+    AssetSpec("mode_chaos", "mode", ICON, ph.icon("CH", theme.CHAOS_MAGENTA), "Chaos"),
     # Chaos rules — ids equal registry rule names
     AssetSpec("fragile_bust", "rule", ICON, ph.icon("FB", theme.CHAOS_MAGENTA), "Fragile Bust"),
     AssetSpec("great_crash", "rule", ICON, ph.icon("GC", theme.CHAOS_MAGENTA), "Great Crash"),
