@@ -1,7 +1,8 @@
-"""Right table column: the shoe, the item inventory and the reward streak.
+"""Right table column: the shoe, the item inventory and the shop button.
 
 Items are buttons: clicking one calls `on_use(item_id)` while the view allows
-`use_item`. Hovering shows what the item does.
+`use_item`. Hovering shows what the item does. The shop button calls
+`on_shop()` while betting.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from chaos_blackjack.app.view import Action, GameView, ItemView
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.cards import CARD_SIZE
 from chaos_blackjack.gui.texts import asset_name
-from chaos_blackjack.gui.widgets import Widget, draw_heading, draw_panel, draw_tooltip, fit_text
+from chaos_blackjack.gui.widgets import Button, Widget, draw_heading, draw_panel, draw_tooltip, fit_text
 
 if TYPE_CHECKING:
     from chaos_blackjack.gui.assets import AssetManager
@@ -31,14 +32,18 @@ class ItemPanel(Widget):
         assets: "AssetManager",
         rect: pygame.Rect | tuple[int, int, int, int],
         on_use: Callable[[str], None],
+        on_shop: Callable[[], None],
     ) -> None:
         self.assets = assets
         self.rect = pygame.Rect(rect)
         self.on_use = on_use
         self.items: tuple[ItemView, ...] = ()
         self.can_use = False
-        self.streak = 0
-        self.reward_streak = 0
+        self.restock_in = 0
+        self.shop_button = Button(
+            assets, (self.rect.x + 14, self.rect.bottom - 62, self.rect.w - 28, 48), "Shop",
+            on_shop, hotkey=pygame.K_b, font_size=theme.FONT_BODY,
+        )
         self.item_rects: list[tuple[pygame.Rect, ItemView]] = []
         self.hovered: ItemView | None = None
         self._mouse = (0, 0)
@@ -55,9 +60,12 @@ class ItemPanel(Widget):
     def sync(self, v: GameView) -> None:
         self.items = tuple(i for i in v.items if i.count > 0)
         self.can_use = v.can(Action.USE_ITEM)
-        self.streak, self.reward_streak = v.win_streak, v.reward_streak
+        self.shop_button.enabled = v.can(Action.BUY)
+        self.restock_in = v.shop_restock_in
 
     def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.shop_button.handle_event(event) and event.type != pygame.MOUSEMOTION:
+            return True
         if event.type == pygame.MOUSEMOTION:
             self._mouse = event.pos
             self.hovered = next((i for rect, i in self.item_rects if rect.collidepoint(event.pos)), None)
@@ -83,7 +91,7 @@ class ItemPanel(Widget):
             surface.blit(tiny.render("No items yet", True, theme.TEXT_MUTED), (r.x + 14, y + 4))
         for i, item in enumerate(self.items):
             row = pygame.Rect(r.x + 8, y + i * ITEM_ROW, r.w - 16, ITEM_ROW - 6)
-            if row.bottom > r.bottom - 64:
+            if row.bottom > r.bottom - 100:
                 break
             active = self.can_use
             if item is self.hovered and active:
@@ -102,27 +110,19 @@ class ItemPanel(Widget):
             self.item_rects.append((row, item))
         hint = "Click an item to use it" if self.can_use and self.items else ""
         if hint:
-            surface.blit(tiny.render(hint, True, theme.TEXT_MUTED), (r.x + 14, r.bottom - 76))
+            surface.blit(tiny.render(hint, True, theme.TEXT_MUTED), (r.x + 14, r.bottom - 112))
 
-        self._draw_streak(surface, r.bottom - 48)
+        self._draw_shop(surface)
 
-    def _draw_streak(self, surface: pygame.Surface, y: int) -> None:
-        """Reward progress: one pip per win needed for the next item."""
-        a = self.assets
+    def _draw_shop(self, surface: pygame.Surface) -> None:
+        """Shop button (usable while betting) and the restock countdown."""
         r = self.rect
-        label = a.font(theme.FONT_TINY, bold=True).render("WIN STREAK", True, theme.GOLD_DIM)
-        surface.blit(label, (r.x + 14, y))
-        need = max(1, self.reward_streak)
-        filled = self.streak % need if self.streak else 0
-        for i in range(need):
-            c = (r.x + 24 + i * 22, y + 30)
-            if i < filled:
-                pygame.draw.circle(surface, theme.GOLD, c, 7)
-            else:
-                pygame.draw.circle(surface, theme.GOLD_DIM, c, 7, 1)
-        note = a.font(theme.FONT_TINY).render(f"{need - filled} more win{'s' if need - filled != 1 else ''} for an item",
-                                              True, theme.TEXT_MUTED)
-        surface.blit(note, note.get_rect(midright=(r.right - 14, y + 30)))
+        n = self.restock_in
+        note = self.assets.font(theme.FONT_TINY).render(
+            f"New stock in {n} round{'s' if n != 1 else ''}", True, theme.TEXT_MUTED,
+        )
+        surface.blit(note, note.get_rect(midbottom=(r.centerx, self.shop_button.rect.y - 6)))
+        self.shop_button.draw(surface)
 
     def draw_overlay(self, surface: pygame.Surface) -> None:
         if self.hovered is not None:

@@ -48,3 +48,6 @@ black-jack-assets/
 
 # Agent-player run files (python -m chaos_blackjack.agent)
 .agent_runs/
+
+# Image-generation scratch output
+output/

@@ -93,6 +93,11 @@ class RunSaveData:
     game_state: GameStateSnapshot | None
     active_modifiers: list[ModifierSnapshot]
     chaos_actions_this_turn: int
+    # Shop shelves ({"stock_round", "offers"}) and the seed for future restocks.
+    shop: dict[str, Any] | None = None
+    shop_seed: int | None = None
+    # The dealer's hole card was exposed by an item this round.
+    hole_revealed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -109,6 +114,9 @@ class RunSaveData:
             "game_state": None if self.game_state is None else self.game_state.to_dict(),
             "active_modifiers": [m.to_dict() for m in self.active_modifiers],
             "chaos_actions_this_turn": self.chaos_actions_this_turn,
+            "shop": self.shop,
+            "shop_seed": self.shop_seed,
+            "hole_revealed": self.hole_revealed,
         }
 
     @staticmethod
@@ -130,6 +138,9 @@ class RunSaveData:
             game_state=None if gs is None else GameStateSnapshot.from_dict(gs),
             active_modifiers=[ModifierSnapshot.from_dict(x) for x in d.get("active_modifiers", [])],
             chaos_actions_this_turn=int(d.get("chaos_actions_this_turn", 0)),
+            shop=d.get("shop"),
+            shop_seed=None if d.get("shop_seed") is None else int(d["shop_seed"]),
+            hole_revealed=bool(d.get("hole_revealed", False)),
         )
 
 

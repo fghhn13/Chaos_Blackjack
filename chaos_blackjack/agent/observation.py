@@ -13,10 +13,12 @@ from chaos_blackjack.app.help_text import ITEM_HELP
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import Action, CardView, GameView, RoundResult, TablePhase
 
-OBS_SCHEMA = 1
+OBS_SCHEMA = 2
 
 # Plain-English help so an LLM does not have to guess what ids mean.
 ACTION_HELP: dict[str, str] = {
+    Action.BET: "start the round: bet <amount>",
+    Action.BUY: "buy a shop item before betting: buy <item_id>",
     Action.HIT: "take one more card",
     Action.STAND: "end your turn; the dealer plays",
     Action.DOUBLE: "double the bet, take exactly one card, then stand (first decision only)",
@@ -51,7 +53,7 @@ def event_texts(notices: list[Notice]) -> list[str]:
 
 def legal_actions(v: GameView) -> list[str]:
     if v.phase == TablePhase.BETTING:
-        return ["bet"]
+        return [Action.BET, Action.BUY] if any(o.affordable for o in v.shop_offers) else [Action.BET]
     if v.phase != TablePhase.PLAYER_TURN:
         return []
     acts = [a for a in (Action.HIT, Action.STAND, Action.DOUBLE, Action.SURRENDER) if v.can(a)]
@@ -64,7 +66,10 @@ def next_step_hint(v: GameView, acts: list[str]) -> str:
     if v.phase == TablePhase.RUN_OVER:
         return "The run is over. Start a new one with `new`."
     if v.phase == TablePhase.BETTING:
-        return f"Place a bet: bet <amount> with {v.bet_min} <= amount <= {v.bet_max}."
+        bet = f"Place a bet: bet <amount> with {v.bet_min} <= amount <= {v.bet_max}."
+        if Action.BUY in acts:
+            return bet + " Or buy first: buy <item_id> (see obs.shop)."
+        return bet
     parts = [a if a != Action.USE_ITEM else "use_item <item_id>" for a in acts]
     return "Your move: act " + " | ".join(parts)
 
@@ -81,6 +86,10 @@ def summary(v: GameView) -> str:
         lines.append("Active chaos rules: " + "; ".join(r.description for r in v.active_rules))
     if v.items:
         lines.append("Items: " + ", ".join(f"{i.id} x{i.count}" for i in v.items) + ".")
+    if v.phase == TablePhase.BETTING:
+        on_sale = [f"{o.item} {o.price}" for o in v.shop_offers if not o.sold]
+        stock = ", ".join(on_sale) if on_sale else "sold out"
+        lines.append(f"Shop: {stock} (restocks in {v.shop_restock_in} round{'s' if v.shop_restock_in != 1 else ''}).")
     return " ".join(lines)
 
 
@@ -99,10 +108,17 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
         "bet_range": [v.bet_min, v.bet_max] if v.phase == TablePhase.BETTING else None,
         "bet": v.current_bet if in_hand else None,
         "win_streak": v.win_streak,
-        "reward_every": v.reward_streak,
         "you": {"cards": [card_str(c) for c in v.player_cards], "total": v.player_total} if in_hand else None,
         "dealer": {"cards": [card_str(c) for c in v.dealer_cards], "total": v.dealer_total} if in_hand else None,
         "items": [{"id": i.id, "count": i.count, "help": ITEM_HELP.get(i.id, "")} for i in v.items],
+        "shop": {
+            "offers": [
+                {"item": o.item, "price": o.price, "sold": o.sold, "affordable": o.affordable,
+                 "help": ITEM_HELP.get(o.item, "")}
+                for o in v.shop_offers
+            ],
+            "restock_in": v.shop_restock_in,
+        } if v.phase == TablePhase.BETTING else None,
         "chaos": {
             "enabled": v.chaos_enabled,
             "budget": v.chaos_budget,

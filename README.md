@@ -52,10 +52,10 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 - **Natural blackjack** (first two cards = 21) pays **3:2**, rounded down. A dealer natural wins before the player acts; two naturals push.
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
-- Every 2 consecutive wins grant 1 random item (`peek`, `swap`, `shield`, …).
+- **Shop** (between rounds): spend bankroll on items. It shows 3 different items, each can be bought once, and it restocks every 2 rounds. A purchase must leave you enough to bet (at least 2). Prices are placeholders for now.
 - **Chaos mode**: before each player turn the Chaos AI may apply one rule — e.g. card values −1, ties go to the dealer, bust above 18. Totals shown always include active rules.
 
-Natural blackjack, double down and surrender are implemented in `GameController` (GUI and agent interface); the text CLI still runs the original hit / stand loop.
+Natural blackjack, double down, surrender and the shop are implemented in `GameController` (GUI and agent interface); the text CLI still runs the original hit / stand loop with the old streak reward.
 
 All payout ratios and options live in `RunConfig` (`chaos_blackjack/app/config.py`).
 
@@ -71,7 +71,7 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene gallery
 
 | Phase | Mouse | Keyboard |
 | ----- | ----- | -------- |
-| Betting | left-click a chip to add, right-click to remove; Clear / Max | ↑ / ↓ ±1, Enter deals |
+| Betting | left-click a chip to add, right-click to remove; Clear / Max; Shop | ↑ / ↓ ±1, Enter deals, B shop (1–3 buy) |
 | Your turn | Hit / Stand / Double / Surrender buttons | H / S / D / R |
 | Round over | Next Round | Enter |
 | Anywhere | — | Esc (menu, asks first), F11 fullscreen, F5 reload assets |
@@ -98,6 +98,7 @@ LLM agents (or scripts) play through one-shot shell commands; the run is kept in
 python -m chaos_blackjack.agent new --seed 7 --chaos
 python -m chaos_blackjack.agent --brief bet 20
 python -m chaos_blackjack.agent --brief act double     # hit | stand | double | surrender | use_item <id>
+python -m chaos_blackjack.agent --brief buy peek        # buy from the shop while betting
 ```
 
 A streaming JSON-lines mode (`play`) and a Python API (`AgentSession`) are also available. Quick reference: **[AGENTS.md](AGENTS.md)**; full guide with rule/item catalogs, transcripts and strategy: **[docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md)**.
@@ -218,7 +219,7 @@ Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed
 ## Extending
 
 1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
-2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it for agents in `agent/observation.py` (`ITEM_HELP`).
+2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it in `app/help_text.py` (`ITEM_HELP`) and give it a shop price in `DEFAULT_SHOP_PRICES` (`app/config.py`).
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.
 5. **LLM provider**: implement `LLMBackend.complete(system, user) -> str` returning JSON, or reuse `GptsApiLLM` for any OpenAI-compatible relay.

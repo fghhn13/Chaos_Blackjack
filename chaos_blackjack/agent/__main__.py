@@ -4,6 +4,7 @@ One-shot commands (state kept in a file between calls):
 
   python -m chaos_blackjack.agent new [--seed N] [--chaos] [--llm]
   python -m chaos_blackjack.agent observe
+  python -m chaos_blackjack.agent buy peek
   python -m chaos_blackjack.agent bet 20
   python -m chaos_blackjack.agent act hit|stand|double|surrender
   python -m chaos_blackjack.agent act use_item peek
@@ -29,7 +30,7 @@ from chaos_blackjack.agent.session import AgentSession, LlmUnavailable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE = PROJECT_ROOT / ".agent_runs" / "current.json"
-BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "bet_range", "last_round", "run_end")
+BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "bet_range", "shop", "last_round", "run_end")
 
 
 def _emit(reply: dict[str, Any], *, brief: bool, compact: bool) -> None:
@@ -130,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
     _add_new_options(sub.add_parser("new", help="start a new run (overwrites the run file)"))
     sub.add_parser("observe", help="show the current observation")
     sub.add_parser("help", help="list game commands")
+    buy = sub.add_parser("buy", help="buy a shop item (betting phase)")
+    buy.add_argument("item")
     bet = sub.add_parser("bet", help="place a bet")
     bet.add_argument("amount", type=int)
     act = sub.add_parser("act", help="act in your turn")
@@ -154,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
             command = {"cmd": args.command}
             if args.command == "bet":
                 command["amount"] = args.amount
+            elif args.command == "buy":
+                command["item"] = args.item
             elif args.command == "act":
                 command["action"] = args.action
                 if args.item:

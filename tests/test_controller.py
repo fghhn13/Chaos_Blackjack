@@ -38,7 +38,7 @@ def test_starts_in_betting_with_limits() -> None:
     v = c.view()
     assert v.phase == TablePhase.BETTING
     assert (v.bet_min, v.bet_max) == (1, 50)
-    assert v.available_actions == frozenset({Action.BET, Action.SAVE})
+    assert v.available_actions == frozenset({Action.BET, Action.BUY, Action.SAVE})
     assert v.player_cards == ()
 
 
@@ -90,16 +90,15 @@ def test_stand_dealer_steps_then_win_and_next_round() -> None:
     assert c.view().phase == TablePhase.BETTING and c.view().round == 2
 
 
-def test_streak_reward_lands_in_inventory() -> None:
-    c = _ctrl(reward_streak=1, reward_pool=("peek",))
-    c.place_bet(10)
-    _rig(c, [_c("K"), _c("Q")], [_c("10"), _c("7")])
-    c.stand()
-    c.finish_dealer()
-    assert c.view().last_result.reward == "peek"
-    c.next_round()
-    c.place_bet(10)
-    assert [i.id for i in c.view().items] == ["peek"]
+def test_wins_no_longer_grant_items() -> None:
+    c = _ctrl()
+    for _ in range(2):
+        c.place_bet(10)
+        _rig(c, [_c("K"), _c("Q")], [_c("10"), _c("7")])
+        c.stand()
+        c.finish_dealer()
+        c.next_round()
+    assert c.view().win_streak == 2 and c.view().items == ()
 
 
 def test_use_item_consumes_and_reports() -> None:

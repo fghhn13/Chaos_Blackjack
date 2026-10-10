@@ -71,7 +71,7 @@ class TableScene(Scene):
         )
         self.cards = CardRenderer(a)
         self.chaos_panel = ChaosPanel(a, LEFT_PANEL)
-        self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item)
+        self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
         log = self.chaos_panel.log_area
         self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
         self.bet_panel = BetPanel(a, (W // 2, ACTION_Y + 30), self._deal, initial=10,
@@ -137,6 +137,13 @@ class TableScene(Scene):
             self.controller.use_item(item_id)
         except ActionError as e:
             self.feed.push(str(e), BAD)
+        self._after_command()
+
+    def _open_shop(self) -> None:
+        if self.view.can(Action.BUY):
+            self.app.scenes.push("shop", controller=self.controller, on_change=self._after_command)
+
+    def on_resume(self, result=None) -> None:
         self._after_command()
 
     def _after_command(self) -> None:

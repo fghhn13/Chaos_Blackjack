@@ -74,8 +74,9 @@ class FeedbackLog:
             self.add(f"🎒 Item [{item}] — top {len(peeked_ranks)} ranks: {shown}")
             return
 
-        if pl.get("shield_requested"):
-            self.add(f"🎒 Item [{item}] — shield primed")
+        dispelled = pl.get("dispelled_rules")
+        if isinstance(dispelled, list) and dispelled:
+            self.add(f"🎒 Item [{item}] — dispelled: {', '.join(str(x) for x in dispelled)}")
             return
 
         swap_from = pl.get("swap_from_rank")

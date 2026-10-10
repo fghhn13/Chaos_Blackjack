@@ -1,11 +1,11 @@
-"""Run economy — bankroll, bets, settlement and streak rewards (pure helpers)."""
+"""Run economy — bankroll, bets, settlement and win streak (pure helpers)."""
 
 from __future__ import annotations
 
 import random
 from dataclasses import dataclass
 
-from chaos_blackjack.app.config import DEFAULT_BLACKJACK_PAYS, DEFAULT_REWARD_STREAK
+from chaos_blackjack.app.config import DEFAULT_BLACKJACK_PAYS
 
 
 @dataclass
@@ -57,14 +57,20 @@ def settle_money(money: int, bet: int, outcome: str, **kwargs) -> int:
     return money + settlement_delta(bet, outcome, **kwargs)
 
 
+def update_streak(run: RunState, outcome: str) -> None:
+    """Count consecutive wins (a stat only; items now come from the shop)."""
+    run.win_streak = run.win_streak + 1 if outcome in WIN_OUTCOMES else 0
+
+
 def update_streak_and_maybe_reward(
     *,
     run: RunState,
     outcome: str,
     reward_pool: tuple[str, ...],
     rng: random.Random,
-    reward_streak: int = DEFAULT_REWARD_STREAK,
+    reward_streak: int = 2,
 ) -> str | None:
+    """Legacy streak reward, still used by the text CLI (`ui/session.py`)."""
     if outcome in WIN_OUTCOMES:
         run.win_streak += 1
         if run.win_streak >= reward_streak and reward_pool:
