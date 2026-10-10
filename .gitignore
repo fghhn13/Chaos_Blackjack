@@ -52,5 +52,10 @@ black-jack-assets/
 # Image-generation scratch output
 output/
 
+# Game database (balance profiles, saves); created on first run
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # Balance simulator (separate git repository)
 black-jack-sim/

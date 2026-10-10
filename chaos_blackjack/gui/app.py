@@ -16,6 +16,7 @@ import pygame
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import AssetManager
 from chaos_blackjack.gui.scene import SceneManager
+from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.gui.settings import LOGICAL_SIZE, GuiSettings
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
@@ -38,6 +39,7 @@ class App:
         self.canvas = pygame.Surface(LOGICAL_SIZE).convert()
         self.clock = pygame.time.Clock()
         self.assets = AssetManager(self.settings.asset_dirs)
+        self.balance = load_balance(self.settings.balance_profile)
         self.prefs = Preferences()
         self.scenes = SceneManager(self)
         self.running = False

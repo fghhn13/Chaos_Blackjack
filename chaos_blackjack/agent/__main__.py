@@ -80,7 +80,7 @@ def _new_session(args: argparse.Namespace) -> AgentSession:
     if args.target_money is not None:
         config["target_money"] = args.target_money
     return AgentSession.new(seed=args.seed, chaos=args.chaos, use_llm=args.llm,
-                            max_steps=args.max_steps, **config)
+                            max_steps=args.max_steps, profile=args.profile, **config)
 
 
 def _add_new_options(p: argparse.ArgumentParser) -> None:
@@ -91,6 +91,8 @@ def _add_new_options(p: argparse.ArgumentParser) -> None:
     p.add_argument("--start-money", type=int, default=None)
     p.add_argument("--target-money", type=int, default=None)
     p.add_argument("--max-steps", type=int, default=2000)
+    p.add_argument("--profile", default=None,
+                   help="balance profile in data/game.db (default: $CHAOS_PROFILE or 'default')")
 
 
 def _play_stream(args: argparse.Namespace) -> int:
@@ -164,7 +166,8 @@ def main(argv: list[str] | None = None) -> int:
                 if args.item:
                     command["item"] = args.item
             reply = session.execute(command)
-        reply["run"] = {"seed": session.seed, "steps": session.steps, "state_file": str(args.state)}
+        reply["run"] = {"seed": session.seed, "steps": session.steps, "state_file": str(args.state),
+                        "profile": session.controller.config.balance_profile}
         _save(args.state, session)
         if args.command not in ("observe", "help"):
             _log(args.state, command, reply, session.steps)

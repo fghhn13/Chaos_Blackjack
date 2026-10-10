@@ -24,6 +24,7 @@ from typing import Any
 
 from chaos_blackjack.agent.observation import build_observation, card_str, event_texts, round_result_dict
 from chaos_blackjack.app.config import DEFAULT_SHOP_PRICES, RunConfig
+from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.persistence import build_save_data
 from chaos_blackjack.app.view import Action, TablePhase
@@ -102,12 +103,14 @@ class AgentSession:
         chaos: bool = False,
         use_llm: bool = False,
         max_steps: int = DEFAULT_MAX_STEPS,
+        profile: str | None = None,
         **config: Any,
     ) -> "AgentSession":
-        """`config` takes any RunConfig field (start_money, target_money, ...)."""
+        """`profile` names a balance profile (default: $CHAOS_PROFILE or "default");
+        `config` overrides any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
-        cfg = RunConfig(enable_chaos=chaos, seed=seed, **config)
+        cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, **config)
         ctrl = GameController(cfg, loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n)
         ctrl.drain_notices()
         return cls(ctrl, seed=seed, use_llm=use_llm, max_steps=max_steps)
@@ -241,6 +244,7 @@ class AgentSession:
                 "blackjack_pays": list(c.config.blackjack_pays),
                 "allow_double": c.config.allow_double,
                 "allow_surrender": c.config.allow_surrender,
+                "balance_profile": c.config.balance_profile,
             },
         }
         return {
@@ -272,6 +276,7 @@ class AgentSession:
             blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
             allow_double=bool(cfg_extra.get("allow_double", True)),
             allow_surrender=bool(cfg_extra.get("allow_surrender", True)),
+            balance_profile=str(cfg_extra.get("balance_profile", RunConfig.balance_profile)),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(

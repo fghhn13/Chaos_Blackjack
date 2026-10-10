@@ -67,7 +67,7 @@ class TableScene(Scene):
     def on_enter(self, controller: GameController | None = None, **params) -> None:
         a = self.app.assets
         self.controller = controller or GameController(
-            RunConfig(enable_chaos=self.app.prefs.enable_chaos)
+            RunConfig.from_balance(self.app.balance, enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
         self.chaos_panel = ChaosPanel(a, LEFT_PANEL)

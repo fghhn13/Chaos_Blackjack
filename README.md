@@ -57,7 +57,25 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 
 Natural blackjack, double down, surrender and the shop are implemented in `GameController` (GUI and agent interface); the text CLI still runs the original hit / stand loop with the old streak reward.
 
-All payout ratios and options live in `RunConfig` (`chaos_blackjack/app/config.py`).
+### Balance profiles (SQLite)
+
+Every tunable number of a run (bankroll, target, payouts, dealer rule, shop
+slots, restock interval, item prices) is stored as a **balance profile** in
+`data/game.db` (SQLite, created on first run, git-ignored; `CHAOS_DB` points
+elsewhere).
+
+- The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
+  the single source of truth for shipped values. It is locked and re-imported
+  whenever that file changes; change shipped values there.
+- To experiment, copy it into a new profile and edit that one, e.g. with
+  DB Browser for SQLite or `clone_profile()` from `chaos_blackjack.data`; values
+  are validated (type, min / max, no unknown keys) when a run starts.
+- Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
+  A run keeps the numbers it started with.
+- Schema changes go in new `chaos_blackjack/data/migrations/NNNN_*.sql` files.
+
+Game logic never reads the database: front-ends load a `Balance` and build a
+`RunConfig` from it (`RunConfig.from_balance`). Tests use an in-memory database.
 
 ---
 
@@ -66,7 +84,7 @@ All payout ratios and options live in `RunConfig` (`chaos_blackjack/app/config.p
 ### Pygame GUI
 
 ```bash
-python -m chaos_blackjack.gui              # --fullscreen, --scene gallery
+python -m chaos_blackjack.gui              # --fullscreen, --scene gallery, --profile NAME
 ```
 
 | Phase | Mouse | Keyboard |
@@ -160,6 +178,7 @@ Notes:
 | `ai/` | `ChaosPipeline`, `StubLLM`, `GptsApiLLM`, prompt + permission loaders, `.env` loading |
 | `events/` | `Event` / `EventDispatcher` |
 | `app/` | `GameController` state machine (betting → chaos → player turn → dealer → round over → run over), `GameView`, `Notice` stream, `RunConfig` |
+| `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |
 | `ui/`, `cli/` | Text CLI |
@@ -176,11 +195,13 @@ Black_jack/
 │   ├── items/                # item plugins (self-register)
 │   ├── ai/                   # pipeline, prompts/, permissions/, gptsapi_llm.py
 │   ├── app/                  # GameController, views, notices, config
+│   ├── data/                 # SQLite: migrations/, seed/default.sql, balance loader
 │   ├── agent/                # agent-player interface
 │   ├── gui/                  # Pygame client (assets/, components/, scenes/)
 │   ├── ui/                   # text CLI session
 │   └── saves/
 ├── assets/                   # drop final art here (see assets/README.md)
+├── data/game.db              # local database (git-ignored, created on first run)
 ├── cli/main.py
 ├── scripts/                  # debug_smoke.py, debug_llm.py
 ├── tests/

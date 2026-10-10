@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
+from dataclasses import replace
 
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.economy import (
@@ -149,16 +150,12 @@ class GameController:
         **kwargs,
     ) -> "GameController":
         base = config or RunConfig()
-        cfg = RunConfig(
+        cfg = replace(
+            base,
             start_money=data.start_money,
             target_money=data.target_money,
             objective=data.objective,
-            shop_prices=base.shop_prices,
-            shop_slots=base.shop_slots,
-            shop_refresh_rounds=base.shop_refresh_rounds,
-            dealer_stand_on=base.dealer_stand_on,
             enable_chaos=bool(base.enable_chaos or data.enable_chaos),
-            seed=base.seed,
         )
         c = cls(cfg, **kwargs)
         c.run.money = data.money

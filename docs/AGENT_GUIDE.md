@@ -38,7 +38,7 @@ Subcommands:
 
 | Subcommand | Purpose |
 | ---------- | ------- |
-| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N]` | start a run; **overwrites** the state file and its log |
+| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N] [--profile NAME]` | start a run; **overwrites** the state file and its log |
 | `observe` | current observation; changes nothing, not logged |
 | `help` | list game commands |
 | `buy <item_id>` | buy an item from the shop (phase `betting`, before you bet) |
@@ -53,6 +53,7 @@ Subcommands:
 - `--chaos` — the Chaos AI may change a rule every round (§7).
 - `--llm` — the Chaos AI is a **real, billed** model behind the GPTsAPI relay instead of the offline stub. Needs `GPTSAPI_API_KEY` in `.env`. Only use it when your instructions say so.
 - `--start-money N`, `--target-money N` — change the economy (defaults 100 → 400).
+- `--profile NAME` — use a balance profile from `data/game.db` (default: `$CHAOS_PROFILE` or `default`). The reply's `run.profile` names it; a resumed run keeps its numbers even if the profile changes.
 - `--max-steps N` — cap on accepted `bet` / `act` commands (default 2000).
 
 Exit codes: `0` accepted, `1` rejected by the game (`ok: false`), `2` usage problem (no run file, bad state file, `--llm` without a key).
