@@ -215,6 +215,8 @@ class ChaosPipeline:
         return ChaosEffect()
 
     def _build_user_prompt(self, obs: ChaosObservation) -> str:
+        if obs.context_json is not None:
+            return "Full private game context:\n" + obs.context_json + "\nChoose your JSON action."
         pv = sum(1 for _ in obs.state.player_hand)
         dv = sum(1 for _ in obs.state.dealer_hand)
         return (

@@ -7,11 +7,12 @@ the portrait reacts to what just happened (a rule landing, a bust, a win).
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 import pygame
 
 from chaos_blackjack.app.notices import Notice, NoticeKind
-from chaos_blackjack.app.view import GameView, RuleView
+from chaos_blackjack.app.view import GameView, RuleView, TablePhase
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.texts import asset_name
 from chaos_blackjack.gui.widgets import Widget, draw_heading, draw_panel, draw_tooltip, fit_text, wrap_text
@@ -58,7 +59,8 @@ OFF_LINE = "Chaos mode is off. Plain blackjack tonight."
 
 
 class ChaosPanel(Widget):
-    def __init__(self, assets: "AssetManager", rect: pygame.Rect | tuple[int, int, int, int]) -> None:
+    def __init__(self, assets: "AssetManager", rect: pygame.Rect | tuple[int, int, int, int],
+                 on_poke: Callable[[], object] | None = None) -> None:
         self.assets = assets
         self.rect = pygame.Rect(rect)
         self.mood = "calm"
@@ -68,6 +70,14 @@ class ChaosPanel(Widget):
         self.rule_rects: list[tuple[pygame.Rect, RuleView]] = []
         self.hovered: RuleView | None = None
         self._mouse = (0, 0)
+        self.on_poke = on_poke
+        self.poke_enabled = False
+
+    @property
+    def portrait_rect(self) -> pygame.Rect:
+        rect = pygame.Rect(0, 0, PORTRAIT, PORTRAIT)
+        rect.midtop = (self.rect.centerx, self.rect.y + 12)
+        return rect
 
     @property
     def log_area(self) -> pygame.Rect:
@@ -81,13 +91,16 @@ class ChaosPanel(Widget):
     def sync(self, v: GameView) -> None:
         self.chaos_enabled = v.chaos_enabled
         self.rules = v.active_rules
+        self.poke_enabled = bool(self.on_poke and v.chaos_enabled and v.phase in (
+            TablePhase.BETTING, TablePhase.PLAYER_TURN, TablePhase.ROUND_OVER,
+        ))
         if not v.chaos_enabled:
             self.mood = "calm"
 
     def react(self, n: Notice) -> None:
         if not self.chaos_enabled:
             return
-        if n.kind == NoticeKind.CHAOS_NARRATION:
+        if n.kind in (NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY):
             self.speech = str(n.data.get("text") or n.text) or self.speech
         elif n.kind == NoticeKind.RULE_MODIFIER_APPLIED:
             self.speech = f"New rule: {asset_name(str(n.data.get('rule_id')))}. Good luck."
@@ -106,6 +119,11 @@ class ChaosPanel(Widget):
             self.mood = mood
 
     def handle_event(self, event: pygame.event.Event) -> bool:
+        if (event.type == pygame.MOUSEBUTTONUP and event.button == 1
+                and self.poke_enabled and self.on_poke is not None
+                and self.portrait_rect.collidepoint(event.pos)):
+            self.on_poke()
+            return True
         if event.type == pygame.MOUSEMOTION:
             self._mouse = event.pos
             self.hovered = next((r for rect, r in self.rule_rects if rect.collidepoint(event.pos)), None)
@@ -128,6 +146,12 @@ class ChaosPanel(Widget):
 
         portrait = a.image_fit(mood_face(a, self.mood), (PORTRAIT, PORTRAIT))
         surface.blit(portrait, portrait.get_rect(midtop=(r.centerx, r.y + 12)))
+        if self.poke_enabled:
+            hint = a.font(theme.FONT_TINY).render("Click to ask", True, theme.IVORY)
+            label = pygame.Rect(0, 0, hint.get_width() + 18, hint.get_height() + 8)
+            label.midbottom = (self.portrait_rect.centerx, self.portrait_rect.bottom - 4)
+            pygame.draw.rect(surface, theme.DARK, label, border_radius=6)
+            surface.blit(hint, hint.get_rect(center=label.center))
 
         y = r.y + 12 + PORTRAIT + 4
         name = a.font(theme.FONT_BODY + 2, role="display").render("Chaos AI", True, theme.GOLD)

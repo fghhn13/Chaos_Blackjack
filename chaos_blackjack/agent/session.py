@@ -229,6 +229,7 @@ class AgentSession:
             shop=c.shop,
             shop_seed=c.shop_seed,
             hole_revealed=c.hole_revealed,
+            chaos_memory=c.chaos_memory.export(),
         )
         hidden = {
             "save": save.to_dict(),
@@ -241,6 +242,9 @@ class AgentSession:
                 "blackjack_pays": list(c.config.blackjack_pays),
                 "allow_double": c.config.allow_double,
                 "allow_surrender": c.config.allow_surrender,
+                "chaos_guidance_probability": c.config.chaos_guidance_probability,
+                "chaos_memory_enabled": c.config.chaos_memory_enabled,
+                "chaos_memory_limit": c.config.chaos_memory_limit,
             },
         }
         return {
@@ -272,6 +276,9 @@ class AgentSession:
             blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
             allow_double=bool(cfg_extra.get("allow_double", True)),
             allow_surrender=bool(cfg_extra.get("allow_surrender", True)),
+            chaos_guidance_probability=float(cfg_extra.get("chaos_guidance_probability", 0.5)),
+            chaos_memory_enabled=bool(cfg_extra.get("chaos_memory_enabled", False)),
+            chaos_memory_limit=int(cfg_extra.get("chaos_memory_limit", 32)),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(

@@ -35,11 +35,16 @@ class ShopScene(Scene):
         self,
         controller: GameController | None = None,
         on_change: Callable[[], None] | None = None,
+        on_poke: Callable[[], bool] | None = None,
+        portrait_rect: pygame.Rect | None = None,
         **params,
     ) -> None:
         assert controller is not None
         self.controller = controller
         self.on_change = on_change
+        self.on_poke = on_poke
+        self.portrait_rect = portrait_rect
+        self._poke_pending = False
         self.message: tuple[str, theme.Color] | None = None
         self.box = pygame.Rect(0, 0, 3 * CARD_W + 2 * CARD_GAP + 64, 500)
         self.box.center = (W // 2, H // 2)
@@ -68,6 +73,8 @@ class ShopScene(Scene):
 
     def _buyer(self, item_id: str) -> Callable[[], None]:
         def buy() -> None:
+            if self._poke_pending:
+                return
             try:
                 self.controller.buy(item_id)
                 self.message = (f"Bought {asset_name(item_id)}.", theme.GOLD)
@@ -80,7 +87,17 @@ class ShopScene(Scene):
         return buy
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        if self._poke_pending:
+            return
+        if (event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.on_poke is not None
+                and self.portrait_rect is not None and self.portrait_rect.collidepoint(event.pos)):
+            self._poke_pending = self.on_poke()
+            return
         self.ui.handle_event(event)
+
+    def on_resume(self, result=None) -> None:
+        self._poke_pending = False
+        self._build()
 
     def draw(self, surface: pygame.Surface) -> None:
         a = self.app.assets

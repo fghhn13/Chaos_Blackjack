@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from threading import Event, current_thread
 from types import SimpleNamespace
@@ -81,6 +82,181 @@ def test_full_round_with_hotkeys(app: App) -> None:
     assert any("Dealer busts" in line.text for line in t.feed.lines)
     _key(app, pygame.K_RETURN)           # next round
     assert t.view.phase == TablePhase.BETTING and t.view.round == 2
+
+
+def _portrait_click(app, table):
+    # Do not flush queued scene changes: exercise several events in one frame.
+    app.scenes.handle_event(pygame.event.Event(
+        pygame.MOUSEBUTTONUP, {"button": 1, "pos": table.chaos_panel.portrait_rect.center}))
+
+
+def _open_poke(app, monkeypatch, llm, table=None):
+    t = table or _open_table(app, enable_chaos=True)
+    llm.response = '{"reply":"Keep enough chips to bet."}'
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", llm)
+    _portrait_click(app, t)
+    app.scenes.apply_pending()
+    assert llm.started.wait(timeout=1)
+    return t, app.scenes.top
+
+
+def test_poke_blocks_same_frame_clicks_and_keeps_banner_animating(app, monkeypatch, slow_llm):
+    t = _open_table(app, enable_chaos=True)
+    slow_llm.response = '{"reply":"Keep enough chips to bet."}'
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", slow_llm)
+    before = t.controller.view()
+    delivered = []
+    t.subscribe(NoticeKind.CHAOS_POKE_REPLY, lambda n: delivered.append(current_thread()))
+    for _ in range(8):
+        _portrait_click(app, t)
+    t._deal(10)
+    app.scenes.apply_pending()
+    banner = app.scenes.top
+    assert type(banner).__name__ == "ChaosPokeScene" and len(app.scenes.stack) == 2
+    assert slow_llm.started.wait(timeout=1)
+    assert not banner.continue_button.enabled
+    _tick(app, 0.01)
+    area = (banner.box.centerx - 30, banner.box.centery + 12, 60, 16)
+    pixels = pygame.image.tostring(app.canvas.subsurface(area), "RGB")
+    _tick(app, .25)
+    assert pixels != pygame.image.tostring(app.canvas.subsurface(area), "RGB")
+    for key in (pygame.K_RETURN, pygame.K_h, pygame.K_s, pygame.K_b):
+        _key(app, key)
+    _portrait_click(app, t)
+    app.scenes.apply_pending()
+    assert app.scenes.top is banner and slow_llm.calls == 1
+    assert t.controller.view() == before
+    assert slow_llm.thread is not current_thread() and slow_llm.thread.daemon
+    slow_llm.release.set()
+    banner._future.result(timeout=3)
+    _tick(app, .01)
+    assert banner.continue_button.enabled and app.scenes.top is banner
+    _portrait_click(app, t)
+    app.scenes.apply_pending()
+    assert slow_llm.calls == 1
+    _key(app, pygame.K_RETURN)
+    assert app.scenes.top is t and not t._poke_pending
+    assert t.controller.view() == before and t.chaos_panel.poke_enabled
+    assert t.chaos_panel.speech == "Keep enough chips to bet."
+    assert delivered == [current_thread()]
+    monkeypatch.setattr(t.controller, "_save_fn", lambda data, name: name)
+    assert "chaos_memory" not in t.controller.save("unused").to_dict()
+
+
+def test_shop_poke_snapshots_purchase_and_returns_to_shop(app, monkeypatch, slow_llm):
+    t = _open_table(app, enable_chaos=True, shop_prices={"peek": 10, "shield": 30}, shop_slots=2)
+    _key(app, pygame.K_b)
+    shop = app.scenes.top
+    _key(app, pygame.K_1)
+    bought = shop.view.shop_offers[0].item
+    before = t.controller.view()
+    slow_llm.response = '{"reply":"Keep enough chips to bet."}'
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", slow_llm)
+    for _ in range(3):
+        _portrait_click(app, t)
+    app.scenes.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_2, "mod": 0}))
+    app.scenes.apply_pending()
+    banner = app.scenes.top
+    assert slow_llm.started.wait(timeout=1)
+    assert len(app.scenes.stack) == 3 and t.controller.view() == before
+    snapshot = json.loads(banner.request.context_json)
+    assert next(o for o in snapshot["shop"]["offers"] if o["item"] == bought)["sold"]
+    assert snapshot["bankroll"] == before.money
+    assert snapshot["inventory"][0]["id"] == bought
+    shop._buyer(shop.view.shop_offers[1].item)()  # queued callback cannot purchase now
+    _key(app, pygame.K_2)
+    assert t.controller.view() == before and slow_llm.calls == 1
+    slow_llm.release.set()
+    banner._future.result(timeout=3)
+    _tick(app, .01)
+    _key(app, pygame.K_RETURN)
+    assert app.scenes.top is shop and not shop._poke_pending
+    _key(app, pygame.K_2)
+    assert t.controller.view().money < before.money
+    _key(app, pygame.K_ESCAPE)
+    assert app.scenes.top is t and len(t.view.items) == 2
+
+
+@pytest.mark.parametrize("settled", [False, True])
+def test_poke_at_player_turn_and_round_result_restores_controls(app, monkeypatch, slow_llm, settled):
+    t = _open_table(app, enable_chaos=True,
+                    deal=([_c("9"), _c("7")], [_c("K"), _c("8")], [_c("K"), _c("2")]))
+    monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: False)
+    t._deal(10)
+    _tick(app, CHAOS_DELAY)
+    t._chaos_future.result(timeout=3)
+    _tick(app, .01)
+    if settled:
+        t.controller.stand()
+        t.controller.finish_dealer()
+        t._after_command()
+    before = t.controller.view()
+    _, banner = _open_poke(app, monkeypatch, slow_llm, t)
+    snapshot = json.loads(banner.request.context_json)
+    assert snapshot["dealer"]["cards"] == ["K♠", "8♠"]
+    assert snapshot["deck"] == ["K♠", "2♠"]
+    assert snapshot["phase"] == ("round_over" if settled else "player_turn")
+    slow_llm.release.set()
+    banner._future.result(timeout=3)
+    _tick(app, .01)
+    _key(app, pygame.K_RETURN)
+    assert app.scenes.top is t and t.controller.view() == before
+    assert t.next_button.enabled if settled else t.action_buttons[Action.HIT].enabled
+
+
+def test_poke_exit_discards_late_reply_and_cancel_preserves_request(app, monkeypatch, slow_llm):
+    t, banner = _open_poke(app, monkeypatch, slow_llm)
+    result = banner._future
+    # Repeated Escape events before apply_pending must create just one confirmation.
+    event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_ESCAPE, "mod": 0})
+    for _ in range(3):
+        app.scenes.handle_event(event)
+    app.scenes.apply_pending()
+    assert len(app.scenes.stack) == 3
+    _key(app, pygame.K_ESCAPE)
+    assert app.scenes.top is banner and slow_llm.calls == 1
+    _key(app, pygame.K_ESCAPE)
+    _key(app, pygame.K_RETURN)
+    assert type(app.scenes.top).__name__ == "MainMenuScene"
+    assert t._closed and banner._closed and not result.done()
+    fresh = _open_table(app, enable_chaos=True)
+    slow_llm.release.set()
+    result.result(timeout=3)
+    _tick(app, .01)
+    assert app.scenes.top is fresh and fresh.chaos_panel.speech is None
+    assert NoticeKind.CHAOS_POKE_REPLY not in [n.kind for n in t.controller.drain_notices()]
+
+
+def test_failed_poke_is_dismissible_without_retry(app, monkeypatch, slow_llm):
+    slow_llm.fail = True
+    t, banner = _open_poke(app, monkeypatch, slow_llm)
+    before = t.controller.view()
+    slow_llm.release.set()
+    banner._future.result(timeout=3)
+    _tick(app, .01, times=3)
+    assert not banner.reply.ok and banner.continue_button.enabled
+    _key(app, pygame.K_RETURN)
+    assert app.scenes.top is t and t.chaos_panel.poke_enabled
+    assert t.controller.view() == before and slow_llm.calls == 1
+
+
+def test_off_portrait_in_shop_does_not_lock_purchases(app):
+    t = _open_table(app, shop_prices={"peek": 10}, shop_slots=1)
+    _key(app, pygame.K_b)
+    shop = app.scenes.top
+    _portrait_click(app, t)
+    app.scenes.apply_pending()
+    assert app.scenes.top is shop and not shop._poke_pending
+    _key(app, pygame.K_1)
+    assert shop.view.money == 90
+
+
+def test_window_quit_does_not_wait_for_poke(app, monkeypatch, slow_llm):
+    _, banner = _open_poke(app, monkeypatch, slow_llm)
+    result = banner._future
+    app.running = True
+    app._dispatch(pygame.event.Event(pygame.QUIT))
+    assert not app.running and not result.done()
 
 
 def test_double_and_surrender_buttons_follow_view(app: App) -> None:

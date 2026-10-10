@@ -118,9 +118,9 @@ class GameLoop:
         """Backward compatible alias (older code called apply_chaos_phase directly)."""
         return self.maybe_apply_chaos_phase(state)
 
-    def maybe_apply_chaos_phase(self, state: GameState) -> GameState:
+    def maybe_apply_chaos_phase(self, state: GameState, *, context_json: str | None = None) -> GameState:
         """Run chaos pipeline if policy/scheduler allows it."""
-        return self._apply_chaos(state)
+        return self._apply_chaos(state, context_json=context_json)
 
     def draw_for_player(self, state: GameState) -> GameState:
         return self._draw(state, to_player=True)
@@ -140,12 +140,13 @@ class GameLoop:
             return state.with_deck(new_deck).with_player_hand(state.player_hand + (card,))
         return state.with_deck(new_deck).with_dealer_hand(state.dealer_hand + (card,))
 
-    def _apply_chaos(self, state: GameState) -> GameState:
+    def _apply_chaos(self, state: GameState, *, context_json: str | None = None) -> GameState:
         obs = ChaosObservation(
             state=state,
             modifiers=self.modifiers,
             chaos_budget_remaining=state.chaos_budget_remaining,
             chaos_actions_this_turn=self._chaos_actions_this_turn,
+            context_json=context_json,
         )
         policy = self.pipeline.policy
         if not self.pipeline.scheduler.should_attempt(obs):

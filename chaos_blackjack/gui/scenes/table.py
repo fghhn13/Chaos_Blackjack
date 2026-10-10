@@ -22,6 +22,7 @@ from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import Action, GameView, TablePhase
+from chaos_blackjack.contracts.chaos_interaction import PokeOutcome
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.bet_panel import BetPanel, draw_bet_stack
 from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, layout_hand
@@ -84,7 +85,7 @@ class TableScene(Scene):
             RunConfig(enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
-        self.chaos_panel = ChaosPanel(a, LEFT_PANEL)
+        self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke)
         self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
         log = self.chaos_panel.log_area
         self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
@@ -110,6 +111,7 @@ class TableScene(Scene):
         self._chaos_future: Future[None] | None = None
         self._chaos_failed = False
         self._closed = False
+        self._poke_pending = False
         self._ending_opened = False
         self.view: GameView = self.controller.view()
         self._sync_widgets()
@@ -140,7 +142,7 @@ class TableScene(Scene):
 
     def _command(self, method: str) -> Callable[[], None]:
         def run() -> None:
-            if self._closed or self._chaos_future is not None or self._chaos_failed:
+            if self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed:
                 return
             try:
                 getattr(self.controller, method)()
@@ -151,7 +153,7 @@ class TableScene(Scene):
         return run
 
     def _deal(self, amount: int) -> None:
-        if self._closed or self._chaos_future is not None or self._chaos_failed:
+        if self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed:
             return
         try:
             self.controller.place_bet(amount)
@@ -160,7 +162,7 @@ class TableScene(Scene):
         self._after_command()
 
     def _use_item(self, item_id: str) -> None:
-        if self._closed or self._chaos_future is not None or self._chaos_failed:
+        if self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed:
             return
         try:
             self.controller.use_item(item_id)
@@ -169,8 +171,32 @@ class TableScene(Scene):
         self._after_command()
 
     def _open_shop(self) -> None:
+        if self._closed or self._poke_pending:
+            return
         if self.view.can(Action.BUY):
-            self.app.scenes.push("shop", controller=self.controller, on_change=self._after_command)
+            self.app.scenes.push("shop", controller=self.controller, on_change=self._after_command,
+                                 on_poke=self._poke, portrait_rect=self.chaos_panel.portrait_rect)
+
+    def _poke(self) -> bool:
+        if self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed:
+            return False
+        try:
+            request = self.controller.prepare_poke()
+        except ActionError:
+            return False
+        # Several queued clicks can arrive before push() is applied.
+        self._poke_pending = True
+        self.chaos_panel.poke_enabled = False
+        self.app.scenes.push("chaos_poke", request=request, llm=self.controller.loop.pipeline.llm,
+                             on_reply=self._accept_poke)
+        return True
+
+    def _accept_poke(self, outcome: PokeOutcome) -> None:
+        if self._closed:
+            return
+        self._poke_pending = False
+        self.controller.accept_poke_reply(outcome.request, outcome.reply)
+        self._after_command()
 
     def on_resume(self, result=None) -> None:
         self._after_command()
@@ -178,7 +204,7 @@ class TableScene(Scene):
     def _after_command(self) -> None:
         # Shop callbacks and modal resumes share this refresh path. A worker
         # owns the controller until update() consumes its completed result.
-        if self._closed or self._chaos_future is not None or self._chaos_failed:
+        if self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed:
             return
         self._timer = 0.0
         self._pump_notices()
@@ -188,6 +214,8 @@ class TableScene(Scene):
     # ------------------------------------------------------------- frame
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        if self._closed or self._poke_pending:
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.push(
                 "confirm",
@@ -197,14 +225,15 @@ class TableScene(Scene):
             return
         if self.item_panel.handle_event(event):
             return
-        self.chaos_panel.handle_event(event)
+        if self.chaos_panel.handle_event(event):
+            return
         if self.view.phase == TablePhase.BETTING:
             self.bet_panel.handle_event(event)
         else:
             self.ui.handle_event(event)
 
     def update(self, dt: float) -> None:
-        if self._closed:
+        if self._closed or self._poke_pending:
             return
         self.feed.update(dt)
         self._timer += dt

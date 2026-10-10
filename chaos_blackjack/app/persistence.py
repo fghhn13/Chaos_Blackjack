@@ -97,6 +97,7 @@ def build_save_data(
     shop: ShopState | None = None,
     shop_seed: int | None = None,
     hole_revealed: bool = False,
+    chaos_memory: list[dict] | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -119,4 +120,5 @@ def build_save_data(
         shop=shop.to_dict() if shop is not None else None,
         shop_seed=shop_seed,
         hole_revealed=bool(hole_revealed and state is not None),
+        chaos_memory=chaos_memory,
     )

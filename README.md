@@ -84,6 +84,24 @@ fullscreen and window events remain responsive. Returning to the menu discards t
 old table's result without waiting for an in-flight request. No additional art is
 needed for the procedural indicator.
 
+In Chaos Mode, click the Chaos portrait while betting, choosing a player action,
+or reviewing a round result to ask for a suggestion. The portrait also works while
+the shop is open. A modal banner animates while the reply is generated and blocks
+repeated clicks and gameplay; click **Continue** or press Enter after the reply.
+While waiting, Esc opens the return-to-menu confirmation. Each interaction chooses
+guidance or misdirection with **50% probability each**, without revealing which.
+These are intent probabilities, not a guarantee of the model's advice accuracy.
+The offline backend gives local suggestions; with a real LLM each poke makes one
+billed completion, with no repair or automatic retry.
+
+The AI receives a private snapshot containing hands, hidden cards, ordered deck,
+effective totals and rules, bankroll, inventory, and shop stock/prices/restocking.
+Replies only provide text; they cannot buy items, play cards, or change rules.
+Public player observations continue to hide private cards. Run-local memory is
+implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
+no history is collected, included in prompts, or written to saves. A future opt-in
+can retain at most `chaos_memory_limit` events (default 32) across save/load.
+
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
 ### Text CLI

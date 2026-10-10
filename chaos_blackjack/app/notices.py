@@ -24,6 +24,7 @@ class NoticeKind:
     PHASE_CHANGED = "phase_changed"
     ROUND_STARTED = "round_started"
     CHAOS_NARRATION = "chaos_narration"
+    CHAOS_POKE_REPLY = "chaos_poke_reply"
     ITEM_RESULT = "item_result"
     PLAYER_BUST = "player_bust"
     PLAYER_BLACKJACK = "player_blackjack"

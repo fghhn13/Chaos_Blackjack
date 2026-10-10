@@ -39,3 +39,12 @@ class RunConfig:
     allow_surrender: bool = True
     enable_chaos: bool = False
     seed: int | None = None
+    chaos_guidance_probability: float = 0.5
+    chaos_memory_enabled: bool = False
+    chaos_memory_limit: int = 32
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.chaos_guidance_probability <= 1:
+            raise ValueError("Chaos guidance probability must be between 0 and 1")
+        if self.chaos_memory_limit < 1:
+            raise ValueError("Chaos memory limit must be positive")

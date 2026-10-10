@@ -15,3 +15,4 @@ class ChaosObservation:
     chaos_budget_remaining: int = 999
     chaos_actions_this_turn: int = 0
     last_event_summary: str | None = None
+    context_json: str | None = None

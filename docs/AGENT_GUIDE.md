@@ -167,6 +167,23 @@ Shop
 
 ## 7. Chaos AI and chaos rules
 
+The GUI also supports asking Chaos for advice by clicking its portrait at a
+player decision point (betting, player turn, or round result), including while
+the shop is open. A modal thinking banner blocks repeated clicks and gameplay;
+Continue/Enter dismisses a completed reply, and Esc while waiting offers a return
+to the menu. Each poke independently chooses guidance or misdirection with 50%
+probability each; the intent is hidden, and this does not guarantee advice accuracy.
+Replies are text only and cannot execute gameplay actions. The real backend makes
+one billed request per poke without retries; the stub gives local suggestions.
+This interaction currently has no agent command.
+
+Chaos receives private AI context including hidden hands, deck order, active rules,
+bankroll, inventory, and shop stock/prices/restocking. Player observations remain
+restricted to table-visible information. Run-local memory is prepared but disabled
+by default: no collected history, prompt history, or memory save field. Explicit
+Python configuration can opt into a bounded history via
+`RunConfig(chaos_memory_enabled=True, chaos_memory_limit=32)`.
+
 With `--chaos`, after every deal the Chaos AI gets **one** chance to act, before the naturals check and before your first decision. It can:
 
 - **apply one rule** for the rest of the round (listed in `obs.chaos.active_rules`, announced in `events`), or

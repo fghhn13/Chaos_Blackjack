@@ -1,0 +1,65 @@
+"""Full, private AI context; player-facing observations stay separate."""
+
+from dataclasses import asdict
+import json
+from typing import TYPE_CHECKING
+
+from chaos_blackjack.app.help_text import ITEM_HELP
+from chaos_blackjack.app.item_use import inventory_counts
+from chaos_blackjack.app.economy import bet_limits
+from chaos_blackjack.app.persistence import serialize_modifier_params
+from chaos_blackjack.app.shop import rounds_until_restock
+from chaos_blackjack.ui.descriptions import describe_modifier
+
+if TYPE_CHECKING:
+    from chaos_blackjack.app.controller import GameController
+
+
+def build_chaos_context(controller: "GameController") -> str:
+    c = controller
+    st = c.state
+    ctx = c.loop.context()
+
+    def cards(hand):
+        return [f"{card.rank}{card.suit}" for card in hand]
+
+    def hand(hand):
+        total = c.loop.rules.hand_value(hand, ctx)
+        return {"cards": cards(hand), "total": total, "bust": c.loop.rules.is_bust(total, ctx)}
+
+    data = {
+        "phase": c.phase.value, "round": c.run.round,
+        "bankroll": c.run.money, "start_money": c.run.start_money,
+        "target": c.run.target_money, "objective": c.run.objective,
+        "bet": c.run.current_bet, "win_streak": c.run.win_streak,
+        "bet_range": bet_limits(c.run.money), "doubled": c._doubled,
+        "legal_actions": sorted(c._available_actions()),
+        "player": hand(st.player_hand) if st else None,
+        "dealer": hand(st.dealer_hand) if st else None,
+        "hole_revealed_to_player": c.hole_revealed,
+        "deck": cards(st.deck) if st else [],
+        "next_hit": hand(st.player_hand + st.deck[:1]) if st and st.deck else None,
+        "inventory": [{"id": item, "count": count, "help": ITEM_HELP.get(item, "")}
+                      for item, count in inventory_counts(st.inventory if st else c.run.items)],
+        "item_catalog": ITEM_HELP,
+        "shop": {**c.shop.to_dict(), "restock_in": rounds_until_restock(
+            c.shop, c.run.round, c.config.shop_refresh_rounds),
+            "catalog_prices": c.config.shop_prices,
+            "slots": c.config.shop_slots, "refresh_rounds": c.config.shop_refresh_rounds},
+        "chaos": {"enabled": c.config.enable_chaos,
+                  "budget": st.chaos_budget_remaining if st else c.loop.chaos_budget_initial,
+                  "actions_this_turn": c.loop._chaos_actions_this_turn,
+                  "permission_profile": c.loop.pipeline.permission_profile,
+                  "rules": [{"id": str(getattr(mod, "id", "?")),
+                             "params": serialize_modifier_params(mod), "help": describe_modifier(mod)}
+                            for mod in c.loop.modifiers.items]},
+        "rules": {"dealer_stand_on": c.config.dealer_stand_on,
+                  "blackjack_pays": c.config.blackjack_pays,
+                  "allow_double": c.config.allow_double, "allow_surrender": c.config.allow_surrender},
+        "last_result": asdict(c.last_result) if c.last_result else None,
+        "run_end": asdict(c.run_end) if c.run_end else None,
+    }
+    memory = c.chaos_memory.export()
+    if memory is not None:
+        data["memory"] = memory
+    return json.dumps(data, ensure_ascii=False, sort_keys=True)

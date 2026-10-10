@@ -98,9 +98,11 @@ class RunSaveData:
     shop_seed: int | None = None
     # The dealer's hole card was exposed by an item this round.
     hole_revealed: bool = False
+    # Optional run-local AI history; absent when memory is disabled.
+    chaos_memory: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "version": int(self.version),
             "money": self.money,
             "start_money": self.start_money,
@@ -118,6 +120,9 @@ class RunSaveData:
             "shop_seed": self.shop_seed,
             "hole_revealed": self.hole_revealed,
         }
+        if self.chaos_memory is not None:
+            data["chaos_memory"] = self.chaos_memory
+        return data
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "RunSaveData":
@@ -141,6 +146,7 @@ class RunSaveData:
             shop=d.get("shop"),
             shop_seed=None if d.get("shop_seed") is None else int(d["shop_seed"]),
             hole_revealed=bool(d.get("hole_revealed", False)),
+            chaos_memory=d.get("chaos_memory"),
         )
 
 

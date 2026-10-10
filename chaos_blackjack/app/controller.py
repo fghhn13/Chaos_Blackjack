@@ -26,6 +26,8 @@ from __future__ import annotations
 import random
 from collections.abc import Callable
 
+from chaos_blackjack.ai.memory import ChaosMemory
+from chaos_blackjack.app.chaos_context import build_chaos_context
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.economy import (
     RunState,
@@ -53,6 +55,7 @@ from chaos_blackjack.app.view import (
     TablePhase,
 )
 from chaos_blackjack.contracts.items import ItemResult
+from chaos_blackjack.contracts.chaos_interaction import PokeReply, PokeRequest
 from chaos_blackjack.core.game_loop import GameLoop
 from chaos_blackjack.core.game_state import GamePhase, GameState
 from chaos_blackjack.core.run_state import RunSaveData
@@ -114,6 +117,9 @@ class GameController:
         self.loop = factory(self._dispatcher)
         self.loop.initial_inventory = ()
         self.rng = random.Random(self.config.seed)
+        self._poke_rng = random.Random(None if self.config.seed is None else f"{self.config.seed}:poke")
+        self.chaos_memory = ChaosMemory(enabled=self.config.chaos_memory_enabled,
+                                        limit=self.config.chaos_memory_limit)
         self.run_end_policy = run_end_policy or default_run_end_policy()
         self._save_fn = save_fn
 
@@ -159,6 +165,9 @@ class GameController:
             dealer_stand_on=base.dealer_stand_on,
             enable_chaos=bool(base.enable_chaos or data.enable_chaos),
             seed=base.seed,
+            chaos_guidance_probability=base.chaos_guidance_probability,
+            chaos_memory_enabled=base.chaos_memory_enabled,
+            chaos_memory_limit=base.chaos_memory_limit,
         )
         c = cls(cfg, **kwargs)
         c.run.money = data.money
@@ -171,6 +180,7 @@ class GameController:
             c.shop_seed = data.shop_seed
         c.shop = ShopState.from_dict(data.shop) if data.shop else c._roll_shop()
         c.hole_revealed = data.hole_revealed
+        c.chaos_memory.restore(data.chaos_memory)
         c.run_end = None
         c.phase = TablePhase.BETTING
 
@@ -236,11 +246,27 @@ class GameController:
         this controller (including draining notices) until the call finishes;
         render a cached GameView while waiting."""
         self._require(Action.RESOLVE_CHAOS)
-        self.state = self.loop.maybe_apply_chaos_phase(self._st)
+        self.state = self.loop.maybe_apply_chaos_phase(self._st, context_json=build_chaos_context(self))
         narration = self.loop.last_chaos_narration
         if narration:
             self._notify(NoticeKind.CHAOS_NARRATION, narration, {"text": narration})
         self._enter_player_turn()
+
+    def prepare_poke(self) -> PokeRequest:
+        """Capture a private immutable context before starting the reply worker."""
+        if not self.config.enable_chaos or self.phase not in (
+            TablePhase.BETTING, TablePhase.PLAYER_TURN, TablePhase.ROUND_OVER,
+        ):
+            raise ActionError("Chaos cannot be poked during this phase")
+        intent = "guide" if self._poke_rng.random() < self.config.chaos_guidance_probability else "mislead"
+        return PokeRequest(build_chaos_context(self), intent)
+
+    def accept_poke_reply(self, request: PokeRequest, reply: PokeReply) -> bool:
+        """Publish on the UI thread; ignore a reply for a changed game state."""
+        if not reply.ok or request.context_json != build_chaos_context(self):
+            return False
+        self._notify(NoticeKind.CHAOS_POKE_REPLY, reply.text, {"text": reply.text})
+        return True
 
     def hit(self) -> None:
         self._require(Action.HIT)
@@ -332,6 +358,7 @@ class GameController:
             shop=self.shop,
             shop_seed=self.shop_seed,
             hole_revealed=self.hole_revealed,
+            chaos_memory=self.chaos_memory.export(),
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})
@@ -429,9 +456,17 @@ class GameController:
 
     def _notify(self, kind: str, text: str = "", data: dict | None = None) -> None:
         self._notices.append(Notice(kind=kind, text=text, data=data or {}))
+        if kind in {
+            NoticeKind.ROUND_STARTED, NoticeKind.ITEM_BOUGHT, NoticeKind.ITEM_RESULT,
+            NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY, NoticeKind.ROUND_SETTLED,
+        }:
+            self.chaos_memory.record(self.run.round, kind, data or {"text": text})
 
     def _on_core_event(self, event: Event) -> None:
-        self._notices.append(self._translator.translate(event))
+        notice = self._translator.translate(event)
+        self._notices.append(notice)
+        if notice.kind == NoticeKind.DRAW_CARD:
+            self.chaos_memory.record(self.run.round, notice.kind, dict(notice.data))
 
     def _is_natural(self, hand) -> bool:
         if len(hand) != 2:
