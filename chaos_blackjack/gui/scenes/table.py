@@ -93,12 +93,16 @@ class TableScene(Scene):
         self._handlers: dict[str, list[NoticeHandler]] = {}
         self.subscribe("*", self._feed_notice)
         self.subscribe("*", self.chaos_panel.react)
+        self.subscribe("*", self.app.audio.handle_notice)
         self._timer = 0.0
         self._ending_opened = False
         self.view: GameView = self.controller.view()
         self._sync_widgets()
 
     # ----------------------------------------------------------- notices
+
+    def on_exit(self) -> None:
+        self.app.audio.stop()
 
     def subscribe(self, kind: str, handler: NoticeHandler) -> None:
         """`kind="*"` receives every notice."""

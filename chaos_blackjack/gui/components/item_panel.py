@@ -126,7 +126,8 @@ class ItemPanel(Widget):
 
     def draw_overlay(self, surface: pygame.Surface) -> None:
         if self.hovered is not None:
-            text = f"{asset_name(self.hovered.id)}: {ITEM_HELP.get(self.hovered.id, '')}"
+            description = self.hovered.description or ITEM_HELP.get(self.hovered.id, "")
+            text = f"{asset_name(self.hovered.id)}: {description}"
             if not self.can_use:
                 text += " (usable on your turn)"
             row = next(rect for rect, i in self.item_rects if i is self.hovered)

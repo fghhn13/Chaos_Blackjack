@@ -37,6 +37,11 @@ class MainMenuScene(Scene):
             Button(a, row(3), "Asset Gallery", lambda: self.app.scenes.push("gallery"), style="ghost"),
             Button(a, row(4), "Quit", self.app.quit, style="ghost", hotkey=pygame.K_ESCAPE),
         )
+        self.sound_button = Button(a, (740, 630, 270, 44), "", self.app.audio.toggle_mute,
+                                   style="ghost", font_size=20)
+        self.ui.add(self.sound_button)
+        self.ui.add(Button(a, (1022, 630, 48, 44), "-", lambda: self.app.adjust_volume(-0.1), style="ghost"))
+        self.ui.add(Button(a, (1082, 630, 48, 44), "+", lambda: self.app.adjust_volume(0.1), style="ghost"))
 
     def _set_chaos(self, on: bool) -> None:
         self.app.prefs.enable_chaos = on
@@ -50,6 +55,11 @@ class MainMenuScene(Scene):
         face = mood_face(a, "smug" if self.app.prefs.enable_chaos else "calm")
         portrait = a.image_fit(face, (420, 420))
         surface.blit(portrait, portrait.get_rect(center=(int(W * 0.74), int(H * 0.55))))
+        audio = self.app.audio
+        status = "muted" if audio.muted else f"{audio.volume:.0%}"
+        if not audio.available:
+            status = "unavailable"
+        self.sound_button.text = f"Sound: {status}  M"
         self.ui.draw(surface)
-        hint = a.font(theme.FONT_SMALL).render("F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
+        hint = a.font(theme.FONT_SMALL).render("M mute   +/- volume   F11 fullscreen   F5 reload assets", True, theme.TEXT_MUTED)
         surface.blit(hint, hint.get_rect(bottomright=(W - 20, H - 14)))

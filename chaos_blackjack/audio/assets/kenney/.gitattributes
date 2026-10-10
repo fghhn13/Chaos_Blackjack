@@ -1,0 +1,3 @@
+# Preserve the source pack's unusual license line endings byte-for-byte.
+License.txt -text -diff
+*.ogg -text

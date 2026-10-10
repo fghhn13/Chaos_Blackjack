@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "default_master_volume": 0.4,
+  "cues": {
+    "deal": {
+      "files": ["card-place-1.ogg", "card-place-2.ogg", "card-place-3.ogg", "card-place-4.ogg"],
+      "gain": 0.7,
+      "description": "A card is placed on the table."
+    },
+    "chips": {
+      "files": ["chip-lay-1.ogg", "chip-lay-2.ogg", "chip-lay-3.ogg"],
+      "gain": 0.8,
+      "description": "A wager is placed or doubled."
+    },
+    "win": {
+      "files": ["chips-stack-4.ogg", "chips-stack-6.ogg"],
+      "gain": 0.9,
+      "description": "Collect and stack winnings; a Casino Audio foley cue, not a musical jingle."
+    },
+    "lose": {
+      "files": ["card-shove-1.ogg", "card-shove-4.ogg"],
+      "gain": 0.7,
+      "description": "Sweep away a losing hand; a Casino Audio foley cue."
+    },
+    "chaos": {
+      "files": ["card-shuffle.ogg"],
+      "gain": 0.65,
+      "description": "Shuffle the rules when a Chaos effect succeeds."
+    }
+  }
+}

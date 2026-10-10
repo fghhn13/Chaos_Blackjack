@@ -16,6 +16,12 @@ Contents: [Setup](#1-setup) · [Commands](#2-commands) · [What happens inside a
 
 ## 1. Setup
 
+For agents implementing GUI sound, see [AUDIO_GUIDE.md](AUDIO_GUIDE.md).
+The GUI uses Kenney CC0 casino cues, defaults to 40% master volume, and supports
+M mute, +/- volume, `--volume 0..1` and `--mute`. Shell play remains silent and
+requires no pygame. `python -m chaos_blackjack.audio validate` checks materials
+offline without a sound device.
+
 - Python 3.10+. From the repository root, nothing needs installing to play the agent interface (`pip install -e .` is optional).
 - Run every command from the repository root.
 - The run is stored in a **state file** between calls. Default: `.agent_runs/current.json` (git-ignored). Use `--state PATH` to keep several runs apart, e.g. one per test case.
