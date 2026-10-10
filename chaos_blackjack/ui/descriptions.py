@@ -54,6 +54,10 @@ def _describe_one(tid: str, m: Any) -> str:
     return f"Active rule: {tid}"
 
 
+def describe_modifier(m: Any) -> str:
+    return _describe_one(getattr(m, "id", "?"), m)
+
+
 def info_rules_text(modifiers: ActiveModifiers) -> str:
     lines = ["Current Rules:"]
     lines.extend(f"- {x}" for x in describe_active_modifiers(modifiers))
