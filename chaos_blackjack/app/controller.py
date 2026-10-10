@@ -232,7 +232,9 @@ class GameController:
 
     def resolve_chaos(self) -> None:
         """Let the Chaos AI act once. May block on an LLM call — GUIs should
-        run this off the render thread."""
+        run this off the render thread. The caller must not read or mutate
+        this controller (including draining notices) until the call finishes;
+        render a cached GameView while waiting."""
         self._require(Action.RESOLVE_CHAOS)
         self.state = self.loop.maybe_apply_chaos_phase(self._st)
         narration = self.loop.last_chaos_narration

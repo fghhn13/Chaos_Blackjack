@@ -1,8 +1,9 @@
 """Table scene — plays a run through GameController.
 
-The scene never decides rules. Each frame it reads `controller.view()` to
-show/enable widgets and drains notices into handlers. Automatic steps (chaos
-resolution, dealer draws) are paced by timers so they can be animated later.
+The scene never decides rules. Controller snapshots and notice handlers stay
+on the render thread. While chaos resolves in a worker, the scene renders its
+cached snapshot without reading or mutating the controller. Dealer draws are
+paced by a timer.
 
 Extending:
   * new player action  -> add a row to ACTION_BUTTONS (+ controller method)
@@ -12,6 +13,8 @@ Extending:
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import Future
+from threading import Thread
 
 import pygame
 
@@ -50,6 +53,7 @@ FEED_LINE = 22  # px per event-feed line
 DEALER_STEP_DELAY = 0.7  # seconds between dealer decisions
 CHAOS_DELAY = 0.4        # pause before the chaos AI acts
 RUN_END_DELAY = 1.5      # let the last result sink in before the ending
+CHAOS_ERROR = "Chaos AI failed. Press Esc to return to the menu."
 
 # (action id, label, hotkey, style, controller method)
 ACTION_BUTTONS: tuple[tuple[str, str, int, str, str], ...] = (
@@ -60,6 +64,16 @@ ACTION_BUTTONS: tuple[tuple[str, str, int, str, str], ...] = (
 )
 
 NoticeHandler = Callable[[Notice], None]
+
+
+def _resolve_chaos(controller: GameController, result: Future[None]) -> None:
+    """Own the controller until completion; never call Pygame or scene handlers."""
+    try:
+        controller.resolve_chaos()
+    except Exception as exc:
+        result.set_exception(exc)
+    else:
+        result.set_result(None)
 
 
 @register_scene("table")
@@ -93,9 +107,18 @@ class TableScene(Scene):
         self.subscribe("*", self._feed_notice)
         self.subscribe("*", self.chaos_panel.react)
         self._timer = 0.0
+        self._chaos_future: Future[None] | None = None
+        self._chaos_failed = False
+        self._closed = False
         self._ending_opened = False
         self.view: GameView = self.controller.view()
         self._sync_widgets()
+
+    def on_exit(self) -> None:
+        # In-flight network requests cannot be cancelled. The daemon finishes
+        # against its old controller without touching this scene or delaying exit.
+        self._closed = True
+        self._chaos_future = None
 
     # ----------------------------------------------------------- notices
 
@@ -117,6 +140,8 @@ class TableScene(Scene):
 
     def _command(self, method: str) -> Callable[[], None]:
         def run() -> None:
+            if self._closed or self._chaos_future is not None or self._chaos_failed:
+                return
             try:
                 getattr(self.controller, method)()
             except ActionError as e:
@@ -126,6 +151,8 @@ class TableScene(Scene):
         return run
 
     def _deal(self, amount: int) -> None:
+        if self._closed or self._chaos_future is not None or self._chaos_failed:
+            return
         try:
             self.controller.place_bet(amount)
         except ActionError as e:
@@ -133,6 +160,8 @@ class TableScene(Scene):
         self._after_command()
 
     def _use_item(self, item_id: str) -> None:
+        if self._closed or self._chaos_future is not None or self._chaos_failed:
+            return
         try:
             self.controller.use_item(item_id)
         except ActionError as e:
@@ -171,12 +200,31 @@ class TableScene(Scene):
             self.ui.handle_event(event)
 
     def update(self, dt: float) -> None:
+        if self._closed:
+            return
         self.feed.update(dt)
         self._timer += dt
+        if self._chaos_future is not None:
+            if self._chaos_future.done():
+                result = self._chaos_future
+                self._chaos_future = None
+                try:
+                    result.result()
+                except Exception:
+                    # Do not retry a potentially billed call or expose backend
+                    # errors. Keep the cached table and allow returning to menu.
+                    self._chaos_failed = True
+                    self.feed.push(CHAOS_ERROR, BAD)
+                else:
+                    self._after_command()
+            return
         phase = self.view.phase
-        if phase == TablePhase.CHAOS and self._timer >= CHAOS_DELAY:
-            # Synchronous for now; phase 4 moves LLM calls off the render thread.
-            self._command("resolve_chaos")()
+        if phase == TablePhase.CHAOS and not self._chaos_failed and self._timer >= CHAOS_DELAY:
+            result = Future()
+            self._chaos_future = result
+            # A daemon avoids waiting for a slow network request at app shutdown.
+            Thread(target=_resolve_chaos, args=(self.controller, result),
+                   name="chaos-ai", daemon=True).start()
         elif phase == TablePhase.DEALER_TURN and self._timer >= DEALER_STEP_DELAY:
             self._command("dealer_step")()
         elif phase == TablePhase.RUN_OVER and not self._ending_opened and self._timer >= RUN_END_DELAY:
@@ -225,7 +273,10 @@ class TableScene(Scene):
         elif v.phase in (TablePhase.ROUND_OVER, TablePhase.RUN_OVER) and v.last_result:
             self._draw_banner(surface, v)
         elif v.phase == TablePhase.CHAOS:
-            self._draw_center_text(surface, "The Chaos AI is thinking...", theme.CHAOS_MAGENTA)
+            if self._chaos_failed:
+                self._draw_center_text(surface, CHAOS_ERROR, BAD)
+            else:
+                self._draw_chaos_thinking(surface)
         elif v.phase == TablePhase.DEALER_TURN:
             self._draw_center_text(surface, "Dealer is playing...", theme.TEXT_MUTED)
 
@@ -289,3 +340,15 @@ class TableScene(Scene):
     def _draw_center_text(self, surface: pygame.Surface, text: str, color) -> None:
         img = self.app.assets.font(theme.FONT_BODY).render(text, True, color)
         surface.blit(img, img.get_rect(center=(W // 2, ACTION_Y + 28)))
+
+    def _draw_chaos_thinking(self, surface: pygame.Surface) -> None:
+        """Procedural placeholder animation; no additional art is required."""
+        img = self.app.assets.font(theme.FONT_BODY).render(
+            "The Chaos AI is thinking...", True, theme.CHAOS_MAGENTA,
+        )
+        surface.blit(img, img.get_rect(center=(W // 2, ACTION_Y + 14)))
+        active = int(self._timer / 0.25) % 3
+        for i in range(3):
+            color = theme.CHAOS_MAGENTA if i == active else theme.CHAOS_PURPLE
+            radius = 5 if i == active else 3
+            pygame.draw.circle(surface, color, (W // 2 + (i - 1) * 18, ACTION_Y + 42), radius)
