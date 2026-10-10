@@ -42,3 +42,9 @@ Thumbs.db
 # Local scratch
 *.log
 scratch/
+
+# Art repo (separate git repository)
+black-jack-assets/
+
+# Agent-player run files (python -m chaos_blackjack.agent)
+.agent_runs/

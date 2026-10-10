@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Any, NotRequired, TypedDict
+from typing import Any, TypedDict
 
 
-class StructuredAIAction(TypedDict, total=False):
-    """LLM / stub must return JSON matching this shape."""
-
+class _RequiredAction(TypedDict):
     action: str
     """High-level verb: apply_rule, noop, use_item."""
 
-    narration: NotRequired[str]
+
+class StructuredAIAction(_RequiredAction, total=False):
+    """LLM / stub must return JSON matching this shape.
+
+    (Required/optional split via inheritance: typing.NotRequired is 3.11+.)
+    """
+
+    narration: str
     """Short human-readable explanation for UI (no markdown)."""
 
-    rule_id: NotRequired[str | None]
-    params: NotRequired[dict[str, Any]]
-    item_id: NotRequired[str | None]
+    rule_id: str | None
+    params: dict[str, Any]
+    item_id: str | None
 
 
 def parse_structured_action(raw: dict[str, Any]) -> StructuredAIAction | None:

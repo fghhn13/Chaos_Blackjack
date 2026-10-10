@@ -11,7 +11,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from chaos_blackjack.ai.gemini_llm import load_dotenv_from_project_root
+from chaos_blackjack.ai.env import load_dotenv_from_project_root
 
 load_dotenv_from_project_root()
 

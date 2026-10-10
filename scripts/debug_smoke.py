@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from chaos_blackjack.ai.gemini_llm import load_dotenv_from_project_root
+from chaos_blackjack.ai.env import load_dotenv_from_project_root
 from chaos_blackjack.ai.permissions_loader import load_permission_profile
 from chaos_blackjack.ai.pipeline import ChaosPipeline, StubLLM
 from chaos_blackjack.ai.prompts_loader import load_prompt

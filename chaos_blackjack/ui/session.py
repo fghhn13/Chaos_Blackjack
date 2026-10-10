@@ -2,167 +2,49 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import random
 import shlex
 import sys
 from typing import Callable, TextIO
 
 from chaos_blackjack import auto_load_plugins
-from chaos_blackjack.contracts.items import ItemResult
+from chaos_blackjack.app.config import (
+    DEFAULT_REWARD_POOL as MVP_DEFAULT_REWARD_POOL,
+    DEFAULT_REWARD_STREAK as MVP_REWARD_STREAK,
+    DEFAULT_START_MONEY as MVP_START_MONEY,
+    DEFAULT_TARGET_MONEY as MVP_TARGET_MONEY,
+)
+from chaos_blackjack.app.economy import (
+    RunState,
+    bet_limits as _bet_limits,
+    settle_money as _settle_money,
+    update_streak_and_maybe_reward as _update_streak_and_maybe_reward,
+)
+from chaos_blackjack.app.item_use import (
+    apply_item_effects as _apply_item_effects,
+    inventory_counts as _inventory_counts,
+    use_item,
+)
+from chaos_blackjack.app.persistence import (
+    build_save_data as _build_save_data,
+    deserialize_active_modifiers as _deserialize_active_modifiers,
+    game_state_to_snapshot as _game_state_to_snapshot,
+    snapshot_to_game_state as _snapshot_to_game_state,
+)
 from chaos_blackjack.core.game_loop import GameLoop
-from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
+from chaos_blackjack.core.game_state import GamePhase, GameState
 from chaos_blackjack.events.dispatcher import EventDispatcher
 from chaos_blackjack.registry import get_registry
 from chaos_blackjack.rules.rule_engine import RuleContext
-from chaos_blackjack.core.run_state import (
-    CardSnapshot,
-    GameStateSnapshot,
-    ModifierSnapshot,
-    RunSaveData,
-)
 from chaos_blackjack.core.save_manager import save_game
 from chaos_blackjack.logic.run_end_policy import (
     CompositeRunEndPolicy,
     MoneyBankruptDefeatPolicy,
     MoneyTargetVictoryPolicy,
 )
-from chaos_blackjack.rules.modifiers import ActiveModifiers
 from chaos_blackjack.ui.descriptions import chaos_ai_flavor, describe_active_modifiers, info_rules_text
 from chaos_blackjack.ui.feedback import FeedbackLog
 from chaos_blackjack.ui.formatting import format_dealer_visible, format_hand
-
-
-def _inventory_counts(inventory: tuple[str, ...]) -> list[tuple[str, int]]:
-    counts: dict[str, int] = {}
-    for x in inventory:
-        counts[x] = counts.get(x, 0) + 1
-    return sorted(counts.items())
-
-
-def _remove_one(inv: tuple[str, ...], item_id: str) -> tuple[str, ...]:
-    lst = list(inv)
-    if item_id in lst:
-        lst.remove(item_id)
-    return tuple(lst)
-
-
-MVP_START_MONEY = 100
-MVP_TARGET_MONEY = 400
-MVP_REWARD_STREAK = 2
-MVP_DEFAULT_REWARD_POOL: tuple[str, ...] = ("peek", "shield", "swap")
-
-
-@dataclass
-class RunState:
-    money: int
-    start_money: int
-    round: int
-    target_money: int
-    objective: str
-    win_streak: int
-    current_bet: int
-    items: tuple[str, ...]
-
-
-def _card_to_snapshot(card: Card) -> CardSnapshot:
-    return CardSnapshot(rank=str(card.rank), suit=str(card.suit or ""))
-
-
-def _snapshot_to_card(s: CardSnapshot) -> Card:
-    return Card(Rank(s.rank), s.suit)
-
-
-def _game_state_to_snapshot(state: GameState) -> GameStateSnapshot:
-    return GameStateSnapshot(
-        player_hand=[_card_to_snapshot(c) for c in state.player_hand],
-        dealer_hand=[_card_to_snapshot(c) for c in state.dealer_hand],
-        deck=[_card_to_snapshot(c) for c in state.deck],
-        phase=state.phase.name,
-        chaos_budget_remaining=int(state.chaos_budget_remaining),
-        inventory=list(state.inventory),
-    )
-
-
-def _snapshot_to_game_state(s: GameStateSnapshot) -> GameState:
-    return GameState(
-        player_hand=tuple(_snapshot_to_card(c) for c in s.player_hand),
-        dealer_hand=tuple(_snapshot_to_card(c) for c in s.dealer_hand),
-        deck=tuple(_snapshot_to_card(c) for c in s.deck),
-        phase=GamePhase[s.phase],
-        chaos_budget_remaining=int(s.chaos_budget_remaining),
-        inventory=tuple(s.inventory),
-    )
-
-
-def _serialize_modifier_params(mod: object) -> dict[str, object]:
-    # Generic heuristics for current modifier plugins.
-    params: dict[str, object] = {}
-    if hasattr(mod, "delta"):
-        try:
-            params["delta"] = int(getattr(mod, "delta"))
-        except Exception:
-            pass
-
-    mid = getattr(mod, "id", None)
-    if mid == "tiebreaker_shift" and hasattr(mod, "chaos_flags"):
-        flags = getattr(mod, "chaos_flags") or frozenset()
-        ties_to = "dealer" if "dealer_wins_ties" in flags else "player"
-        params["ties_to"] = ties_to
-
-    return params
-
-
-def _serialize_active_modifiers(loop: GameLoop) -> list[ModifierSnapshot]:
-    out: list[ModifierSnapshot] = []
-    for m in loop.modifiers.items:
-        mid = getattr(m, "id", None)
-        if not mid:
-            continue
-        params = _serialize_modifier_params(m)
-        out.append(ModifierSnapshot(id=str(mid), params=params))
-    return out
-
-
-def _deserialize_active_modifiers(
-    mods: list[ModifierSnapshot],
-    *,
-    registry,
-) -> ActiveModifiers:
-    built: list[object] = []
-    for m in mods:
-        inst = registry.build_chaos_rule(m.id, m.params)
-        if inst is None:
-            raise ValueError(f"Unknown chaos rule id in save: {m.id}")
-        built.append(inst)
-    return ActiveModifiers(items=tuple(built))
-
-
-def _build_save_data(
-    *,
-    run: RunState,
-    state: GameState,
-    loop: GameLoop,
-    enable_chaos: bool,
-) -> RunSaveData:
-    active = _serialize_active_modifiers(loop)
-    chaos_actions_this_turn = int(getattr(loop, "_chaos_actions_this_turn", 0))
-
-    return RunSaveData(
-        version=1,
-        money=run.money,
-        start_money=run.start_money,
-        round=run.round,
-        items=list(state.inventory),
-        objective=run.objective,
-        win_streak=run.win_streak,
-        target_money=run.target_money,
-        current_bet=run.current_bet,
-        enable_chaos=bool(enable_chaos),
-        game_state=_game_state_to_snapshot(state),
-        active_modifiers=active,
-        chaos_actions_this_turn=chaos_actions_this_turn,
-    )
 
 
 def run_interactive_session(
@@ -700,59 +582,6 @@ def _use_item_menu(
     return state
 
 
-def _apply_item_use(
-    stdout: TextIO,
-    loop: GameLoop,
-    log: FeedbackLog,
-    state: GameState,
-    item_id: str,
-) -> GameState:
-    from chaos_blackjack.contracts.items import ItemContext
-
-    reg = get_registry()
-    cls = reg.resolve_item(item_id)
-    if cls is None:
-        stdout.write(f"\nUnknown item: {item_id}\n\n> ")
-        return state
-    if item_id not in state.inventory:
-        stdout.write("\nYou don't have that item.\n\n> ")
-        return state
-
-    ctx = ItemContext(
-        state,
-        emit_event=loop.emit_event,
-        peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
-    )
-    inst = cls()
-    result = inst.use(ctx)
-    stdout.write("\n")
-    for line in log.drain():
-        stdout.write(line + "\n")
-    if result.ok:
-        state_after_effect = _apply_item_effects(state, result)
-        new_inv = _remove_one(state_after_effect.inventory, item_id)
-        stdout.write(f"{result.message}\n\n> ")
-        return state_after_effect.with_inventory(new_inv)
-    stdout.write(f"{result.message}\n\n> ")
-    return state
-
-
-def _apply_item_effects(state: GameState, result: ItemResult) -> GameState:
-    extra = result.extra if isinstance(result.extra, dict) else {}
-    if not extra.get("swap_top_into_first_player_card"):
-        return state
-    if not state.player_hand or not state.deck:
-        return state
-    top, *rest = state.deck
-    player = state.player_hand
-    swapped = (top,) + player[1:]
-    return state.with_player_hand(swapped).with_deck(tuple(rest))
-
-
-def _bet_limits(money: int) -> tuple[int, int]:
-    return (1, money // 2)
-
-
 def _prompt_bet(
     *,
     read_line: Callable[[str], str],
@@ -808,31 +637,19 @@ def _start_new_round_with_bet(
     )
 
 
-def _settle_money(money: int, bet: int, outcome: str) -> int:
-    if outcome == "player":
-        return money + bet
-    if outcome == "dealer":
-        return money - bet
-    return money
-
-
-def _update_streak_and_maybe_reward(
-    *,
-    run: RunState,
-    outcome: str,
-    reward_pool: tuple[str, ...],
-    rng: random.Random,
-) -> str | None:
-    if outcome == "player":
-        run.win_streak += 1
-        if run.win_streak >= MVP_REWARD_STREAK and reward_pool:
-            reward = rng.choice(reward_pool)
-            run.items = run.items + (reward,)
-            run.win_streak = 0
-            return reward
-        return None
-    run.win_streak = 0
-    return None
+def _apply_item_use(
+    stdout: TextIO,
+    loop: GameLoop,
+    log: FeedbackLog,
+    state: GameState,
+    item_id: str,
+) -> GameState:
+    new_state, result = use_item(loop, state, item_id)
+    stdout.write("\n")
+    for line in log.drain():
+        stdout.write(line + "\n")
+    stdout.write(f"{result.message}\n\n> ")
+    return new_state
 
 
 def _run_dealer_with_feedback(

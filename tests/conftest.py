@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# Tests must never make billed API calls, whatever the local .env says
+# (.env loading never overrides variables that are already set).
+os.environ["CHAOS_USE_LLM"] = "0"
 
 import pytest
 

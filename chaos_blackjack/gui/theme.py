@@ -1,0 +1,33 @@
+"""Palette and type scale — matches black-jack-assets/docs/generation-plan.md."""
+
+from __future__ import annotations
+
+Color = tuple[int, int, int]
+
+DARK: Color = (0x0B, 0x10, 0x11)
+FELT: Color = (0x10, 0x3B, 0x2E)
+FELT_LIGHT: Color = (0x1A, 0x55, 0x42)
+GOLD: Color = (0xD5, 0xB3, 0x65)
+GOLD_DIM: Color = (0x8A, 0x74, 0x42)
+CHAOS_PURPLE: Color = (0x9A, 0x42, 0xE8)
+CHAOS_MAGENTA: Color = (0xE4, 0x43, 0xB5)
+IVORY: Color = (0xF3, 0xEB, 0xDC)
+INK: Color = (0x22, 0x22, 0x22)
+SUIT_RED: Color = (0xB8, 0x2B, 0x2B)
+TEXT: Color = IVORY
+TEXT_MUTED: Color = (0x9A, 0xA3, 0x9E)
+PANEL: Color = (0x14, 0x1C, 0x1E)
+
+CHIP_COLORS: dict[int, Color] = {
+    1: (0xE8, 0xE0, 0xCC),
+    5: (0xB8, 0x2B, 0x2B),
+    10: (0x2B, 0x58, 0xB8),
+    25: GOLD,
+}
+
+# Font sizes in logical pixels (canvas is 1280x720).
+FONT_SMALL = 16
+FONT_BODY = 20
+FONT_BUTTON = 24
+FONT_HEADING = 36
+FONT_TITLE = 64
