@@ -25,8 +25,9 @@ class MainMenuScene(Scene):
         self.ui = WidgetGroup(
             Label(a, "Chaos Blackjack", (x, 150), size=theme.FONT_TITLE, color=theme.GOLD, role="display"),
             Label(a, "Rules bend. The house cheats.", (x + 4, 232), size=theme.FONT_HEADING - 8, color=theme.CHAOS_MAGENTA),
+            Label(a, "Quick play - no player progress", (x + 4, y - 26), size=theme.FONT_SMALL, color=theme.TEXT_MUTED),
             Button(a, row(0), "New Game", lambda: self.app.scenes.push("table"), hotkey=pygame.K_RETURN),
-            Button(a, row(1), "Load Game", enabled=False, style="ghost", tooltip="Coming in phase 4"),
+            Button(a, row(1), "Players", lambda: self.app.scenes.push("player_select"), style="ghost"),
             Toggle(
                 a, row(2),
                 lambda on: f"Chaos Mode: {'ON' if on else 'OFF'}",

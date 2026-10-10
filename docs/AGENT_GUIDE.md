@@ -356,3 +356,10 @@ Use `python -m chaos_blackjack.content play example --agent` for a quick stream.
 Pack AIs use their offline strategies unless `--llm` is explicitly supplied.
 Players and Chaos AI apply the same item effects; Swap now also changes the hand
 when used by Chaos AI. Shield remains a placeholder with no blocking effect.
+
+## 15. GUI player progression
+
+The GUI now offers three named player slots, a hub, permanent/consumable upgrades,
+run rewards and history through the meta API. Quick play remains available through
+New Game. The agent interface continues without meta progression or token rewards,
+so its seeded runs remain fair and reproducible. See [GUI guide](META_GUI.md).

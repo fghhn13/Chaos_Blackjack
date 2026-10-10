@@ -5,3 +5,5 @@ and import it below.
 """
 
 from chaos_blackjack.gui.scenes import chaos_poke, confirm, ending, gallery, items, menu, shop, table  # noqa: F401
+
+from chaos_blackjack.gui.scenes import history, hub, meta_shop, player_select, run_result  # noqa: F401

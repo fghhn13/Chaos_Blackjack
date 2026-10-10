@@ -349,3 +349,11 @@ Pack items are sold only when their plugin is loaded; win streaks grant no items
 ---
 
 Made with controlled chaos.
+
+## Player progression GUI
+
+Open **Players** from the menu to create or continue one of three named slots.
+The hub selects Classic/Chaos mode and consumables, and opens the token shop,
+history and settings. Player runs use the meta API for upgrades and rewards;
+Quick play remains available through **New Game** without player progression.
+See [GUI operation and agent handoff](docs/META_GUI.md).
