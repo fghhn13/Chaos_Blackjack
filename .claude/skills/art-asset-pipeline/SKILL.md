@@ -134,6 +134,7 @@ the PR description.
 ```bash
 python scripts/preview_assets.py --out output/asset_previews
 python scripts/preview_assets.py --matte card_back card_front_blank peek chip_1 chaos_calm
+python scripts/preview_assets.py --motion   # + filmstrips of dealing, settling and the chaos glitch
 ```
 
 This writes the menu (chaos off and on), table while betting and mid-round, both

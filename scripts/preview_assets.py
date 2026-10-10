@@ -10,6 +10,7 @@ Writes PNGs into --out (default output/asset_previews/):
   gallery_<category>.png                     asset gallery, one per tab
   matte_<id>.png                             asset large on dark / felt / white
   zoom_cards.png, zoom_chips.png             in-game sizes magnified x3
+  motion_*.png (with --motion)               animation filmstrips: deal, settle, chaos glitch
 
   python scripts/preview_assets.py
   python scripts/preview_assets.py --matte card_back card_front_blank peek chip_1
@@ -101,6 +102,75 @@ def _hover_first_item(scene) -> None:
     scene.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {"pos": rect.center, "rel": (0, 0), "buttons": (0, 0, 0)}))
 
 
+FRAME_DT = 1 / 60
+
+
+def film(app: App, times: list[float], start=None) -> list[tuple[float, pygame.Surface]]:
+    """Run the top scene at 60 fps and grab the canvas at each time (seconds after `start`)."""
+    if start is not None:
+        start(app.scenes.top)
+    frames, t = [], 0.0
+    for target in sorted(times):
+        while t < target - 1e-9:
+            app.scenes.update(FRAME_DT)
+            app.scenes.apply_pending()
+            t += FRAME_DT
+        app.canvas.fill(theme.DARK)
+        app.scenes.draw(app.canvas)
+        frames.append((target, app.canvas.copy()))
+    return frames
+
+
+def film_sheet(app: App, frames: list[tuple[float, pygame.Surface]], cols: int = 3, scale: float = 0.4) -> pygame.Surface:
+    w, h = (round(v * scale) for v in frames[0][1].get_size())
+    rows = (len(frames) + cols - 1) // cols
+    sheet = pygame.Surface((cols * (w + 8) + 8, rows * (h + 30) + 8))
+    sheet.fill((12, 12, 12))
+    font = app.assets.font(theme.FONT_SMALL, bold=True)
+    for i, (t, frame) in enumerate(frames):
+        x, y = 8 + (i % cols) * (w + 8), 8 + (i // cols) * (h + 30)
+        sheet.blit(font.render(f"t = {t:.2f}s", True, theme.IVORY), (x, y))
+        sheet.blit(pygame.transform.smoothscale(frame, (w, h)), (x, y + 24))
+    return sheet
+
+
+def fresh_chaos_seed() -> int:
+    """A seed whose first round gets a chaos rule (probed on a throwaway controller)."""
+    for seed in range(1, 400):
+        c = GameController(RunConfig(seed=seed, enable_chaos=True))
+        c.place_bet(15)
+        if c.phase == TablePhase.CHAOS:
+            c.resolve_chaos()
+            if c.view().active_rules:
+                return seed
+    raise RuntimeError("no seed applies a chaos rule in round one")
+
+
+def motion_strips(app: App) -> dict[str, pygame.Surface]:
+    out: dict[str, pygame.Surface] = {}
+    app.scenes.reset("table", controller=in_play_seed_controller())
+    app.scenes.apply_pending()
+    out["motion_deal"] = film_sheet(app, film(app, [0.0, 0.12, 0.25, 0.4, 0.55, 0.9],
+                                              start=lambda s: s._deal(15)))
+    out["motion_settle"] = film_sheet(app, film(app, [0.3, 0.8, 1.15, 1.5, 1.9, 2.6],
+                                                start=lambda s: s._command("stand")()))
+    app.scenes.reset("table", controller=GameController(RunConfig(seed=fresh_chaos_seed(), enable_chaos=True)))
+    app.scenes.apply_pending()
+    out["motion_glitch"] = film_sheet(app, film(app, [1.0, 1.3, 1.36, 1.45, 1.6, 1.9],
+                                                start=lambda s: s._deal(15)))
+    return out
+
+
+def in_play_seed_controller() -> GameController:
+    """Fresh controller (betting phase) whose first deal leaves the player to act."""
+    for seed in range(1, 200):
+        probe = GameController(RunConfig(seed=seed, enable_chaos=False))
+        probe.place_bet(15)
+        if probe.phase == TablePhase.PLAYER_TURN:
+            return GameController(RunConfig(seed=seed, enable_chaos=False))
+    raise RuntimeError("no seed produced a player turn")
+
+
 def matte_sheet(app: App, asset_id: str, max_h: int = 640) -> pygame.Surface:
     img = app.assets.image(asset_id)
     w, h = img.get_size()
@@ -154,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=str(ROOT / "output" / "asset_previews"))
     ap.add_argument("--dir", action="append", help="asset folder(s) in search order (default: the game's)")
     ap.add_argument("--matte", nargs="*", default=list(DEFAULT_MATTE_IDS), help="ids for matte sheets")
+    ap.add_argument("--motion", action="store_true", help="also render animation filmstrips")
     args = ap.parse_args(argv)
 
     out = Path(args.out)
@@ -185,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         shots[f"matte_{asset_id}"] = matte_sheet(app, asset_id)
     shots["zoom_cards"] = zoom_cards(app)
     shots["zoom_chips"] = zoom_chips(app)
+    if args.motion:
+        shots.update(motion_strips(app))
 
     for name, surf in shots.items():
         pygame.image.save(surf, str(out / f"{name}.png"))

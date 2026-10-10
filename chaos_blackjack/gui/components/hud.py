@@ -17,9 +17,13 @@ if TYPE_CHECKING:
 
 W, H = LOGICAL_SIZE
 BAR_H = 48
+GAIN = (0x9C, 0xC2, 0x96)  # bankroll text while it rolls up / down
+LOSS = (0xD0, 0x7C, 0x70)
 
 
-def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView) -> None:
+def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView, *, money: int | None = None) -> None:
+    """`money` overrides the bankroll shown (it rolls toward `v.money` while animating)."""
+    shown = v.money if money is None else money
     bar = pygame.Surface((W, BAR_H), pygame.SRCALPHA)
     bar.fill((*theme.DARK, 225))
     surface.blit(bar, (0, 0))
@@ -32,11 +36,12 @@ def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView
     # Bankroll progress toward the target, aligned with the left column.
     x, y, pw, ph = 16, 10, 240, 28
     pygame.draw.rect(surface, theme.PANEL, (x, y, pw, ph), border_radius=6)
-    k = max(0.0, min(1.0, v.money / max(1, v.target_money)))
+    k = max(0.0, min(1.0, shown / max(1, v.target_money)))
     if k > 0:
         pygame.draw.rect(surface, theme.GOLD_DIM, (x, y, max(12, int(pw * k)), ph), border_radius=6)
     pygame.draw.rect(surface, theme.GOLD, (x, y, pw, ph), 1, border_radius=6)
-    money = body.render(f"{v.money} / {v.target_money}", True, theme.IVORY)
+    color = theme.IVORY if shown == v.money else (GAIN if shown < v.money else LOSS)
+    money = body.render(f"{shown} / {v.target_money}", True, color)
     surface.blit(money, money.get_rect(center=(x + pw // 2, y + ph // 2)))
     surface.blit(tiny.render("BANKROLL", True, theme.GOLD_DIM), (x + pw + 12, y + 7))
 
