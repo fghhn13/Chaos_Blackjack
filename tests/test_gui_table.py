@@ -258,6 +258,66 @@ def test_chaos_completion_waits_for_modal_to_close(app, monkeypatch, slow_llm):
     assert t.action_buttons[Action.HIT].enabled
 
 
+def test_cancel_exit_while_chaos_runs_does_not_read_controller(app, monkeypatch, slow_llm):
+    t = _start_chaos(app, monkeypatch, slow_llm)
+    cached = t.view
+    timer = t._timer
+
+    def forbidden_read():
+        pytest.fail("Modal resume read the controller while the chaos worker owns it")
+
+    with monkeypatch.context() as reads:
+        reads.setattr(t.controller, "view", forbidden_read)
+        reads.setattr(t.controller, "drain_notices", forbidden_read)
+        _key(app, pygame.K_ESCAPE)
+        _tick(app, 0.01)
+        _key(app, pygame.K_ESCAPE)
+        assert app.scenes.top is t
+        assert t.view is cached and t._timer == timer
+        _key(app, pygame.K_b)
+        assert app.scenes.top is t
+
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view.phase == TablePhase.PLAYER_TURN
+    assert t.action_buttons[Action.HIT].enabled
+
+
+def test_shop_purchase_survives_chaos_and_shield_dispels_result(app, monkeypatch, slow_llm):
+    t = _open_table(app, enable_chaos=True, shop_prices={"shield": 10}, shop_slots=1,
+                    deal=([_c("10"), _c("8")], [_c("10"), _c("7")], []))
+    slow_llm.response = ('{"action":"apply_rule","rule_id":"modify_card_value",'
+                         '"params":{"delta":-1}}')
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", slow_llm)
+    monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
+    _key(app, pygame.K_b)
+    _key(app, pygame.K_1)
+    _key(app, pygame.K_ESCAPE)
+    assert app.scenes.top is t
+    assert t.view.money == 90 and t.view.items[0].id == "shield"
+    t._deal(10)
+    _tick(app, CHAOS_DELAY)
+    assert slow_llm.started.wait(timeout=1)
+    cached = t.view
+    t._use_item("shield")
+    _key(app, pygame.K_b)
+    assert t.view is cached and app.scenes.top is t
+
+    slow_llm.release.set()
+    t._chaos_future.result(timeout=3)
+    _tick(app, 0.01)
+    assert t.view.player_total == 16 and t.view.active_rules
+    assert t.view.items[0].id == "shield"
+    t._use_item("shield")
+    assert t.view.player_total == 18 and not t.view.active_rules and not t.view.items
+    _key(app, pygame.K_s)
+    _tick(app, 1.0)
+    assert t.view.last_result.outcome == "player" and t.view.money == 100
+    _key(app, pygame.K_RETURN)
+    assert t.view.phase == TablePhase.BETTING
+
+
 def test_window_quit_does_not_wait_for_chaos(app, monkeypatch, slow_llm):
     t = _start_chaos(app, monkeypatch, slow_llm)
     result = t._chaos_future

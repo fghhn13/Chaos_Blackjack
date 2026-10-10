@@ -176,6 +176,10 @@ class TableScene(Scene):
         self._after_command()
 
     def _after_command(self) -> None:
+        # Shop callbacks and modal resumes share this refresh path. A worker
+        # owns the controller until update() consumes its completed result.
+        if self._closed or self._chaos_future is not None or self._chaos_failed:
+            return
         self._timer = 0.0
         self._pump_notices()
         self.view = self.controller.view()
