@@ -195,7 +195,7 @@ class GameController:
 
     def place_bet(self, amount: int) -> None:
         self._require(Action.BET)
-        lo, hi = self._bet_limits(self.run.money)
+        lo, hi = self.bet_limits(self.run.money)
         if not lo <= amount <= hi:
             raise ActionError(f"Invalid bet. Allowed range: {lo}~{hi}")
         self.run.current_bet = amount
@@ -219,7 +219,7 @@ class GameController:
         offer = self.shop.offer(item_id)
         if offer is None:
             raise ActionError(f"The shop has no {item_id!r} for sale")
-        if not self._can_bet(self.run.money - offer.price):
+        if not self.can_bet(self.run.money - offer.price):
             raise ActionError(f"Not enough chips: {item_id} costs {offer.price} and you must keep enough to bet")
         self.run.money -= offer.price
         self.run.items = self.run.items + (item_id,)
@@ -340,6 +340,17 @@ class GameController:
 
     # ------------------------------------------------------------ read side
 
+    def bet_limits(self, money: int | None = None) -> tuple[int, int]:
+        """Allowed bet range for `money` (default: the current bankroll) under this run's config."""
+        m = self.run.money if money is None else money
+        return bet_limits(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+
+    def can_bet(self, money: int | None = None) -> bool:
+        """Whether `money` (default: the bankroll) still allows a minimum bet; shop
+        purchases must leave this true."""
+        m = self.run.money if money is None else money
+        return can_bet(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+
     def drain_notices(self) -> list[Notice]:
         out = self._notices
         self._notices = []
@@ -348,7 +359,7 @@ class GameController:
     def view(self) -> GameView:
         st = self.state
         hide_hole = self.phase in (TablePhase.CHAOS, TablePhase.PLAYER_TURN) and not self.hole_revealed
-        lo, hi = self._bet_limits(self.run.money)
+        lo, hi = self.bet_limits(self.run.money)
         player_cards: tuple[CardView, ...] = ()
         dealer_cards: tuple[CardView, ...] = ()
         player_total = dealer_total = None
@@ -380,7 +391,7 @@ class GameController:
             deck_count=len(st.deck) if st is not None else 0,
             items=tuple(ItemView(i, n) for i, n in inventory_counts(inventory)),
             shop_offers=tuple(
-                ShopOfferView(o.item, o.price, o.sold, not o.sold and self._can_bet(self.run.money - o.price))
+                ShopOfferView(o.item, o.price, o.sold, not o.sold and self.can_bet(self.run.money - o.price))
                 for o in self.shop.offers
             ),
             shop_restock_in=rounds_until_restock(self.shop, self.run.round, self.config.shop_refresh_rounds),
@@ -501,11 +512,6 @@ class GameController:
         self.run.round += 1
         self._set_phase(TablePhase.ROUND_OVER)
 
-    def _bet_limits(self, money: int) -> tuple[int, int]:
-        return bet_limits(money, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
-
-    def _can_bet(self, money: int) -> bool:
-        return can_bet(money, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
 
     def _configure_chaos(self) -> None:
         """Hand the balance profile's chaos settings to the pipeline."""
@@ -521,7 +527,7 @@ class GameController:
         return roll_stock(self.shop_seed, self.run.round, self.config.shop_prices, self.config.shop_slots)
 
     def _check_can_bet(self) -> None:
-        if self.phase == TablePhase.BETTING and not self._can_bet(self.run.money):
+        if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):
             self.run_end = RunEndResult(kind="defeat", message=NO_VALID_BET_MESSAGE)
             self._end_run()
 

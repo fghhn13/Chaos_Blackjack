@@ -338,3 +338,23 @@ def test_rule_params_survive_save_and_agent_reload(db) -> None:
     mod = again.controller.loop.modifiers.items[0]
     assert mod.id == "great_crash" and mod.ten_value == 7
     assert again.controller.config.chaos_stub == (("great_crash", {}, 1.0),)
+
+
+def test_rule_descriptions_show_tuned_numbers() -> None:
+    from chaos_blackjack.registry import get_registry
+    from chaos_blackjack.ui.descriptions import describe_modifier
+
+    reg = get_registry()
+    assert "value 5" in describe_modifier(reg.build_chaos_rule("great_crash", {"ten_value": 5}))
+    assert "reduced to 19" in describe_modifier(reg.build_chaos_rule("fragile_bust", {"bust_limit": 19}))
+    assert "+3, odd ranks -2" in describe_modifier(
+        reg.build_chaos_rule("odd_even_chaos", {"even_delta": 3, "odd_delta": -2}))
+    assert "red suits +2, black suits +0" in describe_modifier(
+        reg.build_chaos_rule("suit_power", {"red_delta": 2, "black_delta": 0}))
+    assert "value 1" in describe_modifier(reg.build_chaos_rule("great_crash", {}))
+
+
+def test_public_bet_helpers_follow_the_profile() -> None:
+    c = GameController(RunConfig(min_bet=5, max_bet_fraction=0.25, start_money=40))
+    assert c.bet_limits() == (5, 10) and c.bet_limits(100) == (5, 25)
+    assert c.can_bet() and c.can_bet(20) and not c.can_bet(19)

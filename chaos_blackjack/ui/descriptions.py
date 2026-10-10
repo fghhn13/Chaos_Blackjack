@@ -39,13 +39,15 @@ def _describe_one(tid: str, m: Any) -> str:
     if tid == "reverse_bust":
         return "Reverse bust: high player totals may not count as bust for outcome."
     if tid == "great_crash":
-        return "The Great Crash: all 10/J/Q/K become value 1 (until cleared)."
+        return f"The Great Crash: all 10/J/Q/K become value {getattr(m, 'ten_value', 1)} (until cleared)."
     if tid == "odd_even_chaos":
-        return "Odd-Even Chaos: even ranks +2, odd ranks -1 (until cleared)."
+        even, odd = getattr(m, "even_delta", 2), getattr(m, "odd_delta", -1)
+        return f"Odd-Even Chaos: even ranks {even:+}, odd ranks {odd:+} (until cleared)."
     if tid == "suit_power":
-        return "Suit Power: red suits +1, black suits -1 (until cleared)."
+        red, black = getattr(m, "red_delta", 1), getattr(m, "black_delta", -1)
+        return f"Suit Power: red suits {red:+}, black suits {black:+} (until cleared)."
     if tid == "fragile_bust":
-        return "Fragile Table: bust threshold reduced to 18 (instead of 21)."
+        return f"Fragile Table: bust threshold reduced to {getattr(m, 'bust_limit', 18)} (instead of 21)."
     if tid == "tiebreaker_shift":
         flags = getattr(m, "chaos_flags", frozenset())
         if "dealer_wins_ties" in flags:
