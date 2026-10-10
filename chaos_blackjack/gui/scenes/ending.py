@@ -39,7 +39,7 @@ class EndingScene(Scene):
         surface.blit(band, (0, H - 345))
         head, sub = run_end_text(self.kind)
         color = theme.GOLD if self.kind == "victory" else theme.IVORY
-        h = a.font(theme.FONT_TITLE, bold=True).render(head, True, color)
+        h = a.font(theme.FONT_TITLE, role="display").render(head, True, color)
         surface.blit(h, h.get_rect(center=(W // 2, H - 290)))
         s = a.font(theme.FONT_BODY).render(f"{sub}    Final bankroll {self.money}    Rounds {self.rounds}", True, theme.TEXT)
         surface.blit(s, s.get_rect(center=(W // 2, H - 228)))

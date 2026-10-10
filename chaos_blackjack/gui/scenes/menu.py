@@ -5,6 +5,7 @@ from __future__ import annotations
 import pygame
 
 from chaos_blackjack.gui import theme
+from chaos_blackjack.gui.components.chaos_panel import mood_face
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, Label, Toggle, WidgetGroup
@@ -22,7 +23,7 @@ class MainMenuScene(Scene):
             return (x, y + i * (bh + gap), bw, bh)
 
         self.ui = WidgetGroup(
-            Label(a, "CHAOS BLACKJACK", (x, 150), size=theme.FONT_TITLE, color=theme.GOLD, bold=True),
+            Label(a, "Chaos Blackjack", (x, 150), size=theme.FONT_TITLE, color=theme.GOLD, role="display"),
             Label(a, "Rules bend. The house cheats.", (x + 4, 232), size=theme.FONT_HEADING - 8, color=theme.CHAOS_MAGENTA),
             Button(a, row(0), "New Game", lambda: self.app.scenes.push("table"), hotkey=pygame.K_RETURN),
             Button(a, row(1), "Load Game", enabled=False, style="ghost", tooltip="Coming in phase 4"),
@@ -46,7 +47,7 @@ class MainMenuScene(Scene):
     def draw(self, surface: pygame.Surface) -> None:
         a = self.app.assets
         surface.blit(a.image("menu_background", LOGICAL_SIZE), (0, 0))
-        face = "chaos_smug" if self.app.prefs.enable_chaos else "chaos_calm"
+        face = mood_face(a, "smug" if self.app.prefs.enable_chaos else "calm")
         portrait = a.image_fit(face, (420, 420))
         surface.blit(portrait, portrait.get_rect(center=(int(W * 0.74), int(H * 0.55))))
         self.ui.draw(surface)

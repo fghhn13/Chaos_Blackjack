@@ -16,8 +16,8 @@ from chaos_blackjack.gui.assets.manifest import MANIFEST
 
 Line = tuple[str, theme.Color]
 
-GOOD = (0x7C, 0xD6, 0x92)
-BAD = (0xE0, 0x6A, 0x6A)
+GOOD = (0x9C, 0xC2, 0x96)
+BAD = (0xD0, 0x7C, 0x70)
 
 
 def asset_name(asset_id: str) -> str:
@@ -42,7 +42,7 @@ NOTICE_TEXT: dict[str, Callable[[Notice], Line | None]] = {
     NoticeKind.DEALER_STANDS: lambda n: (f"Dealer stands on {n.data.get('total')}", theme.TEXT),
     NoticeKind.DEALER_BUSTS: lambda n: (f"Dealer busts! {n.data.get('total')}", GOOD),
     NoticeKind.REWARD_GRANTED: lambda n: (f"Streak reward: {asset_name(str(n.data.get('item')))}", theme.GOLD),
-    NoticeKind.RULE_MODIFIER_APPLIED: lambda n: (f"⚡ Chaos rule: {asset_name(str(n.data.get('rule_id')))}", theme.CHAOS_MAGENTA),
+    NoticeKind.RULE_MODIFIER_APPLIED: lambda n: (f"Chaos rule: {asset_name(str(n.data.get('rule_id')))}", theme.CHAOS_MAGENTA),
     NoticeKind.CHAOS_ACTION_REJECTED: lambda n: ("Chaos AI action blocked", theme.TEXT_MUTED),
     NoticeKind.CHAOS_NARRATION: lambda n: (f"Chaos AI: “{n.data.get('text')}”", theme.CHAOS_MAGENTA),
     NoticeKind.ITEM_RESULT: lambda n: (n.text, theme.GOLD if n.data.get("ok") else BAD),

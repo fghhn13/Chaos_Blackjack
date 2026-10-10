@@ -9,21 +9,13 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from chaos_blackjack.app.help_text import ITEM_HELP
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import Action, CardView, GameView, RoundResult, TablePhase
 
 OBS_SCHEMA = 1
 
 # Plain-English help so an LLM does not have to guess what ids mean.
-ITEM_HELP: dict[str, str] = {
-    "peek": "Reveal the rank of the next card in the deck.",
-    "fate_oracle": "Reveal the ranks of the next 3 cards in the deck.",
-    "danger_radar": "Show how many 10/J/Q/K cards remain in the deck.",
-    "hole_card_hacker": "Reveal the dealer's face-down card.",
-    "swap": "Replace your first card with the top card of the deck.",
-    "shield": "Primes a shield against chaos (currently has no game effect).",
-}
-
 ACTION_HELP: dict[str, str] = {
     Action.HIT: "take one more card",
     Action.STAND: "end your turn; the dealer plays",

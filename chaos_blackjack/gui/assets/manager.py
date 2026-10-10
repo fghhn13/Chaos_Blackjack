@@ -5,6 +5,11 @@ Lookup order for `image(id)`:
      (first dir wins; subfolders allowed),
   2. the manifest placeholder,
   3. a magenta checker so missing art is obvious.
+
+Fonts come from a `fonts/` folder in an asset dir. Files named by role are
+used for that role: `ui`, `ui-bold`, `display`, `display-bold` (any font
+extension). Otherwise the first font file found serves every role, and
+without any the system fonts in SYSTEM_FONTS are tried.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from chaos_blackjack.gui.assets.manifest import MANIFEST, AssetSpec
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 FONT_EXTS = (".ttf", ".otf", ".ttc")
+FONT_ROLES = ("ui", "ui-bold", "display", "display-bold")
 # Tried in order when no font file ships in an asset dir's `fonts/` folder.
 SYSTEM_FONTS = ("microsoftyahei", "pingfangsc", "notosanssc", "simhei", "notosanscjksc", "wenquanyimicrohei")
 
@@ -30,9 +36,9 @@ class AssetManager:
         self.asset_dirs = tuple(Path(d) for d in asset_dirs)
         self.manifest = MANIFEST if manifest is None else manifest
         self._files: dict[str, Path] = {}
-        self._font_file: Path | None = None
+        self._font_files: dict[str, Path] = {}  # role (or "any") -> file
         self._images: dict[tuple[str, tuple[int, int] | None], pygame.Surface] = {}
-        self._fonts: dict[tuple[int, bool], pygame.font.Font] = {}
+        self._fonts: dict[tuple[int, bool, str], pygame.font.Font] = {}
         self.refresh()
 
     # ----------------------------------------------------------------- index
@@ -40,7 +46,7 @@ class AssetManager:
     def refresh(self) -> None:
         """Rescan asset dirs (e.g. after new art was exported) and drop caches."""
         files: dict[str, Path] = {}
-        font_file: Path | None = None
+        font_files: dict[str, Path] = {}
         for d in self.asset_dirs:
             if not d.is_dir():
                 continue
@@ -50,10 +56,11 @@ class AssetManager:
                 suffix = p.suffix.lower()
                 if suffix in IMAGE_EXTS:
                     files.setdefault(p.stem, p)
-                elif suffix in FONT_EXTS and font_file is None and p.parent.name == "fonts":
-                    font_file = p
+                elif suffix in FONT_EXTS and p.parent.name == "fonts":
+                    role = p.stem.lower()
+                    font_files.setdefault(role if role in FONT_ROLES else "any", p)
         self._files = files
-        self._font_file = font_file
+        self._font_files = font_files
         self._images.clear()
         self._fonts.clear()
 
@@ -111,19 +118,28 @@ class AssetManager:
 
     # ----------------------------------------------------------------- fonts
 
-    def font(self, size: int, bold: bool = False) -> pygame.font.Font:
-        key = (size, bold)
+    def font(self, size: int, bold: bool = False, role: str = "ui") -> pygame.font.Font:
+        """`role` is "ui" (body text) or "display" (titles, headlines)."""
+        key = (size, bold, role)
         f = self._fonts.get(key)
         if f is None:
-            f = self._make_font(size, bold)
+            f = self._make_font(size, bold, role)
             self._fonts[key] = f
         return f
 
-    def _make_font(self, size: int, bold: bool) -> pygame.font.Font:
+    def _make_font(self, size: int, bold: bool, role: str) -> pygame.font.Font:
         if not pygame.font.get_init():
             pygame.font.init()
-        if self._font_file is not None:
-            f = pygame.font.Font(str(self._font_file), size)
+        roles = [role, "ui"] if role != "ui" else ["ui"]
+        for r in roles:
+            if bold and f"{r}-bold" in self._font_files:
+                return pygame.font.Font(str(self._font_files[f"{r}-bold"]), size)
+            if r in self._font_files:
+                f = pygame.font.Font(str(self._font_files[r]), size)
+                f.set_bold(bold and r != "display")  # display faces ship already heavy
+                return f
+        if "any" in self._font_files:
+            f = pygame.font.Font(str(self._font_files["any"]), size)
             f.set_bold(bold)
             return f
         for name in SYSTEM_FONTS:
