@@ -25,6 +25,7 @@ from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, layout
 from chaos_blackjack.gui.components.chaos_panel import ChaosPanel
 from chaos_blackjack.gui.components.hud import EventFeed, draw_status_bar
 from chaos_blackjack.gui.components.item_panel import ItemPanel
+from chaos_blackjack.gui.components.table_fx import TableFx
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD, notice_line, outcome_banner
@@ -89,12 +90,14 @@ class TableScene(Scene):
                                   self._command("next_round"), hotkey=pygame.K_RETURN)
         self.ui = WidgetGroup(*self.action_buttons.values(), self.next_button)
 
-        self._handlers: dict[str, list[NoticeHandler]] = {}
-        self.subscribe("*", self._feed_notice)
-        self.subscribe("*", self.chaos_panel.react)
         self._timer = 0.0
         self._ending_opened = False
         self.view: GameView = self.controller.view()
+        self.fx = TableFx(self.view, bankroll_anchor=(136, 24), dealer_anchor=(W // 2, DEALER_Y - 40))
+        self._handlers: dict[str, list[NoticeHandler]] = {}
+        self.subscribe("*", self._feed_notice)
+        self.subscribe("*", self.chaos_panel.react)
+        self.subscribe("*", self.fx.react)
         self._sync_widgets()
 
     # ----------------------------------------------------------- notices
@@ -141,8 +144,10 @@ class TableScene(Scene):
 
     def _after_command(self) -> None:
         self._timer = 0.0
+        prev = self.view
         self._pump_notices()
         self.view = self.controller.view()
+        self.fx.view_changed(prev, self.view)
         self._sync_widgets()
 
     # ------------------------------------------------------------- frame
@@ -165,6 +170,10 @@ class TableScene(Scene):
 
     def update(self, dt: float) -> None:
         self.feed.update(dt)
+        self.fx.update(dt)
+        self.chaos_panel.update(dt)
+        if self.fx.busy:
+            return  # automatic steps wait for cards to land; input is never blocked
         self._timer += dt
         phase = self.view.phase
         if phase == TablePhase.CHAOS and self._timer >= CHAOS_DELAY:
@@ -206,12 +215,12 @@ class TableScene(Scene):
         self.chaos_panel.draw(surface)
         self.item_panel.draw(surface)
         self._draw_deck(surface, v)
-        self._draw_bet_zone(surface, v)
         if v.dealer_cards:
             total = "?" if v.dealer_total is None else str(v.dealer_total)
-            self._draw_hand(surface, v.dealer_cards, DEALER_Y, "Dealer", total)
+            self._draw_hand(surface, v.dealer_cards, DEALER_Y, "dealer", total)
         if v.player_cards:
-            self._draw_hand(surface, v.player_cards, PLAYER_Y, "You", str(v.player_total))
+            self._draw_hand(surface, v.player_cards, PLAYER_Y, "player", str(v.player_total))
+        self._draw_bet_zone(surface, v)  # after the hands: settling chips fly over the cards
 
         if v.phase == TablePhase.BETTING:
             self.bet_panel.draw(surface)
@@ -224,7 +233,8 @@ class TableScene(Scene):
 
         self.ui.draw(surface)
         self.feed.draw(surface)
-        draw_status_bar(surface, a, v)
+        draw_status_bar(surface, a, v, money=self.fx.money_shown())
+        self.fx.apply_glitch(surface)
         self.chaos_panel.draw_overlay(surface)
         self.item_panel.draw_overlay(surface)
 
@@ -245,18 +255,27 @@ class TableScene(Scene):
         surface.blit(zone, BET_ZONE)
         if v.phase == TablePhase.BETTING:
             return  # the bet panel draws the pending amount here
-        if v.player_cards and v.current_bet:
-            draw_bet_stack(surface, self.app.assets, v.current_bet, STACK_CENTER)
+        if v.phase in (TablePhase.ROUND_OVER, TablePhase.RUN_OVER):
+            settled = self.fx.settle_position(STACK_CENTER)
+            if settled is None:
+                return  # chips have gone to the winner
+            pos, amount, alpha = settled
+            if amount or v.current_bet:
+                draw_bet_stack(surface, self.app.assets, amount or v.current_bet, pos, alpha=alpha)
+        elif v.player_cards and v.current_bet:
+            x, y = STACK_CENTER
+            draw_bet_stack(surface, self.app.assets, v.current_bet, (x, y + self.fx.chip_drop_offset()))
 
-    def _draw_hand(self, surface: pygame.Surface, cards, y: int, who: str, total: str) -> None:
+    def _draw_hand(self, surface: pygame.Surface, cards, y: int, hand: str, total: str) -> None:
         rects = layout_hand(len(cards), (W // 2, y), max_width=HAND_MAX_WIDTH)
-        for card, rect in zip(cards, rects):
-            shadow = pygame.Surface(rect.size, pygame.SRCALPHA)
-            pygame.draw.rect(shadow, (0, 0, 0, 90), shadow.get_rect(), border_radius=8)
-            surface.blit(shadow, rect.move(3, 4))
-            surface.blit(self.cards.render(card, rect.size), rect)
+        deck = self.item_panel.deck_rect
+        for i, (card, rect) in enumerate(zip(cards, rects)):
+            self.fx.draw_card(surface, self.cards, card, (hand, i), rect, deck)
         # Name + total pill above the hand.
         a = self.app.assets
+        who = "You" if hand == "player" else "Dealer"
+        if self.fx.hand_moving(hand):
+            total = "…"  # don't give the total away before the cards land
         name = a.font(theme.FONT_SMALL, bold=True).render(who.upper(), True, theme.GOLD_DIM)
         value = a.font(theme.FONT_BODY, bold=True).render(total, True, theme.IVORY)
         pill = pygame.Rect(0, 0, name.get_width() + value.get_width() + 34, 30)
@@ -267,17 +286,25 @@ class TableScene(Scene):
         surface.blit(value, value.get_rect(midright=(pill.right - 12, pill.centery)))
 
     def _draw_banner(self, surface: pygame.Surface, v: GameView) -> None:
+        p = self.fx.banner_progress()
+        if p <= 0:
+            return
+        fade = min(1.0, p)
+        rise = round((1 - p) * 14)  # out_back overshoots, so the text settles with a small bounce
         head, detail, color = outcome_banner(v.last_result)
         width = CENTER_RIGHT - CENTER_LEFT
         band = pygame.Surface((width, 72), pygame.SRCALPHA)
-        band.fill((*theme.DARK, 215))
+        band.fill((*theme.DARK, round(215 * fade)))
         surface.blit(band, (CENTER_LEFT, BANNER_Y - 36))
-        pygame.draw.line(surface, color, (CENTER_LEFT, BANNER_Y - 36), (CENTER_RIGHT - 1, BANNER_Y - 36), 2)
+        line_w = round(width * fade)
+        pygame.draw.line(surface, color, (W // 2 - line_w // 2, BANNER_Y - 36), (W // 2 + line_w // 2, BANNER_Y - 36), 2)
         a = self.app.assets
         h = a.font(theme.FONT_HEADING, role="display").render(head, True, color)
         d = a.font(theme.FONT_BODY).render(detail, True, theme.TEXT)
-        surface.blit(h, h.get_rect(midbottom=(W // 2, BANNER_Y + 6)))
-        surface.blit(d, d.get_rect(midtop=(W // 2, BANNER_Y + 8)))
+        h.set_alpha(round(255 * fade))
+        d.set_alpha(round(255 * fade))
+        surface.blit(h, h.get_rect(midbottom=(W // 2, BANNER_Y + 6 + rise)))
+        surface.blit(d, d.get_rect(midtop=(W // 2, BANNER_Y + 8 + rise)))
 
     def _draw_center_text(self, surface: pygame.Surface, text: str, color) -> None:
         img = self.app.assets.font(theme.FONT_BODY).render(text, True, color)

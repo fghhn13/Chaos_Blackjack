@@ -13,6 +13,7 @@ import pygame
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import GameView, RuleView
 from chaos_blackjack.gui import theme
+from chaos_blackjack.gui.anim import Tween, out_back
 from chaos_blackjack.gui.texts import asset_name
 from chaos_blackjack.gui.widgets import Widget, draw_heading, draw_panel, draw_tooltip, fit_text, wrap_text
 
@@ -68,6 +69,7 @@ class ChaosPanel(Widget):
         self.rule_rects: list[tuple[pygame.Rect, RuleView]] = []
         self.hovered: RuleView | None = None
         self._mouse = (0, 0)
+        self._pop: Tween | None = None  # portrait bounce when the mood changes
 
     @property
     def log_area(self) -> pygame.Rect:
@@ -102,8 +104,15 @@ class ChaosPanel(Widget):
                 self.speech = OUTCOME_LINE[outcome]
         else:
             mood = NOTICE_MOOD.get(n.kind)
-        if mood:
+        if mood and mood != self.mood:
             self.mood = mood
+            self._pop = Tween(0.4, ease=out_back)
+
+    def update(self, dt: float) -> None:
+        if self._pop is not None:
+            self._pop.elapsed += dt
+            if self._pop.done:
+                self._pop = None
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if event.type == pygame.MOUSEMOTION:
@@ -127,7 +136,11 @@ class ChaosPanel(Widget):
         inner_w = r.w - 28
 
         portrait = a.image_fit(mood_face(a, self.mood), (PORTRAIT, PORTRAIT))
-        surface.blit(portrait, portrait.get_rect(midtop=(r.centerx, r.y + 12)))
+        if self._pop is not None:
+            k = 0.86 + 0.14 * self._pop.value
+            w, h = portrait.get_size()
+            portrait = pygame.transform.smoothscale(portrait, (max(1, round(w * k)), max(1, round(h * k))))
+        surface.blit(portrait, portrait.get_rect(center=(r.centerx, r.y + 12 + PORTRAIT // 2)))
 
         y = r.y + 12 + PORTRAIT + 4
         name = a.font(theme.FONT_BODY + 2, role="display").render("Chaos AI", True, theme.GOLD)

@@ -133,8 +133,16 @@ def chip_breakdown(amount: int) -> list[tuple[int, int]]:
     return out
 
 
-def draw_bet_stack(surface: pygame.Surface, assets: "AssetManager", amount: int, center: tuple[int, int]) -> None:
+def draw_bet_stack(
+    surface: pygame.Surface, assets: "AssetManager", amount: int, center: tuple[int, int], *, alpha: float = 1.0,
+) -> None:
     """The bet as stacks of chips (one stack per value) with the total beside them."""
+    if alpha < 1.0:
+        layer = pygame.Surface((320, 140), pygame.SRCALPHA)
+        draw_bet_stack(layer, assets, amount, (160, 80))
+        layer.set_alpha(max(0, round(255 * alpha)))
+        surface.blit(layer, (center[0] - 160, center[1] - 80))
+        return
     cx, cy = center
     stacks = chip_breakdown(max(0, amount))
     gap = STACK_CHIP + 6
