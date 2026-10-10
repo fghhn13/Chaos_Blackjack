@@ -57,7 +57,37 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 
 Natural blackjack, double down, surrender and the shop are implemented in `GameController` (GUI and agent interface); the text CLI still runs the original hit / stand loop with the old streak reward.
 
-All payout ratios and options live in `RunConfig` (`chaos_blackjack/app/config.py`).
+### Balance profiles (SQLite)
+
+Every tunable number of a run is stored as a **balance profile** in
+`data/game.db` (SQLite, created on first run, git-ignored; `CHAOS_DB` points
+elsewhere).
+
+| Table | Holds |
+| ----- | ----- |
+| `setting` | bankroll and target, payout ratio, dealer stand total, double / surrender, bet range (`bet.min`, `bet.max_fraction`), shop slots and restock interval |
+| `shop_item` | price, on sale or not, item tuning (`params`, e.g. Fate Oracle `{"cards": 3}`) |
+| `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
+
+- The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
+  the single source of truth for shipped values. It is locked and re-imported
+  whenever that file changes; change shipped values there.
+- To experiment, copy it into a new profile and edit that one, e.g. with
+  DB Browser for SQLite or `clone_profile()` from `chaos_blackjack.data`; values
+  are validated (type, min / max, no unknown keys) when a run starts.
+- Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
+  A run keeps the numbers it started with.
+- Schema changes go in new `chaos_blackjack/data/migrations/NNNN_*.sql` files.
+
+The same database keeps **saves** (`run_save`: the run's JSON, including the
+numbers it was played with, so a save restores them even after its profile
+changes) and **preferences** (`preference`, e.g. the GUI's Chaos Mode switch).
+Saves from older versions (JSON files in `chaos_blackjack/saves/`) are imported
+once with `python -m chaos_blackjack.data import-saves`; `python -m
+chaos_blackjack.data saves` lists what is stored.
+
+Game logic never reads the database: front-ends load a `Balance` and build a
+`RunConfig` from it (`RunConfig.from_balance`). Tests use an in-memory database.
 
 ---
 
@@ -66,7 +96,7 @@ All payout ratios and options live in `RunConfig` (`chaos_blackjack/app/config.p
 ### Pygame GUI
 
 ```bash
-python -m chaos_blackjack.gui              # --fullscreen, --scene gallery
+python -m chaos_blackjack.gui              # --fullscreen, --scene gallery, --profile NAME
 ```
 
 | Phase | Mouse | Keyboard |
@@ -114,7 +144,7 @@ python cli/main.py --enable-chaos
 python cli/main.py demo            # one automated round, no input
 ```
 
-Type `save` during a game to write a JSON save under `chaos_blackjack/saves/`; Load Game lists them. The CLI layout follows [UX_design.md](UX_design.md).
+Type `save` during a game to store the run in `data/game.db`; Load Game lists the saves. The CLI layout follows [UX_design.md](UX_design.md).
 
 ### Agent players
 
@@ -186,6 +216,7 @@ Notes:
 | `ai/` | `ChaosPipeline`, `StubLLM`, `GptsApiLLM`, prompt + permission loaders, `.env` loading |
 | `events/` | `Event` / `EventDispatcher` |
 | `app/` | `GameController` state machine (betting → chaos → player turn → dealer → round over → run over), `GameView`, `Notice` stream, `RunConfig` |
+| `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader, saves, preferences |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |
 | `ui/`, `cli/` | Text CLI |
@@ -202,11 +233,12 @@ Black_jack/
 │   ├── items/                # item plugins (self-register)
 │   ├── ai/                   # pipeline, prompts/, permissions/, gptsapi_llm.py
 │   ├── app/                  # GameController, views, notices, config
+│   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── agent/                # agent-player interface
 │   ├── gui/                  # Pygame client (assets/, components/, scenes/)
 │   ├── ui/                   # text CLI session
-│   └── saves/
 ├── assets/                   # drop final art here (see assets/README.md)
+├── data/game.db              # local database: profiles, saves, prefs (git-ignored)
 ├── cli/main.py
 ├── scripts/                  # debug_smoke.py, debug_llm.py
 ├── tests/
@@ -244,7 +276,7 @@ Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed
 
 ## Extending
 
-1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
+1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Read tunable numbers from `params` with a default, and add a `chaos_rule` row (its `params`, `stub_weight`) to `data/seed/default.sql`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
 2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it in `app/help_text.py` (`ITEM_HELP`) and give it a shop price in `DEFAULT_SHOP_PRICES` (`app/config.py`).
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.

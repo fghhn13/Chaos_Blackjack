@@ -1,6 +1,7 @@
 """Private advice snapshots, probability, read-only replies and dormant memory."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -186,7 +187,9 @@ def test_opt_in_memory_is_bounded_detached_and_loadable():
     loaded = GameController.from_save(data, c.config)
     assert loaded.chaos_memory.export() == c.chaos_memory.export()
     assert json.loads(build_chaos_context(loaded))["memory"][-1]["details"]["text"] == "Last reply."
-    assert GameController.from_save(data).chaos_memory.export() is None
+    # New SQLite saves carry their own config, including the opt-in memory flag.
+    assert GameController.from_save(data).chaos_memory.export() == c.chaos_memory.export()
+    assert GameController.from_save(replace(data, config=None)).chaos_memory.export() is None
 
 
 def test_agent_state_preserves_memory_configuration_and_history():
@@ -204,3 +207,46 @@ def test_agent_state_preserves_memory_configuration_and_history():
 def test_invalid_interaction_configuration_is_rejected(config):
     with pytest.raises(ValueError):
         RunConfig(**config)
+
+
+@pytest.mark.parametrize("intent", ["guide", "mislead"])
+def test_non_default_bet_limits_and_unaffordable_shop_advice(intent):
+    c = controller(start_money=40, min_bet=5, max_bet_fraction=.25, balance_profile="tight")
+    context = json.loads(build_chaos_context(c))
+    assert context["bet_range"] == [5, 10]
+    assert context["rules"]["min_bet"] == 5 and context["rules"]["max_bet_fraction"] == .25
+    assert context["rules"]["balance_profile"] == "tight"
+    offers = {offer["item"]: offer["affordable"] for offer in context["shop"]["offers"]}
+    assert offers == {offer.item: offer.affordable for offer in c.view().shop_offers}
+    assert offers == {"peek": True, "shield": False}  # 10 chips left cannot fund a 5-chip bet at 25%.
+    reply = ask_chaos(c.loop.pipeline.llm, PokeRequest(build_chaos_context(c), intent))
+    assert "peek" in reply.text.lower() and "shield" not in reply.text.lower()
+    c.buy("peek")
+    context = json.loads(build_chaos_context(c))
+    assert context["bet_range"] == [5, 7] and not any(o["affordable"] for o in context["shop"]["offers"])
+    reply = ask_chaos(c.loop.pipeline.llm, PokeRequest(build_chaos_context(c), intent))
+    assert "peek" not in reply.text.lower() and "shield" not in reply.text.lower()
+
+
+def test_model_rule_choices_and_descriptions_follow_profile_tuning(monkeypatch):
+    c = controller(disabled_rules=("great_crash",),
+                   chaos_rule_params={"great_crash": {"ten_value": 5}, "fragile_bust": {"bust_limit": 19}},
+                   item_params={"fate_oracle": {"cards": 2}})
+    rig(c, TablePhase.CHAOS)
+    context = json.loads(build_chaos_context(c))
+    assert "great_crash" not in context["chaos"]["permission_profile"]["allowed_rules"]
+    assert "great_crash" not in [r["id"] for r in context["chaos"]["rule_catalog"]]
+    assert context["chaos"]["rule_params"] == {"fragile_bust": {"bust_limit": 19}}
+    assert "reduced to 19" in next(r["help"] for r in context["chaos"]["rule_catalog"]
+                                   if r["id"] == "fragile_bust")
+    assert context["item_params"] == {"fate_oracle": {"cards": 2}}
+    llm = FakeLLM('{"action":"apply_rule","rule_id":"fragile_bust","params":{"bust_limit":21}}')
+    c.loop.pipeline.llm = llm
+    monkeypatch.setattr(c.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
+    c.resolve_chaos()
+    system, user = llm.calls[0]
+    assert "great_crash" not in system and '"bust_limit": 19' in system
+    assert json.loads(user.split("\n")[1])["chaos"]["rule_params"] == {"fragile_bust": {"bust_limit": 19}}
+    assert c.loop.modifiers.items[0].bust_limit == 19
+    active = json.loads(build_chaos_context(c))["chaos"]["rules"][0]
+    assert active["params"] == {"bust_limit": 19} and "reduced to 19" in active["help"]

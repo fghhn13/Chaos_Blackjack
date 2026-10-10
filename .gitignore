@@ -51,3 +51,13 @@ black-jack-assets/
 
 # Image-generation scratch output
 output/
+
+# Game database (balance profiles, saves); created on first run
+# Old JSON saves (import with `python -m chaos_blackjack.data import-saves`)
+chaos_blackjack/saves/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Balance simulator (separate git repository)
+black-jack-sim/

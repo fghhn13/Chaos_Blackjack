@@ -56,3 +56,4 @@ jobs:
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" new --seed 7
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief bet 10
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief act stand
+          CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data saves

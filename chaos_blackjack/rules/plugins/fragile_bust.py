@@ -1,4 +1,7 @@
-"""Chaos rule: Fragile Table — bust threshold reduced to 18."""
+"""Chaos rule: Fragile Table — bust threshold reduced (to 18 by default).
+
+Params: `bust_limit` (balance profile).
+"""
 
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ from chaos_blackjack.rules.modifiers import RuleModifier
 @dataclass(frozen=True)
 class FragileBustModifier:
     id: str = "fragile_bust"
+    bust_limit: int = 18
     chaos_flags: frozenset[str] = field(
         default_factory=lambda: frozenset({"fragile_bust"}),
     )
@@ -26,7 +30,7 @@ class FragileBustPlugin:
 
     @classmethod
     def from_params(cls, params: dict[str, Any]) -> RuleModifier:
-        return FragileBustModifier(id=cls.id)
+        return FragileBustModifier(id=cls.id, bust_limit=int(params.get("bust_limit", 18)))
 
 
 register_rule("fragile_bust", FragileBustPlugin)

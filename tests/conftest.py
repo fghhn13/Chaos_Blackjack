@@ -9,6 +9,9 @@ from pathlib import Path
 # Tests must never make billed API calls, whatever the local .env says
 # (.env loading never overrides variables that are already set).
 os.environ["CHAOS_USE_LLM"] = "0"
+# ...and never read or write the player's data/game.db.
+os.environ["CHAOS_DB"] = ":memory:"
+os.environ.pop("CHAOS_PROFILE", None)
 
 import pytest
 

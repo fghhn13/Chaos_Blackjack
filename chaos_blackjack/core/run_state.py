@@ -100,6 +100,9 @@ class RunSaveData:
     hole_revealed: bool = False
     # Optional run-local AI history; absent when memory is disabled.
     chaos_memory: list[dict[str, Any]] | None = None
+    # RunConfig.to_dict() of the run: loading restores these numbers even if
+    # the balance profile changed since. Absent in older saves.
+    config: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -119,6 +122,7 @@ class RunSaveData:
             "shop": self.shop,
             "shop_seed": self.shop_seed,
             "hole_revealed": self.hole_revealed,
+            "config": self.config,
         }
         if self.chaos_memory is not None:
             data["chaos_memory"] = self.chaos_memory
@@ -147,6 +151,7 @@ class RunSaveData:
             shop_seed=None if d.get("shop_seed") is None else int(d["shop_seed"]),
             hole_revealed=bool(d.get("hole_revealed", False)),
             chaos_memory=d.get("chaos_memory"),
+            config=d.get("config"),
         )
 
 

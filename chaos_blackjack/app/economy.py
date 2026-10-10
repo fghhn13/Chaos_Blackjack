@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
+from fractions import Fraction
 
 from chaos_blackjack.app.config import DEFAULT_BLACKJACK_PAYS
 
@@ -20,12 +22,13 @@ class RunState:
     items: tuple[str, ...]
 
 
-def bet_limits(money: int) -> tuple[int, int]:
-    return (1, money // 2)
+def bet_limits(money: int, *, min_bet: int = 1, max_fraction: float = 0.5) -> tuple[int, int]:
+    """Allowed bet range: `min_bet` to `max_fraction` of the bankroll, rounded down."""
+    return (min_bet, math.floor(money * Fraction(str(max_fraction))))
 
 
-def can_bet(money: int) -> bool:
-    lo, hi = bet_limits(money)
+def can_bet(money: int, *, min_bet: int = 1, max_fraction: float = 0.5) -> bool:
+    lo, hi = bet_limits(money, min_bet=min_bet, max_fraction=max_fraction)
     return hi >= lo
 
 

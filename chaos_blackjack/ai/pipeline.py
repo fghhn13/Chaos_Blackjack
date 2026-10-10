@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from chaos_blackjack.contracts.ai_action import StructuredAIAction, parse_structured_action
@@ -46,6 +47,10 @@ class ChaosPipeline:
     prompt_name: str
     llm: LLMBackend
     registry: Registry | None = None
+    # From the balance profile: fixed params per rule (they win over the AI's
+    # params) and rules switched off for this run.
+    rule_params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    disabled_rules: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if self.registry is None:
@@ -76,7 +81,9 @@ class ChaosPipeline:
         emit: Callable[[Event], None],
         peek_next_card_rank: Callable[[], str | None],
     ) -> ChaosEffect:
-        system = load_prompt(self.prompt_name)
+        system = (load_prompt(self.prompt_name) + "\n\nAuthoritative run-specific action constraints:\n"
+                  + json.dumps(self.action_constraints(), ensure_ascii=False)
+                  + "\nUse only these allowed ids. Fixed rule_params override any parameters you choose.")
         user = self._build_user_prompt(obs)
         raw = self.llm.complete(system, user)
         def _repair_user_prompt(prev_raw: str) -> str:
@@ -147,6 +154,15 @@ class ChaosPipeline:
         if act == "apply_rule":
             rid = parsed.get("rule_id") or ""
             params = parsed.get("params") if isinstance(parsed.get("params"), dict) else {}
+            if rid in self.disabled_rules:
+                emit(
+                    Event(
+                        EventType.CHAOS_ACTION_REJECTED,
+                        {"reason": "rule_disabled", "rule_id": rid},
+                    ),
+                )
+                return ChaosEffect()
+            params = {**params, **self.rule_params.get(rid, {})}
             assert self.registry is not None
             mod = self.registry.build_chaos_rule(rid, params)
             if mod is None:
@@ -214,6 +230,15 @@ class ChaosPipeline:
         emit(Event(EventType.CHAOS_ACTION_REJECTED, {"reason": "unknown_verb"}))
         return ChaosEffect()
 
+    def action_constraints(self) -> dict[str, Any]:
+        """Model-visible choices after this run's balance disables and tuning."""
+        allowed = [rid for rid in self.policy.allowed_rules if rid not in self.disabled_rules]
+        return {
+            "allowed_rules": allowed,
+            "allowed_items": list(self.policy.allowed_items) if self.policy.allowed_items is not None else None,
+            "rule_params": {rid: dict(self.rule_params[rid]) for rid in allowed if rid in self.rule_params},
+        }
+
     def _build_user_prompt(self, obs: ChaosObservation) -> str:
         if obs.context_json is not None:
             return "Full private game context:\n" + obs.context_json + "\nChoose your JSON action."
@@ -237,3 +262,32 @@ class StubLLM:
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         return self.response_json
+
+
+# (rule_id, AI params, weight)
+StubChoice = tuple[str, dict[str, Any], float]
+DEFAULT_STUB_CHOICES: tuple[StubChoice, ...] = (("modify_card_value", {"delta": -1}, 1.0),)
+
+
+@dataclass
+class OfflineChaosStub(StubLLM):
+    """The offline Chaos AI: applies a rule drawn by weight from `choices`.
+
+    `reseed()` before each chaos turn makes the draw depend only on the run and
+    round, so a run replays the same way however it is resumed. With no positive
+    weight it answers noop.
+    """
+
+    response_json: str = ""
+    choices: tuple[StubChoice, ...] = DEFAULT_STUB_CHOICES
+    rng: random.Random = field(default_factory=random.Random, repr=False)
+
+    def reseed(self, seed: str) -> None:
+        self.rng.seed(seed)
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        live = [c for c in self.choices if c[2] > 0]
+        if not live:
+            return '{"action":"noop"}'
+        rule_id, params, _ = self.rng.choices(live, weights=[c[2] for c in live])[0]
+        return json.dumps({"action": "apply_rule", "rule_id": rule_id, "params": params})

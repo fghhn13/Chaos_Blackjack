@@ -40,6 +40,7 @@ class MainMenuScene(Scene):
 
     def _set_chaos(self, on: bool) -> None:
         self.app.prefs.enable_chaos = on
+        self.app.prefs.save()
 
     def handle_event(self, event: pygame.event.Event) -> None:
         self.ui.handle_event(event)

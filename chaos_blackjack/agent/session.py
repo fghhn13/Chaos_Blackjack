@@ -23,7 +23,8 @@ import zlib
 from typing import Any
 
 from chaos_blackjack.agent.observation import build_observation, card_str, event_texts, round_result_dict
-from chaos_blackjack.app.config import DEFAULT_SHOP_PRICES, RunConfig
+from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.persistence import build_save_data
 from chaos_blackjack.app.view import Action, TablePhase
@@ -62,10 +63,10 @@ def _make_loop_factory(use_llm: bool):
 
     def make(dispatcher):
         from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
-        from chaos_blackjack.ai.pipeline import ChaosPipeline, StubLLM
-        from chaos_blackjack.core.game_loop import STUB_CHAOS_RESPONSE, GameLoop
+        from chaos_blackjack.ai.pipeline import ChaosPipeline, OfflineChaosStub
+        from chaos_blackjack.core.game_loop import GameLoop
 
-        backend = try_create_gptsapi_llm() if use_llm else StubLLM(response_json=STUB_CHAOS_RESPONSE)
+        backend = try_create_gptsapi_llm() if use_llm else OfflineChaosStub()
         if backend is None:
             raise LlmUnavailable("Real LLM requested but GPTSAPI_API_KEY is not configured")
         pipeline = ChaosPipeline.from_profile_name("easy", "chaotic", backend)
@@ -102,12 +103,14 @@ class AgentSession:
         chaos: bool = False,
         use_llm: bool = False,
         max_steps: int = DEFAULT_MAX_STEPS,
+        profile: str | None = None,
         **config: Any,
     ) -> "AgentSession":
-        """`config` takes any RunConfig field (start_money, target_money, ...)."""
+        """`profile` names a balance profile (default: $CHAOS_PROFILE or "default");
+        `config` overrides any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
-        cfg = RunConfig(enable_chaos=chaos, seed=seed, **config)
+        cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, **config)
         ctrl = GameController(cfg, loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n)
         ctrl.drain_notices()
         return cls(ctrl, seed=seed, use_llm=use_llm, max_steps=max_steps)
@@ -230,22 +233,12 @@ class AgentSession:
             shop_seed=c.shop_seed,
             hole_revealed=c.hole_revealed,
             chaos_memory=c.chaos_memory.export(),
+            config=c.config.to_dict(),
         )
         hidden = {
             "save": save.to_dict(),
             "rng": _rng_to_json(c.rng.getstate()),
-            "config": {
-                "shop_prices": dict(c.config.shop_prices),
-                "shop_slots": c.config.shop_slots,
-                "shop_refresh_rounds": c.config.shop_refresh_rounds,
-                "dealer_stand_on": c.config.dealer_stand_on,
-                "blackjack_pays": list(c.config.blackjack_pays),
-                "allow_double": c.config.allow_double,
-                "allow_surrender": c.config.allow_surrender,
-                "chaos_guidance_probability": c.config.chaos_guidance_probability,
-                "chaos_memory_enabled": c.config.chaos_memory_enabled,
-                "chaos_memory_limit": c.config.chaos_memory_limit,
-            },
+            "config": c.config.to_dict(),
         }
         return {
             "version": STATE_VERSION,
@@ -265,20 +258,10 @@ class AgentSession:
         if int(data.get("version", 0)) != STATE_VERSION:
             raise ValueError(f"Unsupported state version {data.get('version')!r}")
         hidden = json.loads(zlib.decompress(base64.b64decode(data["packed"])).decode("utf-8"))
-        cfg_extra = hidden.get("config", {})
-        cfg = RunConfig(
+        cfg = RunConfig.from_dict(
+            hidden.get("config", {}),
             enable_chaos=bool(data.get("chaos")),
             seed=data.get("seed"),
-            shop_prices={str(k): int(v) for k, v in cfg_extra.get("shop_prices", DEFAULT_SHOP_PRICES).items()},
-            shop_slots=int(cfg_extra.get("shop_slots", RunConfig.shop_slots)),
-            shop_refresh_rounds=int(cfg_extra.get("shop_refresh_rounds", RunConfig.shop_refresh_rounds)),
-            dealer_stand_on=int(cfg_extra.get("dealer_stand_on", RunConfig.dealer_stand_on)),
-            blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
-            allow_double=bool(cfg_extra.get("allow_double", True)),
-            allow_surrender=bool(cfg_extra.get("allow_surrender", True)),
-            chaos_guidance_probability=float(cfg_extra.get("chaos_guidance_probability", 0.5)),
-            chaos_memory_enabled=bool(cfg_extra.get("chaos_memory_enabled", False)),
-            chaos_memory_limit=int(cfg_extra.get("chaos_memory_limit", 32)),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(

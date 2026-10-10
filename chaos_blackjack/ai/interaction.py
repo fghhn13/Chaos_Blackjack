@@ -16,7 +16,7 @@ def _offline_reply(request: PokeRequest) -> PokeReply:
     guide = request.intent == "guide"
     if context["phase"] == "betting":
         offers = [o for o in context["shop"]["offers"]
-                  if not o["sold"] and context["bankroll"] - o["price"] >= 2]
+                  if not o["sold"] and o["affordable"]]
         if offers:
             item = (min if guide else max)(offers, key=lambda offer: offer["price"])["item"]
             return PokeReply(f"Consider {item.replace('_', ' ')}. " + (

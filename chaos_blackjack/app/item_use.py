@@ -55,8 +55,14 @@ def apply_item_effects(state: GameState, result: ItemResult) -> GameState:
     return s
 
 
-def use_item(loop: GameLoop, state: GameState, item_id: str) -> tuple[GameState, ItemResult]:
-    """Run an item; on success apply its effects and consume one copy."""
+def use_item(
+    loop: GameLoop,
+    state: GameState,
+    item_id: str,
+    params: dict[str, Any] | None = None,
+) -> tuple[GameState, ItemResult]:
+    """Run an item; on success apply its effects and consume one copy.
+    `params` is the item's tuning from the balance profile."""
     cls = get_registry().resolve_item(item_id)
     if cls is None:
         return state, ItemResult(ok=False, message=f"Unknown item: {item_id}")
@@ -68,6 +74,7 @@ def use_item(loop: GameLoop, state: GameState, item_id: str) -> tuple[GameState,
         emit_event=loop.emit_event,
         peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
         active_rule_ids=tuple(str(getattr(m, "id", "?")) for m in loop.modifiers.items),
+        params=params,
     )
     result = cls().use(ctx)
     if not result.ok:

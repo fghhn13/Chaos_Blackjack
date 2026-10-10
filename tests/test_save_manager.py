@@ -1,4 +1,4 @@
-"""SaveManager tests: save/load/list round-trip."""
+"""SaveManager (text CLI wrapper over the SQLite save store): save/load/list round-trip."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ import chaos_blackjack.core.save_manager as save_manager
 
 @pytest.mark.parametrize("name_in", ["save_1", "save_1.json", "  save_2  "])
 def test_save_and_load_roundtrip(tmp_path: Path, monkeypatch, name_in: str) -> None:
-    # Redirect save directory to a temp folder.
-    monkeypatch.setattr(save_manager, "SAVE_DIR", tmp_path / "saves")
+    # Saves live in the database; use a throwaway one.
+    monkeypatch.setenv("CHAOS_DB", str(tmp_path / "game.db"))
 
     snap = GameStateSnapshot(
         player_hand=[CardSnapshot(rank="9", suit=""), CardSnapshot(rank="A", suit="")],

@@ -16,6 +16,16 @@ class RuleContext:
     modifiers: ActiveModifiers
 
 
+BLACKJACK = 21
+
+
+def bust_limit(ctx: RuleContext) -> int:
+    """Highest total that is not a bust: 21, or lower while a modifier sets
+    `bust_limit` (e.g. Fragile Bust)."""
+    limits = [m.bust_limit for m in ctx.modifiers.items if getattr(m, "bust_limit", None) is not None]
+    return min([BLACKJACK, *limits])
+
+
 @runtime_checkable
 class RuleEngine(Protocol):
     def hand_value(self, hand: tuple[Card, ...], ctx: RuleContext) -> int:
@@ -67,9 +77,7 @@ class DefaultBlackjackRules:
         return total
 
     def is_bust(self, value: int, ctx: RuleContext) -> bool:
-        if "fragile_bust" in ctx.modifiers.chaos_flags():
-            return value > 18
-        return value > 21
+        return value > bust_limit(ctx)
 
     def compare_player_dealer(self, state: GameState, ctx: RuleContext) -> str:
         pv = self.hand_value(state.player_hand, ctx)

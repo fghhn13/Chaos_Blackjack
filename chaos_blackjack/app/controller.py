@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
+from dataclasses import replace
 
 from chaos_blackjack.ai.memory import ChaosMemory
 from chaos_blackjack.app.chaos_context import build_chaos_context
+from chaos_blackjack.ai.pipeline import OfflineChaosStub
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.economy import (
     RunState,
@@ -59,7 +61,7 @@ from chaos_blackjack.contracts.chaos_interaction import PokeReply, PokeRequest
 from chaos_blackjack.core.game_loop import GameLoop
 from chaos_blackjack.core.game_state import GamePhase, GameState
 from chaos_blackjack.core.run_state import RunSaveData
-from chaos_blackjack.core.save_manager import save_game
+from chaos_blackjack.data.saves import save_run
 from chaos_blackjack.events.dispatcher import EventDispatcher
 from chaos_blackjack.events.event import Event
 from chaos_blackjack.logic.run_end_policy import (
@@ -102,7 +104,7 @@ class GameController:
         *,
         loop_factory: Callable[[EventDispatcher], GameLoop] | None = None,
         run_end_policy: RunEndPolicy | None = None,
-        save_fn: Callable[[RunSaveData, str], object] = save_game,
+        save_fn: Callable[[RunSaveData, str], object] = save_run,
     ) -> None:
         from chaos_blackjack import auto_load_plugins
 
@@ -116,6 +118,7 @@ class GameController:
         factory = loop_factory or (lambda d: GameLoop(dispatcher=d))
         self.loop = factory(self._dispatcher)
         self.loop.initial_inventory = ()
+        self._configure_chaos()
         self.rng = random.Random(self.config.seed)
         self._poke_rng = random.Random(None if self.config.seed is None else f"{self.config.seed}:poke")
         self.chaos_memory = ChaosMemory(enabled=self.config.chaos_memory_enabled,
@@ -140,7 +143,8 @@ class GameController:
         self._doubled = False
         self._dealer_blackjack = False
         self.hole_revealed = False
-        # Shop rolls are seeded apart from the deal so buying never changes the cards.
+        # Shop rolls (and the offline Chaos AI) are seeded apart from the deal,
+        # so buying never changes the cards.
         self.shop_seed = self.config.seed if self.config.seed is not None else random.randrange(2**31)
         self.shop = self._roll_shop()
         self._check_can_bet()
@@ -154,20 +158,20 @@ class GameController:
         config: RunConfig | None = None,
         **kwargs,
     ) -> "GameController":
-        base = config or RunConfig()
-        cfg = RunConfig(
+        # A save that carries its config restores those numbers; `config` can
+        # still switch chaos on. Older saves take the numbers from `config`.
+        if data.config:
+            base = RunConfig.from_dict(data.config)
+            if config is not None and config.enable_chaos:
+                base = replace(base, enable_chaos=True)
+        else:
+            base = config or RunConfig()
+        cfg = replace(
+            base,
             start_money=data.start_money,
             target_money=data.target_money,
             objective=data.objective,
-            shop_prices=base.shop_prices,
-            shop_slots=base.shop_slots,
-            shop_refresh_rounds=base.shop_refresh_rounds,
-            dealer_stand_on=base.dealer_stand_on,
             enable_chaos=bool(base.enable_chaos or data.enable_chaos),
-            seed=base.seed,
-            chaos_guidance_probability=base.chaos_guidance_probability,
-            chaos_memory_enabled=base.chaos_memory_enabled,
-            chaos_memory_limit=base.chaos_memory_limit,
         )
         c = cls(cfg, **kwargs)
         c.run.money = data.money
@@ -191,7 +195,7 @@ class GameController:
         c.state = snapshot_to_game_state(data.game_state)
         if data.active_modifiers:
             c.loop.modifiers = deserialize_active_modifiers(
-                data.active_modifiers, registry=get_registry()
+                data.active_modifiers, registry=get_registry(), rule_params=cfg.chaos_rule_params,
             )
         if c.state.phase == GamePhase.PLAYER_TURN:
             c._set_phase(TablePhase.PLAYER_TURN)
@@ -205,7 +209,7 @@ class GameController:
 
     def place_bet(self, amount: int) -> None:
         self._require(Action.BET)
-        lo, hi = bet_limits(self.run.money)
+        lo, hi = self.bet_limits(self.run.money)
         if not lo <= amount <= hi:
             raise ActionError(f"Invalid bet. Allowed range: {lo}~{hi}")
         self.run.current_bet = amount
@@ -229,7 +233,7 @@ class GameController:
         offer = self.shop.offer(item_id)
         if offer is None:
             raise ActionError(f"The shop has no {item_id!r} for sale")
-        if not can_bet(self.run.money - offer.price):
+        if not self.can_bet(self.run.money - offer.price):
             raise ActionError(f"Not enough chips: {item_id} costs {offer.price} and you must keep enough to bet")
         self.run.money -= offer.price
         self.run.items = self.run.items + (item_id,)
@@ -246,6 +250,9 @@ class GameController:
         this controller (including draining notices) until the call finishes;
         render a cached GameView while waiting."""
         self._require(Action.RESOLVE_CHAOS)
+        llm = getattr(getattr(self.loop, "pipeline", None), "llm", None)
+        if isinstance(llm, OfflineChaosStub):
+            llm.reseed(f"{self.shop_seed}:chaos:{self.run.round}")
         self.state = self.loop.maybe_apply_chaos_phase(self._st, context_json=build_chaos_context(self))
         narration = self.loop.last_chaos_narration
         if narration:
@@ -301,7 +308,7 @@ class GameController:
 
     def use_item(self, item_id: str) -> ItemResult:
         self._require(Action.USE_ITEM)
-        self.state, result = use_item(self.loop, self._st, item_id)
+        self.state, result = use_item(self.loop, self._st, item_id, self.config.item_params.get(item_id))
         self.run.items = self._st.inventory
         extra = result.extra or {}
         if result.ok and extra.get("reveal_hole_card"):
@@ -359,12 +366,24 @@ class GameController:
             shop_seed=self.shop_seed,
             hole_revealed=self.hole_revealed,
             chaos_memory=self.chaos_memory.export(),
+            config=self.config.to_dict(),
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})
         return data
 
     # ------------------------------------------------------------ read side
+
+    def bet_limits(self, money: int | None = None) -> tuple[int, int]:
+        """Allowed bet range for `money` (default: the current bankroll) under this run's config."""
+        m = self.run.money if money is None else money
+        return bet_limits(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+
+    def can_bet(self, money: int | None = None) -> bool:
+        """Whether `money` (default: the bankroll) still allows a minimum bet; shop
+        purchases must leave this true."""
+        m = self.run.money if money is None else money
+        return can_bet(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
 
     def drain_notices(self) -> list[Notice]:
         out = self._notices
@@ -374,7 +393,7 @@ class GameController:
     def view(self) -> GameView:
         st = self.state
         hide_hole = self.phase in (TablePhase.CHAOS, TablePhase.PLAYER_TURN) and not self.hole_revealed
-        lo, hi = bet_limits(self.run.money)
+        lo, hi = self.bet_limits(self.run.money)
         player_cards: tuple[CardView, ...] = ()
         dealer_cards: tuple[CardView, ...] = ()
         player_total = dealer_total = None
@@ -406,7 +425,7 @@ class GameController:
             deck_count=len(st.deck) if st is not None else 0,
             items=tuple(ItemView(i, n) for i, n in inventory_counts(inventory)),
             shop_offers=tuple(
-                ShopOfferView(o.item, o.price, o.sold, not o.sold and can_bet(self.run.money - o.price))
+                ShopOfferView(o.item, o.price, o.sold, not o.sold and self.can_bet(self.run.money - o.price))
                 for o in self.shop.offers
             ),
             shop_restock_in=rounds_until_restock(self.shop, self.run.round, self.config.shop_refresh_rounds),
@@ -535,11 +554,22 @@ class GameController:
         self.run.round += 1
         self._set_phase(TablePhase.ROUND_OVER)
 
+
+    def _configure_chaos(self) -> None:
+        """Hand the balance profile's chaos settings to the pipeline."""
+        pipeline = getattr(self.loop, "pipeline", None)
+        if pipeline is None:
+            return
+        pipeline.rule_params = {k: dict(v) for k, v in self.config.chaos_rule_params.items()}
+        pipeline.disabled_rules = frozenset(self.config.disabled_rules)
+        if isinstance(pipeline.llm, OfflineChaosStub):
+            pipeline.llm.choices = tuple(self.config.chaos_stub)
+
     def _roll_shop(self) -> ShopState:
         return roll_stock(self.shop_seed, self.run.round, self.config.shop_prices, self.config.shop_slots)
 
     def _check_can_bet(self) -> None:
-        if self.phase == TablePhase.BETTING and not can_bet(self.run.money):
+        if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):
             self.run_end = RunEndResult(kind="defeat", message=NO_VALID_BET_MESSAGE)
             self._end_run()
 

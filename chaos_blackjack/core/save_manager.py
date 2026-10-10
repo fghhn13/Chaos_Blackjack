@@ -1,56 +1,34 @@
-"""Save/load manager for Menu Driven + State Driven entry."""
+"""Save/load for the text CLI — a thin wrapper over the SQLite save store.
+
+Saves live in `data/game.db` (`chaos_blackjack.data.saves`). Old JSON files in
+`chaos_blackjack/saves/` can be imported with
+`python -m chaos_blackjack.data import-saves`.
+"""
 
 from __future__ import annotations
-
-import json
-import os
-from pathlib import Path
-from typing import Any
 
 from chaos_blackjack.core.run_state import RunSaveData
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SAVE_DIR = PROJECT_ROOT / "chaos_blackjack" / "saves"
-
-
-def _ensure_dir() -> None:
-    os.makedirs(SAVE_DIR, exist_ok=True)
-
-
 def normalize_save_name(name: str) -> str:
-    n = name.strip()
-    if not n:
-        return "save_1.json"
-    if not n.lower().endswith(".json"):
-        n = n + ".json"
-    return n
+    from chaos_blackjack.data.saves import normalize_save_name as normalize
+
+    return normalize(name)
 
 
 def list_saves() -> list[str]:
-    _ensure_dir()
-    files = []
-    for p in SAVE_DIR.glob("*.json"):
-        files.append(p.name)
-    return sorted(files)
+    from chaos_blackjack.data.saves import list_runs
+
+    return [s.name for s in list_runs()]
 
 
-def save_game(data: RunSaveData, name: str = "save_1.json") -> Path:
-    _ensure_dir()
-    fname = normalize_save_name(name)
-    path = SAVE_DIR / fname
-    payload: dict[str, Any] = data.to_dict()
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=True)
-    return path
+def save_game(data: RunSaveData, name: str = "save_1") -> str:
+    from chaos_blackjack.data.saves import save_run
+
+    return save_run(data, name)
 
 
 def load_game(name: str) -> RunSaveData:
-    fname = normalize_save_name(name)
-    path = SAVE_DIR / fname
-    with path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-    if not isinstance(payload, dict):
-        raise ValueError("save file must contain a JSON object")
-    return RunSaveData.from_dict(payload)
+    from chaos_blackjack.data.saves import load_run
 
+    return load_run(name)

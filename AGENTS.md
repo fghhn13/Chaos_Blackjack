@@ -27,7 +27,8 @@ python -m chaos_blackjack.agent --brief act stand     # smaller reply (recommend
 `new` options: `--seed N` (same seed + same commands = same game), `--chaos`
 (the Chaos AI changes rules each round), `--llm` (the Chaos AI is a real,
 **billed** model instead of the offline stub — only use when told to),
-`--start-money N`, `--target-money N`, `--max-steps N`.
+`--start-money N`, `--target-money N`, `--max-steps N`, `--profile NAME` (a balance
+profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`).
 
 Global flags: `--brief` (only summary / hint / legal actions / results),
 `--compact` (single-line JSON), `--state PATH`.
@@ -132,4 +133,6 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 - Run tests with `python -m pytest`. Tests force `CHAOS_USE_LLM=0`; never make billed API calls in tests or CI.
 - Credentials live only in the git-ignored `.env` (names in `.env.example`). Never print, commit or copy a real key. `python scripts/debug_llm.py models` checks the relay without billing a completion.
 - Art: raw images live in the git-ignored `black-jack-assets/`; final `<id>.png` files go in `assets/`. Use `scripts/asset_tools.py`, `scripts/validate_assets.py`, `scripts/preview_assets.py` and `scripts/fetch_icons.py`; workflow and rules in `.claude/skills/art-asset-pipeline/SKILL.md`.
+- Game numbers live in SQLite balance profiles (`data/game.db`, git-ignored). Shipped values: `chaos_blackjack/data/seed/default.sql` (the locked `default` profile is re-imported when it changes). Schema changes: new `chaos_blackjack/data/migrations/NNNN_*.sql`. Saves (`run_save`) and preferences (`preference`) live in the same database; `python -m chaos_blackjack.data saves` lists saves, `import-saves` imports old JSON saves. Tests force `CHAOS_DB=:memory:` (use a tmp file when a test needs data to persist between connections); never commit a `.db` file.
+- Balance: the simulator is a separate, git-ignored repo in `black-jack-sim/` (see its README). It only imports the game through `bjsim/adapter.py`; after changing rules, prices or the controller API, run `python -m bjsim check` there and update that adapter if needed.
 - Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController`, `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.

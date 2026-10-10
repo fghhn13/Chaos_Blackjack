@@ -78,10 +78,12 @@ def deserialize_active_modifiers(
     mods: list[ModifierSnapshot],
     *,
     registry,
+    rule_params: dict[str, dict] | None = None,
 ) -> ActiveModifiers:
+    """`rule_params` are the balance profile's fixed params per rule."""
     built: list[object] = []
     for m in mods:
-        inst = registry.build_chaos_rule(m.id, m.params)
+        inst = registry.build_chaos_rule(m.id, {**m.params, **(rule_params or {}).get(m.id, {})})
         if inst is None:
             raise ValueError(f"Unknown chaos rule id in save: {m.id}")
         built.append(inst)
@@ -98,6 +100,7 @@ def build_save_data(
     shop_seed: int | None = None,
     hole_revealed: bool = False,
     chaos_memory: list[dict] | None = None,
+    config: dict | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -121,4 +124,5 @@ def build_save_data(
         shop_seed=shop_seed,
         hole_revealed=bool(hole_revealed and state is not None),
         chaos_memory=chaos_memory,
+        config=config,
     )

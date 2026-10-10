@@ -33,3 +33,4 @@ class GuiSettings:
     fps: int = 60
     fullscreen: bool = False
     asset_dirs: tuple[Path, ...] = field(default_factory=default_asset_dirs)
+    balance_profile: str | None = None  # None = $CHAOS_PROFILE, else "default"
