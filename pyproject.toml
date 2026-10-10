@@ -13,6 +13,8 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 gui = ["pygame>=2.5"]
+# Art pipeline (scripts/asset_tools.py); validation and previews need only pygame.
+art = ["pygame>=2.5", "pillow>=10", "numpy>=1.24"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

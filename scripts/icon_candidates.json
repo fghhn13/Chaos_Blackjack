@@ -1,0 +1,14 @@
+{
+  "swap": ["card-exchange", "card-random", "swap-bag"],
+  "shield": ["checked-shield", "edged-shield", "bordered-shield"],
+  "danger_radar": ["radar-sweep", "radar-dish", "radar-cross-section"],
+  "fate_oracle": ["crystal-ball", "crystal-eye", "all-seeing-eye"],
+  "hole_card_hacker": ["cyber-eye", "up-card", "circuitry"],
+  "fragile_bust": ["cracked-glass", "shattered-glass", "shatter"],
+  "great_crash": ["tower-fall", "falling-rocks", "card-burn"],
+  "modify_card_value": ["card-joker", "card-random", "card-draw"],
+  "odd_even_chaos": ["yin-yang", "triple-yin", "inverted-dice-5"],
+  "reverse_bust": ["anticlockwise-rotation", "vertical-flip", "return-arrow"],
+  "suit_power": ["spades", "poker-hand", "card-ace-spades"],
+  "tiebreaker_shift": ["scales", "unbalanced", "weight-scale"]
+}
