@@ -1,4 +1,5 @@
 {
+  "peek": ["semi-closed-eye", "eye-target", "magnifying-glass"],
   "swap": ["card-exchange", "card-random", "swap-bag"],
   "shield": ["checked-shield", "edged-shield", "bordered-shield"],
   "danger_radar": ["radar-sweep", "radar-dish", "radar-cross-section"],

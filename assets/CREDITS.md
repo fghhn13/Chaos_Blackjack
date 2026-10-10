@@ -4,6 +4,7 @@ Licence: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Fetched throu
 
 | Asset id | Icon | Author | Source |
 |---|---|---|---|
+| peek | semi-closed-eye | lorc | https://game-icons.net/1x1/lorc/semi-closed-eye.html |
 | swap | card-exchange | delapouite | https://game-icons.net/1x1/delapouite/card-exchange.html |
 | shield | checked-shield | lorc | https://game-icons.net/1x1/lorc/checked-shield.html |
 | danger_radar | radar-sweep | lorc | https://game-icons.net/1x1/lorc/radar-sweep.html |
