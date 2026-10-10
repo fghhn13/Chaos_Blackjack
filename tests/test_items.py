@@ -9,7 +9,7 @@ from chaos_blackjack.contracts.items import ItemContext
 from chaos_blackjack.events.event import Event
 
 
-def _make_ctx(state: GameState, *, peek_rank: str | None = None) -> ItemContext:
+def _make_ctx(state: GameState, *, peek_rank: str | None = None, rules: tuple[str, ...] = ()) -> ItemContext:
     emitted: list[Event] = []
 
     def emit_event(e: Event) -> None:
@@ -22,6 +22,7 @@ def _make_ctx(state: GameState, *, peek_rank: str | None = None) -> ItemContext:
         state=state,
         emit_event=emit_event,
         peek_next_card_rank=peek_next_card_rank,
+        active_rule_ids=rules,
     )
     # Attach for assertions.
     ctx._emitted_for_test = emitted  # type: ignore[attr-defined]
@@ -124,10 +125,11 @@ def test_shield_item_registered_and_usable() -> None:
         chaos_budget_remaining=3,
         inventory=(),
     )
-    ctx = _make_ctx(st)
-    res = item.use(ctx)
+    assert item.use(_make_ctx(st)).ok is False  # nothing to dispel
+    res = item.use(_make_ctx(st, rules=("great_crash",)))
     assert res.ok is True
     assert "Shield" in res.message
+    assert res.extra == {"dispel_chaos_rules": True}
 
 
 def test_swap_item_returns_swap_effect_extra() -> None:

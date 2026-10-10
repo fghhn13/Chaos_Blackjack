@@ -159,3 +159,24 @@ def test_bet_panel_chips_and_limits(app: App) -> None:
     panel.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_DOWN, "mod": 0, "unicode": ""}))
     panel.deal_button.click()
     assert dealt == [19]
+
+
+def test_shop_opens_while_betting_and_buys(app) -> None:
+    table = _open_table(app)
+    _key(app, pygame.K_b)
+    shop = app.scenes.top
+    assert type(shop).__name__ == "ShopScene"
+    offer = table.view.shop_offers[0]
+    _key(app, pygame.K_1)
+    assert table.view.money == 100 - offer.price
+    assert [i.id for i in table.view.items] == [offer.item]
+    app.scenes.draw(app.canvas)  # renders without errors
+    _key(app, pygame.K_ESCAPE)
+    assert app.scenes.top is table
+
+
+def test_shop_button_disabled_during_a_round(app) -> None:
+    table = _open_table(app)
+    table._deal(10)
+    _key(app, pygame.K_b)
+    assert app.scenes.top is table

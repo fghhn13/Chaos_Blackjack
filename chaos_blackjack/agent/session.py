@@ -23,7 +23,7 @@ import zlib
 from typing import Any
 
 from chaos_blackjack.agent.observation import build_observation, card_str, event_texts, round_result_dict
-from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.app.config import DEFAULT_SHOP_PRICES, RunConfig
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.persistence import build_save_data
 from chaos_blackjack.app.view import Action, TablePhase
@@ -45,6 +45,7 @@ _ACT_METHODS = {
 
 COMMANDS = {
     "observe": "Return the current observation (no state change).",
+    "buy": "Buy a shop item while betting: {\"cmd\":\"buy\",\"item\":\"peek\"}",
     "bet": "Place a bet: {\"cmd\":\"bet\",\"amount\":20}",
     "act": "Act in your turn: {\"cmd\":\"act\",\"action\":\"hit|stand|double|surrender|use_item\",\"item\":\"peek\"}",
     "help": "List commands.",
@@ -119,7 +120,7 @@ class AgentSession:
             return self._reply()
         if cmd == "help":
             return self._reply(extra={"commands": COMMANDS})
-        if cmd not in ("bet", "act"):
+        if cmd not in ("bet", "buy", "act"):
             return self._error("unknown_command", f"Unknown cmd {cmd!r}. Use one of: {', '.join(COMMANDS)}")
         if self.controller.phase == TablePhase.RUN_OVER:
             return self._error("run_over", "The run is over. Start a new one.")
@@ -129,6 +130,8 @@ class AgentSession:
         try:
             if cmd == "bet":
                 self._bet(command)
+            elif cmd == "buy":
+                self._buy(command)
             else:
                 self._act(command)
         except ActionError as e:
@@ -147,6 +150,12 @@ class AgentSession:
             raise ValueError("amount must be an integer")
         self.last_round = None
         self.controller.place_bet(int(amount))
+
+    def _buy(self, command: dict[str, Any]) -> None:
+        item = str(command.get("item", "")).strip()
+        if not item:
+            raise ValueError("buy needs an 'item' id")
+        self.controller.buy(item)
 
     def _act(self, command: dict[str, Any]) -> None:
         action = str(command.get("action", "")).strip().lower()
@@ -217,13 +226,17 @@ class AgentSession:
             state=c.state if c.phase == TablePhase.PLAYER_TURN else None,
             loop=c.loop,
             enable_chaos=c.config.enable_chaos,
+            shop=c.shop,
+            shop_seed=c.shop_seed,
+            hole_revealed=c.hole_revealed,
         )
         hidden = {
             "save": save.to_dict(),
             "rng": _rng_to_json(c.rng.getstate()),
             "config": {
-                "reward_streak": c.config.reward_streak,
-                "reward_pool": list(c.config.reward_pool),
+                "shop_prices": dict(c.config.shop_prices),
+                "shop_slots": c.config.shop_slots,
+                "shop_refresh_rounds": c.config.shop_refresh_rounds,
                 "dealer_stand_on": c.config.dealer_stand_on,
                 "blackjack_pays": list(c.config.blackjack_pays),
                 "allow_double": c.config.allow_double,
@@ -252,8 +265,9 @@ class AgentSession:
         cfg = RunConfig(
             enable_chaos=bool(data.get("chaos")),
             seed=data.get("seed"),
-            reward_streak=int(cfg_extra.get("reward_streak", RunConfig.reward_streak)),
-            reward_pool=tuple(cfg_extra.get("reward_pool", RunConfig.reward_pool)),
+            shop_prices={str(k): int(v) for k, v in cfg_extra.get("shop_prices", DEFAULT_SHOP_PRICES).items()},
+            shop_slots=int(cfg_extra.get("shop_slots", RunConfig.shop_slots)),
+            shop_refresh_rounds=int(cfg_extra.get("shop_refresh_rounds", RunConfig.shop_refresh_rounds)),
             dealer_stand_on=int(cfg_extra.get("dealer_stand_on", RunConfig.dealer_stand_on)),
             blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
             allow_double=bool(cfg_extra.get("allow_double", True)),

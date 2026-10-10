@@ -31,8 +31,9 @@ def _rig(session: AgentSession, player, dealer, deck=()) -> None:
 def test_new_run_starts_at_betting() -> None:
     r = AgentSession.new(seed=7).execute({"cmd": "observe"})
     obs = r["obs"]
-    assert r["ok"] and obs["schema"] == 1
-    assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet"]
+    assert r["ok"] and obs["schema"] == 2
+    assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet", "buy"]
+    assert len(obs["shop"]["offers"]) == 3 and obs["shop"]["restock_in"] == 2
     assert obs["bet_range"] == [1, 50] and obs["you"] is None
     assert "bet <amount>" in obs["hint"]
 
@@ -66,7 +67,7 @@ def test_illegal_action_is_structured_and_changes_nothing() -> None:
     s = AgentSession.new(seed=7)
     r = s.execute({"cmd": "act", "action": "hit"})
     assert not r["ok"]
-    assert r["error"]["code"] == "illegal_action" and r["error"]["legal_actions"] == ["bet"]
+    assert r["error"]["code"] == "illegal_action" and r["error"]["legal_actions"] == ["bet", "buy"]
     assert s.steps == 0 and r["obs"]["phase"] == "betting"
 
 
@@ -158,7 +159,7 @@ def test_cli_one_shot_flow_logs_and_exit_codes(capsys, tmp_path) -> None:
     assert code == 0 and r["obs"]["phase"] == "player_turn"
     code, r = _cli(capsys, tmp_path, "--brief", "act", "stand")
     assert code == 0 and set(r["obs"]) <= {"phase", "summary", "hint", "legal_actions", "bet_range",
-                                            "last_round", "run_end"}
+                                            "shop", "last_round", "run_end"}
     log = (tmp_path / "run.log.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(x)["command"]["cmd"] for x in log] == ["new", "act", "bet", "act"]
     assert [json.loads(x)["ok"] for x in log] == [True, False, True, True]

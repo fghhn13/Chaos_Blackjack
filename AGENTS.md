@@ -17,6 +17,7 @@ Each command is one shell call. The run is saved to a state file between calls
 ```bash
 python -m chaos_blackjack.agent new --seed 7          # start a run (overwrites the run file)
 python -m chaos_blackjack.agent observe               # look at the table, changes nothing
+python -m chaos_blackjack.agent buy peek              # buy a shop item (betting phase)
 python -m chaos_blackjack.agent bet 20                # place a bet
 python -m chaos_blackjack.agent act hit               # hit | stand | double | surrender
 python -m chaos_blackjack.agent act use_item peek     # use an item from your inventory
@@ -43,18 +44,18 @@ drawing, moving to the next round) happens automatically inside your command:
 
 | `obs.phase`   | You send                          |
 | ------------- | --------------------------------- |
-| `betting`     | `bet <amount>` within `obs.bet_range` |
+| `betting`     | `bet <amount>` within `obs.bet_range`; optionally `buy <item>` first (see `obs.shop`) |
 | `player_turn` | `act <action>` from `obs.legal_actions` |
 | `run_over`    | nothing — read `obs.run_end`; `new` to play again |
 
-### Reply shape (schema 1)
+### Reply shape (schema 2)
 
 ```json
 {
   "ok": true,
   "events": ["Round 1 started, bet 20", "You draw: Q"],
   "obs": {
-    "schema": 1,
+    "schema": 2,
     "phase": "player_turn",
     "legal_actions": ["hit", "stand"],
     "hint": "Your move: act hit | stand",
@@ -63,6 +64,7 @@ drawing, moving to the next round) happens automatically inside your command:
     "you": {"cards": ["8♣", "3♥", "Q♥"], "total": 21},
     "dealer": {"cards": ["K♣", "??"], "total": null},
     "items": [{"id": "peek", "count": 1, "help": "Reveal the rank of the next card in the deck."}],
+    "shop": null,
     "chaos": {"enabled": true, "budget": 4, "active_rules": [{"id": "modify_card_value", "help": "..."}]},
     "action_help": {"hit": "take one more card", "stand": "end your turn; the dealer plays"},
     "last_round": null,
@@ -74,7 +76,8 @@ drawing, moving to the next round) happens automatically inside your command:
 
 - Cards are `<rank><suit>` (`A`, `2`–`10`, `J`, `Q`, `K`; `♠ ♥ ♦ ♣`). `??` is the dealer's face-down card; its total is `null` until revealed.
 - `obs.you.total` already includes active chaos rules — trust it over your own arithmetic.
-- After a round settles, the next `obs` is `betting` and `obs.last_round` holds the result: `outcome` (`player` / `dealer` / `push` / `blackjack` / `surrender`), `delta` (bankroll change), both final hands, `doubled`, `reward`.
+- After a round settles, the next `obs` is `betting` and `obs.last_round` holds the result: `outcome` (`player` / `dealer` / `push` / `blackjack` / `surrender`), `delta` (bankroll change), both final hands, `doubled`.
+- While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n}`; `null` in other phases.
 - On failure `ok` is `false` and `error` is `{code, message, legal_actions}`; the state is unchanged, so fix the command and retry. Codes: `illegal_action`, `invalid_argument`, `unknown_command`, `run_over`, `step_limit`, `usage`.
 - Exit code: `0` ok, `1` command rejected, `2` usage or missing/invalid run file.
 
@@ -86,7 +89,7 @@ drawing, moving to the next round) happens automatically inside your command:
 - `double`: first decision only — bet doubles, you get exactly one card, then stand.
 - `surrender`: first decision only — lose half the bet (rounded in the house's favour).
 - Dealer draws to 17 and stands on 17+.
-- Every 2 wins in a row grant a random item.
+- Shop (betting phase only): 3 different items, each buyable once; restocks every 2 rounds. A purchase must leave at least 2 chips. `buy` is in `legal_actions` only when something is affordable.
 - With `--chaos`, the Chaos AI may apply one rule per round (e.g. card values −1, ties go to the dealer, bust above 18). Active rules are listed in `obs.chaos.active_rules` with a plain-English `help`.
 
 ### Fair play
@@ -101,6 +104,7 @@ For a long-lived process: `python -m chaos_blackjack.agent play --seed 7`
 reads one JSON command per line on stdin and writes one JSON reply per line:
 
 ```text
+{"cmd":"buy","item":"peek"}
 {"cmd":"bet","amount":20}
 {"cmd":"act","action":"double"}
 {"cmd":"act","action":"use_item","item":"peek"}

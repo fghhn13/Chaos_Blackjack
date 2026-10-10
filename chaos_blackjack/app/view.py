@@ -9,7 +9,7 @@ from chaos_blackjack.logic.run_end_policy import RunEndResult
 
 
 class TablePhase(Enum):
-    BETTING = "betting"          # waiting for place_bet()
+    BETTING = "betting"          # waiting for place_bet(); the shop is open
     CHAOS = "chaos"              # waiting for resolve_chaos() (may call an LLM)
     PLAYER_TURN = "player_turn"  # hit / stand / use_item
     DEALER_TURN = "dealer_turn"  # dealer_step() until it returns False
@@ -21,6 +21,7 @@ class Action:
     """Action ids a front-end can bind to buttons / keys."""
 
     BET = "bet"
+    BUY = "buy"
     RESOLVE_CHAOS = "resolve_chaos"
     HIT = "hit"
     STAND = "stand"
@@ -46,6 +47,14 @@ class ItemView:
 
 
 @dataclass(frozen=True)
+class ShopOfferView:
+    item: str
+    price: int
+    sold: bool
+    affordable: bool  # unsold and the bankroll can still place a bet afterwards
+
+
+@dataclass(frozen=True)
 class RuleView:
     id: str
     description: str
@@ -61,7 +70,6 @@ class RoundResult:
     bet: int
     delta: int
     money_after: int
-    reward: str | None
     doubled: bool = False
     dealer_blackjack: bool = False
 
@@ -78,7 +86,6 @@ class GameView:
     bet_min: int
     bet_max: int
     win_streak: int
-    reward_streak: int
 
     player_cards: tuple[CardView, ...]
     dealer_cards: tuple[CardView, ...]
@@ -87,6 +94,9 @@ class GameView:
     deck_count: int
 
     items: tuple[ItemView, ...]
+    shop_offers: tuple[ShopOfferView, ...]
+    shop_restock_in: int  # rounds until the shop rolls new stock
+    hole_revealed: bool   # the dealer's hole card was exposed by an item
 
     chaos_enabled: bool
     chaos_budget: int

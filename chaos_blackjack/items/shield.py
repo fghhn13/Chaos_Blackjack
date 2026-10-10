@@ -1,4 +1,4 @@
-"""Item: Shield — reserved for blocking chaos effects."""
+"""Item: Shield — dispel every active chaos rule for the rest of the round."""
 
 from __future__ import annotations
 
@@ -11,17 +11,20 @@ class Shield:
     name = "shield"
 
     def use(self, ctx: ItemContext) -> ItemResult:
+        rules = ctx.active_rule_ids
+        if not rules:
+            return ItemResult(ok=False, message="No chaos rule is active to dispel")
         ctx.emit_event(
             Event(
                 EventType.ITEM_USED,
-                {"item": self.name, "shield_requested": True},
+                {"item": self.name, "dispelled_rules": list(rules)},
             ),
         )
         return ItemResult(
             ok=True,
-            message="Shield primed. (MVP: no active chaos blocking yet)",
+            message=f"Shield dispels {len(rules)} chaos rule{'s' if len(rules) != 1 else ''}",
+            extra={"dispel_chaos_rules": True},
         )
 
 
 register_item(Shield.name, Shield)
-

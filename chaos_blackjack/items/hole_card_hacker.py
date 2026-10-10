@@ -1,4 +1,4 @@
-"""Item: Hole Card Hacker — reveal dealer's hidden (hole) card."""
+"""Item: Hole Card Hacker — flip the dealer's hidden (hole) card face up."""
 
 from __future__ import annotations
 
@@ -28,7 +28,11 @@ class HoleCardHacker:
                 },
             ),
         )
-        return ItemResult(ok=True, message=f"Dealer hole card: {hole_rank}")
+        return ItemResult(
+            ok=True,
+            message=f"Dealer hole card: {hole_rank}",
+            extra={"reveal_hole_card": True},
+        )
 
 
 register_item(HoleCardHacker.name, HoleCardHacker)

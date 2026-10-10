@@ -31,7 +31,7 @@ Global flags go **before** the subcommand:
 | Flag | Effect |
 | ---- | ------ |
 | `--state PATH` | run file to read / write |
-| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, bet_range, last_round, run_end}` — recommended to save tokens |
+| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, bet_range, shop, last_round, run_end}` — recommended to save tokens |
 | `--compact` | single-line JSON |
 
 Subcommands:
@@ -41,6 +41,7 @@ Subcommands:
 | `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N]` | start a run; **overwrites** the state file and its log |
 | `observe` | current observation; changes nothing, not logged |
 | `help` | list game commands |
+| `buy <item_id>` | buy an item from the shop (phase `betting`, before you bet) |
 | `bet <amount>` | place a bet (phase `betting`) |
 | `act hit` / `act stand` / `act double` / `act surrender` | play your hand (phase `player_turn`) |
 | `act use_item <item_id>` | use an item from your inventory (phase `player_turn`) |
@@ -72,32 +73,34 @@ act double   ──► bet x2, one card, then stand (unless bust)
 act stand    ──► dealer reveals and draws to 17+, round settles
 act surrender──► round settles, half the bet returned
 
-settlement   ──► bankroll, win streak, maybe an item reward
+settlement   ──► bankroll, win streak
              └► run over (target reached / bankrupt)?  phase = run_over
              └► otherwise next round: phase = betting, obs.last_round = result
+                 (every 2nd round the shop restocks)
 ```
 
-So a full round is usually `bet` → zero or more `act` → back at `betting`.
+So a full round is usually zero or more `buy` → `bet` → zero or more `act` → back at `betting`.
 
 ## 4. Observation reference
 
 Every reply is `{"ok", "events", "obs", "run"}` (+ `"error"` when `ok` is false).
-`obs.schema` is `1`; it will be incremented if the shape changes.
+`obs.schema` is `2` (2 added `shop` and removed the streak reward); it will be incremented if the shape changes.
 
 | Field | Meaning |
 | ----- | ------- |
 | `phase` | `betting`, `player_turn` or `run_over` (the only phases you will see) |
-| `legal_actions` | exactly what you may send now: `["bet"]`, a subset of `hit stand double surrender use_item`, or `[]` |
+| `legal_actions` | exactly what you may send now: `["bet"]` or `["bet", "buy"]`, a subset of `hit stand double surrender use_item`, or `[]` |
 | `hint` | the next command in plain words, e.g. `Your move: act hit \| stand` |
 | `summary` | one paragraph describing the table; enough to decide on its own |
 | `round` | round number |
 | `bankroll`, `target` | current money and the goal |
 | `bet_range` | `[min, max]` in `betting`, else `null` |
 | `bet` | the bet on the current hand (after a double: the doubled amount) |
-| `win_streak`, `reward_every` | consecutive wins so far / wins needed for an item |
+| `win_streak` | consecutive wins so far (a stat; no reward) |
 | `you` | `{"cards": [...], "total": n}` during a hand, else `null` |
 | `dealer` | `{"cards": ["K♣", "??"], "total": null}` while the hole card is hidden |
 | `items` | `[{"id", "count", "help"}]` — your inventory |
+| `shop` | in `betting`: `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n}`; else `null` |
 | `chaos` | `{"enabled", "budget", "active_rules": [{"id", "help"}]}` |
 | `action_help` | one-line explanation of each legal action |
 | `last_round` | result of the most recent round (see below), `null` once you bet again |
@@ -107,14 +110,14 @@ Cards are `<rank><suit>`: ranks `A 2 … 10 J Q K`, suits `♠ ♥ ♦ ♣` (♥
 
 **Totals already apply every active chaos rule** — always use `you.total` rather than your own arithmetic.
 
-`last_round` fields: `round`, `outcome` (`player`, `dealer`, `push`, `blackjack`, `surrender`), `player_total`, `dealer_total`, `player_bust`, `bet`, `delta` (bankroll change, signed), `money_after`, `reward` (item id or `null`), `doubled`, `dealer_blackjack`, `your_cards`, `dealer_cards` (both final hands, fully revealed).
+`last_round` fields: `round`, `outcome` (`player`, `dealer`, `push`, `blackjack`, `surrender`), `player_total`, `dealer_total`, `player_bust`, `bet`, `delta` (bankroll change, signed), `money_after`, `doubled`, `dealer_blackjack`, `your_cards`, `dealer_cards` (both final hands, fully revealed).
 
 `events` are short English lines in order, for example:
 `Round 2 started, bet 10`, `⚡ Chaos Effect Triggered: rank adjustment -1 per card`,
 `Chaos AI says: ...`, `You draw: Q`, `Dealer draws: 8`, `Dealer stands at 18.`,
 `Dealer busts.`, `💀 BUST!`, `♠ BLACKJACK!`, `Dealer has blackjack.`,
 `Double down! Bet is now 40.`, `You surrender. 10 returned.`,
-`Next card rank: 7` (item result), `Reward earned: peek`.
+`Next card rank: 7` (item result), `Bought peek for 10.`, `The shop has new stock.`
 Treat them as narration; the authoritative state is `obs`.
 
 ## 5. Errors and recovery
@@ -152,7 +155,15 @@ Round
 - Dealer draws until 17 or more and stands on any 17 (no soft-17 rule).
 - Settlement: win `+bet`, loss `-bet`, push `0`, blackjack `+floor(bet*3/2)`.
 - Bust (over 21, or over 18 under Fragile Bust) on your own hit/double settles the round immediately; the dealer does not draw.
-- Win streak: each win or blackjack adds 1; anything else resets it. At 2 you receive a random item (`peek`, `shield` or `swap`) and the streak resets.
+- Win streak: each win or blackjack adds 1; anything else resets it. It is only a statistic.
+
+Shop
+
+- Open only in `betting`. It offers 3 different items from the catalog below; each offer can be bought once (`sold` afterwards).
+- The stock is rolled in round 1 and again every 2 rounds (rounds 3, 5, …); `shop.restock_in` counts down. Unbought offers are lost on restock.
+- A purchase must leave you at least 2 chips (enough for a minimum bet); `affordable` says whether it does.
+- Placeholder prices: `peek` 10, `danger_radar` 10, `swap` 20, `hole_card_hacker` 25, `fate_oracle` 25, `shield` 30.
+- The same seed always shows the same shelves; buying never changes the cards dealt.
 
 ## 7. Chaos AI and chaos rules
 
@@ -176,18 +187,19 @@ At most one rule is active at a time; rules are cleared when the next round is d
 
 ## 8. Items
 
-Use with `act use_item <id>` during `player_turn`. Each use consumes one copy. Information items report through `events`.
+Buy them in the shop, use with `act use_item <id>` during `player_turn`. Each use consumes one copy. Information items report through `events`.
 
 | Item id | Effect |
 | ------- | ------ |
 | `peek` | reveals the rank of the next card in the deck |
 | `fate_oracle` | reveals the ranks of the next 3 cards |
 | `danger_radar` | how many 10/J/Q/K remain in the deck, and the ratio |
-| `hole_card_hacker` | reveals the dealer's face-down card |
+| `hole_card_hacker` | flips the dealer's face-down card face up for the rest of the round (`dealer.cards` and `dealer.total` show it) |
 | `swap` | replaces your first card with the top card of the deck |
-| `shield` | currently no game effect |
+| `shield` | dispels every active chaos rule for the rest of the round; refused (and kept) when no rule is active |
 
-Revealed ranks never change `obs` (the hole card stays `??` there); remember them yourself.
+If an item pushes your total over the limit (a `swap`, or a `shield` removing a rule that kept you under), you bust and the round settles at once.
+Ranks revealed by `peek`, `fate_oracle` and `danger_radar` only appear in `events`; remember them yourself.
 
 ## 9. Worked examples
 
@@ -197,7 +209,7 @@ Real transcripts (`--brief --compact`, `run` field omitted).
 
 ```text
 $ python -m chaos_blackjack.agent new --seed 7
-{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/400.","hint":"Place a bet: bet <amount> with 1 <= amount <= 50.","legal_actions":["bet"],"bet_range":[1,50]}}
+{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/400. Shop: danger_radar 10, swap 20, hole_card_hacker 25 (restocks in 2 rounds).","hint":"Place a bet: bet <amount> with 1 <= amount <= 50. Or buy first: buy <item_id> (see obs.shop).","legal_actions":["bet","buy"],"bet_range":[1,50],"shop":{...}}}
 
 $ python -m chaos_blackjack.agent --brief --compact bet 20
 {"ok":true,"events":["Round 1 started, bet 20"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/400. Bet 20. You: 8♣ 3♥ = 11. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand | double | surrender","legal_actions":["hit","stand","double","surrender"]}}
@@ -206,8 +218,8 @@ $ python -m chaos_blackjack.agent --brief --compact act hit
 {"ok":true,"events":["You draw: Q"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/400. Bet 20. You: 8♣ 3♥ Q♥ = 21. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand","legal_actions":["hit","stand"]}}
 
 $ python -m chaos_blackjack.agent --brief --compact act stand
-{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/400.","hint":"Place a bet: bet <amount> with 1 <= amount <= 60.","legal_actions":["bet"],"bet_range":[1,60],
- "last_round":{"round":1,"outcome":"player","player_total":21,"dealer_total":23,"player_bust":false,"bet":20,"delta":20,"money_after":120,"reward":null,"doubled":false,"dealer_blackjack":false,"your_cards":["8♣","3♥","Q♥"],"dealer_cards":["K♣","5♥","8♦"]}}}
+{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/400. Shop: ...","hint":"...","legal_actions":["bet","buy"],"bet_range":[1,60],"shop":{...},
+ "last_round":{"round":1,"outcome":"player","player_total":21,"dealer_total":23,"player_bust":false,"bet":20,"delta":20,"money_after":120,"doubled":false,"dealer_blackjack":false,"your_cards":["8♣","3♥","Q♥"],"dealer_cards":["K♣","5♥","8♦"]}}}
 ```
 
 (Doubling on 11 would have paid +40 here.)
@@ -230,7 +242,7 @@ J♠ 7♠ is 15, not 17, because of the −1 rule. Doubling on 15 was a bad idea
 
 ```text
 $ python -m chaos_blackjack.agent --brief --compact bet 30        # bankroll 50 -> max 25
-{"ok":false,"events":[],"error":{"code":"illegal_action","message":"Invalid bet. Allowed range: 1~25","legal_actions":["bet"]},"obs":{"phase":"betting", ...,"bet_range":[1,25]}}
+{"ok":false,"events":[],"error":{"code":"illegal_action","message":"Invalid bet. Allowed range: 1~25","legal_actions":["bet","buy"]},"obs":{"phase":"betting", ...,"bet_range":[1,25]}}
 ```
 
 ## 10. Strategy notes
@@ -264,6 +276,7 @@ python -m chaos_blackjack.agent play --seed 7 --chaos
 {"cmd":"observe"}
 {"cmd":"bet","amount":20}
 {"cmd":"act","action":"hit"}
+{"cmd":"buy","item":"peek"}
 {"cmd":"act","action":"use_item","item":"peek"}
 {"cmd":"new","seed":8,"chaos":true}
 {"cmd":"help"}

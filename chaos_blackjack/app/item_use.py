@@ -26,7 +26,9 @@ def remove_one(inv: tuple[str, ...], item_id: str) -> tuple[str, ...]:
 
 
 # Item `extra` flags -> state transform. Add an entry here when a new item
-# needs to change the table (items themselves never mutate state).
+# needs to change the table (items themselves never mutate state). Flags that
+# touch the loop (`dispel_chaos_rules`) are handled in `use_item`; flags that
+# only change what the player sees (`reveal_hole_card`) in the controller.
 ItemEffect = Callable[[GameState, Any], GameState]
 
 
@@ -65,9 +67,12 @@ def use_item(loop: GameLoop, state: GameState, item_id: str) -> tuple[GameState,
         state,
         emit_event=loop.emit_event,
         peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
+        active_rule_ids=tuple(str(getattr(m, "id", "?")) for m in loop.modifiers.items),
     )
     result = cls().use(ctx)
     if not result.ok:
         return state, result
     after = apply_item_effects(state, result)
+    if (result.extra or {}).get("dispel_chaos_rules"):
+        loop.modifiers = loop.modifiers.with_cleared()
     return after.with_inventory(remove_one(after.inventory, item_id)), result
