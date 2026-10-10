@@ -16,7 +16,7 @@ from chaos_blackjack.gui import theme
 if TYPE_CHECKING:
     from chaos_blackjack.gui.assets import AssetManager
 
-CARD_SIZE = (100, 150)
+CARD_SIZE = (120, 180)
 RED_SUITS = frozenset({"♥", "♦"})
 SUITS = ("♠", "♥", "♦", "♣")
 
@@ -76,11 +76,13 @@ class CardRenderer:
         font = self.assets.font(max(10, int(h * 0.17)), bold=True)
         rank = font.render(card.rank, True, color)
         pad = int(w * 0.09)
-        surf.blit(rank, (pad, int(h * 0.04)))
         small = h * 0.1
-        draw_suit(surf, card.suit, (pad + rank.get_width() / 2, h * 0.04 + rank.get_height() + small * 0.55), small, color)
-        corner = pygame.transform.rotate(surf.subsurface((0, 0, w // 2, h // 2)).copy(), 180)
-        surf.blit(corner, (w - w // 2, h - h // 2))
+        # Corner index on its own layer so the rotated copy carries no paper texture.
+        index = pygame.Surface((w // 2, h // 2), pygame.SRCALPHA)
+        index.blit(rank, (pad, int(h * 0.04)))
+        draw_suit(index, card.suit, (pad + rank.get_width() / 2, h * 0.04 + rank.get_height() + small * 0.55), small, color)
+        surf.blit(index, (0, 0))
+        surf.blit(pygame.transform.rotate(index, 180), (w - w // 2, h - h // 2))
         draw_suit(surf, card.suit, (w / 2, h / 2), h * 0.3, color)
         return surf
 
@@ -106,7 +108,9 @@ def layout_hand(
 
 def deck_position(card_size: tuple[int, int] = CARD_SIZE) -> pygame.Rect:
     """Where the shoe sits (also the origin of deal animations later)."""
-    return pygame.Rect(1110, 90, *card_size)
+    rect = pygame.Rect((0, 0), card_size)
+    rect.midtop = (1144, 84)  # top of the right-hand table column
+    return rect
 
 
 __all__ = ["CARD_SIZE", "CardRenderer", "SUITS", "deck_position", "draw_suit", "layout_hand"]

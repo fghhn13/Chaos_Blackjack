@@ -80,7 +80,7 @@ class GalleryScene(Scene):
         surface.fill(theme.DARK)
         total = sum(len(v) for v in by_category().values())
         done = sum(1 for v in by_category().values() for s in v if a.has_file(s.id))
-        title = a.font(theme.FONT_HEADING).render("Asset Gallery", True, theme.GOLD)
+        title = a.font(theme.FONT_HEADING, role="display").render("Asset Gallery", True, theme.GOLD)
         surface.blit(title, (40, 24))
         stat = a.font(theme.FONT_BODY).render(f"Replaced {done} / {total}    click to enlarge    F5 rescan",
                                               True, theme.TEXT_MUTED)

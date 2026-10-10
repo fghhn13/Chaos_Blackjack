@@ -20,9 +20,11 @@ from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import Action, GameView, TablePhase
 from chaos_blackjack.gui import theme
-from chaos_blackjack.gui.components.bet_panel import BetPanel
-from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, deck_position, layout_hand
+from chaos_blackjack.gui.components.bet_panel import BetPanel, draw_bet_stack
+from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, layout_hand
+from chaos_blackjack.gui.components.chaos_panel import ChaosPanel
 from chaos_blackjack.gui.components.hud import EventFeed, draw_status_bar
+from chaos_blackjack.gui.components.item_panel import ItemPanel
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD, notice_line, outcome_banner
@@ -30,10 +32,20 @@ from chaos_blackjack.gui.widgets import Button, WidgetGroup
 
 W, H = LOGICAL_SIZE
 
-DEALER_Y = 200
-PLAYER_Y = 440
-BANNER_Y = 320
-ACTION_Y = 600
+# Three columns: Chaos AI + rules | play area | shoe + items.
+LEFT_PANEL = pygame.Rect(16, 60, 240, 644)
+RIGHT_PANEL = pygame.Rect(W - 16 - 240, 60, 240, 644)
+CENTER_LEFT, CENTER_RIGHT = LEFT_PANEL.right + 16, RIGHT_PANEL.left - 16
+HAND_MAX_WIDTH = CENTER_RIGHT - CENTER_LEFT - 80
+
+DEALER_Y = 192   # card centres
+PLAYER_Y = 510
+BET_ZONE = pygame.Rect(0, 0, 300, 80)
+BET_ZONE.center = (W // 2, 332)
+STACK_CENTER = (BET_ZONE.centerx, BET_ZONE.centery + 6)
+BANNER_Y = BET_ZONE.centery
+ACTION_Y = 616
+FEED_LINE = 22  # px per event-feed line
 
 DEALER_STEP_DELAY = 0.7  # seconds between dealer decisions
 CHAOS_DELAY = 0.4        # pause before the chaos AI acts
@@ -41,10 +53,10 @@ RUN_END_DELAY = 1.5      # let the last result sink in before the ending
 
 # (action id, label, hotkey, style, controller method)
 ACTION_BUTTONS: tuple[tuple[str, str, int, str, str], ...] = (
-    (Action.HIT, "Hit  H", pygame.K_h, "primary", "hit"),
-    (Action.STAND, "Stand  S", pygame.K_s, "primary", "stand"),
-    (Action.DOUBLE, "Double  D", pygame.K_d, "primary", "double_down"),
-    (Action.SURRENDER, "Surrender  R", pygame.K_r, "ghost", "surrender"),
+    (Action.HIT, "Hit", pygame.K_h, "primary", "hit"),
+    (Action.STAND, "Stand", pygame.K_s, "primary", "stand"),
+    (Action.DOUBLE, "Double", pygame.K_d, "primary", "double_down"),
+    (Action.SURRENDER, "Surrender", pygame.K_r, "ghost", "surrender"),
 )
 
 NoticeHandler = Callable[[Notice], None]
@@ -58,10 +70,14 @@ class TableScene(Scene):
             RunConfig(enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
-        self.feed = EventFeed(a, (24, 330))
-        self.bet_panel = BetPanel(a, (W // 2, ACTION_Y + 30), self._deal, initial=10)
+        self.chaos_panel = ChaosPanel(a, LEFT_PANEL)
+        self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item)
+        log = self.chaos_panel.log_area
+        self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
+        self.bet_panel = BetPanel(a, (W // 2, ACTION_Y + 30), self._deal, initial=10,
+                                  stack_center=STACK_CENTER)
 
-        bw, gap = 150, 16
+        bw, gap = 160, 16
         x0 = W // 2 - (len(ACTION_BUTTONS) * (bw + gap) - gap) // 2
         self.action_buttons: dict[str, Button] = {}
         for i, (action, label, key, style, method) in enumerate(ACTION_BUTTONS):
@@ -69,12 +85,13 @@ class TableScene(Scene):
                 a, (x0 + i * (bw + gap), ACTION_Y, bw, 56), label,
                 self._command(method), style=style, hotkey=key,
             )
-        self.next_button = Button(a, (W // 2 - 100, ACTION_Y, 200, 56), "Next Round  Enter",
+        self.next_button = Button(a, (W // 2 - 100, ACTION_Y, 200, 56), "Next Round",
                                   self._command("next_round"), hotkey=pygame.K_RETURN)
         self.ui = WidgetGroup(*self.action_buttons.values(), self.next_button)
 
         self._handlers: dict[str, list[NoticeHandler]] = {}
         self.subscribe("*", self._feed_notice)
+        self.subscribe("*", self.chaos_panel.react)
         self._timer = 0.0
         self._ending_opened = False
         self.view: GameView = self.controller.view()
@@ -115,6 +132,13 @@ class TableScene(Scene):
             self.feed.push(str(e), BAD)
         self._after_command()
 
+    def _use_item(self, item_id: str) -> None:
+        try:
+            self.controller.use_item(item_id)
+        except ActionError as e:
+            self.feed.push(str(e), BAD)
+        self._after_command()
+
     def _after_command(self) -> None:
         self._timer = 0.0
         self._pump_notices()
@@ -131,6 +155,9 @@ class TableScene(Scene):
                 on_confirm=lambda: self.app.scenes.reset("menu"),
             )
             return
+        if self.item_panel.handle_event(event):
+            return
+        self.chaos_panel.handle_event(event)
         if self.view.phase == TablePhase.BETTING:
             self.bet_panel.handle_event(event)
         else:
@@ -164,6 +191,11 @@ class TableScene(Scene):
         self.next_button.visible = v.phase == TablePhase.ROUND_OVER
         if v.phase == TablePhase.BETTING:
             self.bet_panel.set_limits(v.bet_min, v.bet_max)
+        self.chaos_panel.sync(v)
+        self.item_panel.sync(v)
+        log = self.chaos_panel.log_area
+        self.feed.anchor = log.topleft
+        self.feed.max_lines = max(2, log.h // FEED_LINE)
 
     # -------------------------------------------------------------- draw
 
@@ -171,12 +203,15 @@ class TableScene(Scene):
         a = self.app.assets
         v = self.view
         surface.blit(a.image("table_background", LOGICAL_SIZE), (0, 0))
+        self.chaos_panel.draw(surface)
+        self.item_panel.draw(surface)
         self._draw_deck(surface, v)
+        self._draw_bet_zone(surface, v)
         if v.dealer_cards:
             total = "?" if v.dealer_total is None else str(v.dealer_total)
-            self._draw_hand(surface, v.dealer_cards, DEALER_Y, f"Dealer  {total}")
+            self._draw_hand(surface, v.dealer_cards, DEALER_Y, "Dealer", total)
         if v.player_cards:
-            self._draw_hand(surface, v.player_cards, PLAYER_Y, f"You  {v.player_total}")
+            self._draw_hand(surface, v.player_cards, PLAYER_Y, "You", str(v.player_total))
 
         if v.phase == TablePhase.BETTING:
             self.bet_panel.draw(surface)
@@ -190,38 +225,59 @@ class TableScene(Scene):
         self.ui.draw(surface)
         self.feed.draw(surface)
         draw_status_bar(surface, a, v)
+        self.chaos_panel.draw_overlay(surface)
+        self.item_panel.draw_overlay(surface)
 
     def _draw_deck(self, surface: pygame.Surface, v: GameView) -> None:
-        rect = deck_position()
+        rect = self.item_panel.deck_rect
         back = self.cards.back(CARD_SIZE)
         for i in range(3):
             surface.blit(back, rect.move(-i * 2, -i * 2))
         if v.deck_count:
-            n = self.app.assets.font(theme.FONT_SMALL).render(f"{v.deck_count} left", True, theme.TEXT_MUTED)
+            n = self.app.assets.font(theme.FONT_SMALL).render(f"{v.deck_count} cards left", True, theme.TEXT_MUTED)
             surface.blit(n, n.get_rect(midtop=(rect.centerx, rect.bottom + 8)))
 
-    def _draw_hand(self, surface: pygame.Surface, cards, y: int, label: str) -> None:
-        rects = layout_hand(len(cards), (W // 2, y))
+    def _draw_bet_zone(self, surface: pygame.Surface, v: GameView) -> None:
+        """Betting circle on the felt; shows the wager while a round is live."""
+        zone = pygame.Surface(BET_ZONE.size, pygame.SRCALPHA)
+        pygame.draw.ellipse(zone, (0, 0, 0, 40), zone.get_rect())
+        pygame.draw.ellipse(zone, (*theme.GOLD_DIM, 160), zone.get_rect(), 2)
+        surface.blit(zone, BET_ZONE)
+        if v.phase == TablePhase.BETTING:
+            return  # the bet panel draws the pending amount here
+        if v.player_cards and v.current_bet:
+            draw_bet_stack(surface, self.app.assets, v.current_bet, STACK_CENTER)
+
+    def _draw_hand(self, surface: pygame.Surface, cards, y: int, who: str, total: str) -> None:
+        rects = layout_hand(len(cards), (W // 2, y), max_width=HAND_MAX_WIDTH)
         for card, rect in zip(cards, rects):
             shadow = pygame.Surface(rect.size, pygame.SRCALPHA)
             pygame.draw.rect(shadow, (0, 0, 0, 90), shadow.get_rect(), border_radius=8)
             surface.blit(shadow, rect.move(3, 4))
             surface.blit(self.cards.render(card, rect.size), rect)
-        font = self.app.assets.font(theme.FONT_BODY, bold=True)
-        img = font.render(label, True, theme.IVORY)
-        pos = (rects[0].left - 16, y) if rects else (W // 2, y)
-        surface.blit(img, img.get_rect(midright=pos))
+        # Name + total pill above the hand.
+        a = self.app.assets
+        name = a.font(theme.FONT_SMALL, bold=True).render(who.upper(), True, theme.GOLD_DIM)
+        value = a.font(theme.FONT_BODY, bold=True).render(total, True, theme.IVORY)
+        pill = pygame.Rect(0, 0, name.get_width() + value.get_width() + 34, 30)
+        pill.midbottom = (W // 2, y - CARD_SIZE[1] // 2 - 8)
+        pygame.draw.rect(surface, theme.DARK, pill, border_radius=15)
+        pygame.draw.rect(surface, theme.GOLD_DIM, pill, 1, border_radius=15)
+        surface.blit(name, name.get_rect(midleft=(pill.x + 12, pill.centery)))
+        surface.blit(value, value.get_rect(midright=(pill.right - 12, pill.centery)))
 
     def _draw_banner(self, surface: pygame.Surface, v: GameView) -> None:
         head, detail, color = outcome_banner(v.last_result)
-        band = pygame.Surface((W, 66), pygame.SRCALPHA)
-        band.fill((0, 0, 0, 170))
-        surface.blit(band, (0, BANNER_Y - 33))
+        width = CENTER_RIGHT - CENTER_LEFT
+        band = pygame.Surface((width, 72), pygame.SRCALPHA)
+        band.fill((*theme.DARK, 215))
+        surface.blit(band, (CENTER_LEFT, BANNER_Y - 36))
+        pygame.draw.line(surface, color, (CENTER_LEFT, BANNER_Y - 36), (CENTER_RIGHT - 1, BANNER_Y - 36), 2)
         a = self.app.assets
-        h = a.font(theme.FONT_HEADING, bold=True).render(head, True, color)
+        h = a.font(theme.FONT_HEADING, role="display").render(head, True, color)
         d = a.font(theme.FONT_BODY).render(detail, True, theme.TEXT)
-        surface.blit(h, h.get_rect(midright=(W // 2 - 20, BANNER_Y)))
-        surface.blit(d, d.get_rect(midleft=(W // 2 + 4, BANNER_Y)))
+        surface.blit(h, h.get_rect(midbottom=(W // 2, BANNER_Y + 6)))
+        surface.blit(d, d.get_rect(midtop=(W // 2, BANNER_Y + 8)))
 
     def _draw_center_text(self, surface: pygame.Surface, text: str, color) -> None:
         img = self.app.assets.font(theme.FONT_BODY).render(text, True, color)

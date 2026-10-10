@@ -61,16 +61,19 @@ class BetPanel(WidgetGroup):
         center: tuple[int, int],
         on_deal: Callable[[int], None],
         initial: int = 10,
+        *,
+        stack_center: tuple[int, int] | None = None,
     ) -> None:
         super().__init__()
         self.assets = assets
         self.center = center
+        self.stack_center = stack_center  # where the pending bet is shown as chips
         self.on_deal = on_deal
         self.amount = initial
         self.lo, self.hi = 1, 1
         cx, cy = center
         self.chips = [
-            ChipButton(assets, v, (cx - 330 + i * (CHIP_PX + 18), cy), self._add)
+            ChipButton(assets, v, (cx - 300 + i * (CHIP_PX + 18), cy), self._add)
             for i, v in enumerate(CHIP_VALUES)
         ]
         for chip in self.chips:
@@ -102,11 +105,48 @@ class BetPanel(WidgetGroup):
 
     def draw(self, surface: pygame.Surface) -> None:
         cx, cy = self.center
-        font = self.assets.font(theme.FONT_HEADING, bold=True)
-        amount = font.render(f"Bet {self.amount}", True, theme.GOLD)
-        surface.blit(amount, amount.get_rect(center=(cx, cy - 92)))
+        if self.stack_center is not None:
+            draw_bet_stack(surface, self.assets, self.amount, self.stack_center)
+        else:
+            font = self.assets.font(theme.FONT_HEADING, bold=True)
+            amount = font.render(f"Bet {self.amount}", True, theme.GOLD)
+            surface.blit(amount, amount.get_rect(center=(cx, cy - 92)))
         hint = self.assets.font(theme.FONT_SMALL).render(
             f"Range {self.lo}–{self.hi}    left-click add / right-click remove / ↑↓ ±1 / Enter deal", True, theme.TEXT_MUTED,
         )
         surface.blit(hint, hint.get_rect(center=(cx, cy - 58)))
         super().draw(surface)
+
+
+STACK_CHIP = 44
+STACK_STEP = 5   # vertical offset between chips in one stack
+STACK_MAX = 6    # chips drawn per stack before it is capped
+
+
+def chip_breakdown(amount: int) -> list[tuple[int, int]]:
+    """Greedy (value, count) split of `amount`, largest chip first."""
+    out = []
+    for value in sorted(CHIP_VALUES, reverse=True):
+        n, amount = divmod(amount, value)
+        if n:
+            out.append((value, n))
+    return out
+
+
+def draw_bet_stack(surface: pygame.Surface, assets: "AssetManager", amount: int, center: tuple[int, int]) -> None:
+    """The bet as stacks of chips (one stack per value) with the total beside them."""
+    cx, cy = center
+    stacks = chip_breakdown(max(0, amount))
+    gap = STACK_CHIP + 6
+    label = assets.font(theme.FONT_HEADING - 6, bold=True).render(f"{amount}", True, theme.GOLD)
+    chips_w = len(stacks) * gap - 6 if stacks else 0
+    total_w = chips_w + (14 if stacks else 0) + label.get_width()
+    x = cx - total_w // 2
+    for value, n in stacks:
+        img = assets.image(f"chip_{value}", (STACK_CHIP, STACK_CHIP))
+        for k in range(min(n, STACK_MAX)):
+            surface.blit(img, (x, cy - STACK_CHIP // 2 - k * STACK_STEP))
+        x += gap
+    if stacks:
+        x += 8
+    surface.blit(label, label.get_rect(midleft=(x, cy)))
