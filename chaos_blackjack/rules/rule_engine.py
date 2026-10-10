@@ -45,19 +45,25 @@ class DefaultBlackjackRules:
         return int(r)
 
     def hand_value(self, hand: tuple[Card, ...], ctx: RuleContext) -> int:
+        """Sum of card values after modifiers.
+
+        An Ace counts high (11 + modifiers) and can drop by 10 to its low value
+        (1 + the same modifiers) whenever the hand would otherwise bust under
+        the active bust rule — so value shifts move both of its values instead
+        of freezing it (e.g. "values -1": Ace is 10 or 0).
+        """
         total = 0
-        aces_as_eleven = 0
+        soft_aces = 0
         for card in hand:
-            base = self._card_base_value(card)
-            v = base
+            v = self._card_base_value(card)
             for m in ctx.modifiers.items:
                 v = m.adjust_rank_value(card, v)
-            if card.rank.upper() == "A" and v == 11:
-                aces_as_eleven += 1
+            if card.rank.upper() == "A":
+                soft_aces += 1
             total += v
-        while total > 21 and aces_as_eleven > 0:
+        while soft_aces > 0 and self.is_bust(total, ctx):
             total -= 10
-            aces_as_eleven -= 1
+            soft_aces -= 1
         return total
 
     def is_bust(self, value: int, ctx: RuleContext) -> bool:

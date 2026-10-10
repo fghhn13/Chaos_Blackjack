@@ -73,3 +73,42 @@ def test_tiebreaker_shift_player_wins_ties() -> None:
         inventory=(),
     )
     assert rules.compare_player_dealer(state, st_player_vs_dealer) == "player"
+
+
+# --- Aces stay soft under value-changing chaos rules ------------------------
+
+def _hand(*cards: str) -> tuple[Card, ...]:
+    return tuple(Card(Rank(c[:-1]), c[-1]) for c in cards)
+
+
+def _value(mods, *cards: str) -> int:
+    return DefaultBlackjackRules().hand_value(_hand(*cards), RuleContext(modifiers=ActiveModifiers(items=tuple(mods))))
+
+
+def test_baseline_aces_soft_and_hard() -> None:
+    assert _value([], "A♠", "6♥") == 17
+    assert _value([], "A♠", "6♥", "K♦") == 17
+    assert _value([], "A♠", "A♥", "9♦") == 21
+
+
+def test_value_shift_moves_both_ace_values() -> None:
+    from chaos_blackjack.rules.plugins.modify_card_value import ModifyCardValueModifier
+
+    minus1 = [ModifyCardValueModifier(id="modify_card_value", delta=-1)]
+    assert _value(minus1, "A♠", "6♥") == 15                 # 10 + 5, soft
+    assert _value(minus1, "6♥", "Q♦", "A♠") == 14           # agent test R2: was 24 (bust)
+    assert _value(minus1, "4♥", "A♥", "A♦") == 13           # agent test R7: was 23 (bust)
+    assert _value(minus1, "3♣", "6♣", "A♥") == 17           # 2 + 5 + 10 stays high
+
+
+def test_suit_power_aces_soft() -> None:
+    sp = [SuitPowerModifier()]
+    assert _value(sp, "A♥", "K♠") == 21                     # 12 + 9
+    assert _value(sp, "A♥", "K♠", "5♣") == 15               # red Ace drops to 2: 2 + 9 + 4
+
+
+def test_fragile_bust_softens_against_18() -> None:
+    fb = [FragileBustModifier()]
+    assert _value(fb, "A♠", "K♥") == 11                     # 21 would bust at 18 -> Ace counts 1
+    assert _value(fb, "A♠", "7♥") == 18
+    assert _value(fb, "A♠", "8♥") == 9

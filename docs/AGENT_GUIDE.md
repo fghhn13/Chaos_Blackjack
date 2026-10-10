@@ -139,8 +139,8 @@ Economy
 
 Card values
 
-- 2–10 face value, J/Q/K = 10, A = 11, but an Ace drops to 1 when the hand would otherwise bust.
-- Chaos rules change card values before summing. An Ace only keeps its 11→1 flexibility while its value after chaos rules is still exactly 11 (e.g. under "values −1" an Ace is a fixed 10).
+- 2–10 face value, J/Q/K = 10, A = 11, but an Ace drops by 10 (to 1) whenever the hand would otherwise bust under the active bust limit (21, or 18 under Fragile Bust).
+- Chaos rules change card values before summing, and shift **both** Ace values: under "values −1" an Ace is 10 or 0, under Suit Power a red Ace is 12 or 2. Aces stay soft under every rule.
 
 Round
 
@@ -166,7 +166,7 @@ At most one rule is active at a time; rules are cleared when the next round is d
 
 | Rule id | Effect | Implications |
 | ------- | ------ | ------------ |
-| `modify_card_value` | every card's value shifts by `delta` (stub: −1) | totals drop; Aces become fixed values; more room before busting |
+| `modify_card_value` | every card's value shifts by `delta` (stub: −1) | totals drop (an Ace is 10 or 0); more room before busting |
 | `great_crash` | 10, J, Q, K are worth 1 | high cards stop being dangerous; naturals become impossible |
 | `odd_even_chaos` | 2/4/6/8 +2 each, 3/5/7/9 −1 each | even cards push you toward bust |
 | `suit_power` | red cards (♥ ♦) +1, black (♠ ♣) −1 | read suits, not just ranks |
