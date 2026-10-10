@@ -51,3 +51,6 @@ black-jack-assets/
 
 # Image-generation scratch output
 output/
+
+# Balance simulator (separate git repository)
+black-jack-sim/
