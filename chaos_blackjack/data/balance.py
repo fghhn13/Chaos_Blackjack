@@ -61,6 +61,26 @@ class ChaosRuleBalance:
 
 
 @dataclass(frozen=True)
+class MetaUpgradeBalance:
+    """One meta-shop upgrade: an effect (code, chaos_blackjack/meta/effects.py) plus its numbers."""
+
+    upgrade_id: str
+    kind: str                  # permanent | consumable
+    effect: str
+    params: Params = ()
+    cost: int = 0
+    cost_step: int = 0         # permanent: each further level costs this much more
+    max_level: int = 1         # permanent: levels; consumable: most copies held
+    requires: str | None = None
+
+    def cost_of_level(self, level: int) -> int:
+        """Cost of level `level` (1-based) of a permanent upgrade; consumables always cost `cost`."""
+        if self.kind != "permanent":
+            return self.cost
+        return self.cost + (max(1, level) - 1) * self.cost_step
+
+
+@dataclass(frozen=True)
 class Balance:
     profile: str
     start_money: int
@@ -77,9 +97,14 @@ class Balance:
     chaos_guidance_probability: float
     chaos_memory_enabled: bool
     chaos_memory_limit: int
+    meta_win_tokens: int
+    meta_loss_per_round: float
+    meta_loss_per_peak_gain: float
+    meta_loss_cap: int
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
+    meta_upgrades: tuple[MetaUpgradeBalance, ...] = field(default=())  # enabled ones only
 
     @property
     def shop_prices(self) -> dict[str, int]:
@@ -130,6 +155,10 @@ _SETTINGS: dict[str, str] = {
     "chaos.guidance_probability": "chaos_guidance_probability",
     "chaos.memory_enabled": "chaos_memory_enabled",
     "chaos.memory_limit": "chaos_memory_limit",
+    "meta.win_tokens": "meta_win_tokens",
+    "meta.loss_per_round": "meta_loss_per_round",
+    "meta.loss_per_peak_gain": "meta_loss_per_peak_gain",
+    "meta.loss_cap": "meta_loss_cap",
 }
 
 
@@ -226,16 +255,29 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
             "SELECT rule_id, enabled, params, stub_weight, stub_params FROM chaos_rule "
             "WHERE profile_id = ? ORDER BY rule_id", (pid,))
     )
+    upgrades = tuple(
+        MetaUpgradeBalance(
+            upgrade_id, kind, effect, _params(f"Profile {name!r}, upgrade {upgrade_id}", params),
+            int(cost), int(cost_step), int(max_level), requires or None,
+        )
+        for upgrade_id, kind, effect, params, cost, cost_step, max_level, requires in conn.execute(
+            "SELECT upgrade_id, kind, effect, params, cost, cost_step, max_level, requires FROM meta_upgrade "
+            "WHERE profile_id = ? AND enabled = 1 ORDER BY upgrade_id", (pid,))
+    )
+    known_upgrades = {u.upgrade_id for u in upgrades}
+    for u in upgrades:
+        if u.requires and u.requires not in known_upgrades:
+            raise BalanceError(f"Profile {name!r}: upgrade {u.upgrade_id} requires unknown upgrade {u.requires!r}")
 
     if values["target_money"] <= values["start_money"]:
         raise BalanceError(f"Profile {name!r}: run.target_money must be above run.start_money")
     num, den = values.pop("_bj_num"), values.pop("_bj_den")
     return Balance(profile=name, blackjack_pays=(num, den), shop_items=tuple(items),
-                   item_tuning=tuning, chaos_rules=rules, **values)
+                   item_tuning=tuning, chaos_rules=rules, meta_upgrades=upgrades, **values)
 
 
 def clone_profile(conn: sqlite3.Connection, source: str, name: str, description: str = "") -> int:
-    """Copy a profile (all settings, shop items, chaos rules) to a new, editable one."""
+    """Copy a profile (settings, shop items, chaos rules, meta upgrades) to a new, editable one."""
     src = conn.execute("SELECT id FROM balance_profile WHERE name = ?", (source,)).fetchone()
     if src is None:
         raise BalanceError(f"Unknown balance profile {source!r}")
@@ -258,6 +300,10 @@ def clone_profile(conn: sqlite3.Connection, source: str, name: str, description:
             "INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_params) "
             "SELECT ?, rule_id, enabled, params, stub_weight, stub_params FROM chaos_rule WHERE profile_id = ?",
             (pid, src[0]))
+        conn.execute(
+            "INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, max_level, "
+            "enabled, requires) SELECT ?, upgrade_id, kind, effect, params, cost, cost_step, max_level, enabled, "
+            "requires FROM meta_upgrade WHERE profile_id = ?", (pid, src[0]))
     return int(pid)
 
 

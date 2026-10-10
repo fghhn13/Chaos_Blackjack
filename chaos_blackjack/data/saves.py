@@ -56,8 +56,16 @@ def _conn(conn: sqlite3.Connection | None) -> Iterator[sqlite3.Connection]:
         own.close()
 
 
-def save_run(data: RunSaveData, name: str = DEFAULT_SAVE_NAME, *, conn: sqlite3.Connection | None = None) -> str:
-    """Insert or overwrite a save; returns a locator like "data/game.db#save_1"."""
+def save_run(
+    data: RunSaveData,
+    name: str = DEFAULT_SAVE_NAME,
+    *,
+    conn: sqlite3.Connection | None = None,
+    player_id: int | None = None,
+    run_id: int | None = None,
+) -> str:
+    """Insert or overwrite a save; returns a locator like "data/game.db#save_1".
+    `player_id` / `run_id` link a meta-progression run to its save."""
     key = normalize_save_name(name)
     config = data.config or {}
     profile = config.get("balance_profile")
@@ -65,13 +73,14 @@ def save_run(data: RunSaveData, name: str = DEFAULT_SAVE_NAME, *, conn: sqlite3.
     payload = json.dumps(data.to_dict(), ensure_ascii=False)
     with _conn(conn) as c, c:
         c.execute(
-            """INSERT INTO run_save (name, profile_name, balance_hash, save_version, data)
-               VALUES (?, ?, ?, ?, ?)
+            """INSERT INTO run_save (name, profile_name, balance_hash, save_version, data, player_id, run_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(name) DO UPDATE SET
                    profile_name = excluded.profile_name, balance_hash = excluded.balance_hash,
                    save_version = excluded.save_version, data = excluded.data,
+                   player_id = excluded.player_id, run_id = excluded.run_id,
                    updated_at = datetime('now')""",
-            (key, profile, digest, int(data.version), payload),
+            (key, profile, digest, int(data.version), payload, player_id, run_id),
         )
     return f"{db_path() if conn is None else 'db'}#{key}"
 
@@ -88,11 +97,13 @@ def load_run(name: str, *, conn: sqlite3.Connection | None = None) -> RunSaveDat
     return RunSaveData.from_dict(payload)
 
 
-def list_runs(*, conn: sqlite3.Connection | None = None) -> list[SaveInfo]:
+def list_runs(*, conn: sqlite3.Connection | None = None, player_id: int | None = None) -> list[SaveInfo]:
+    """All saves, or only those of one meta-progression player."""
+    where, args = ("WHERE player_id = ?", (player_id,)) if player_id is not None else ("", ())
     with _conn(conn) as c:
         rows = c.execute(
             "SELECT name, updated_at, profile_name, json_extract(data, '$.round'), "
-            "json_extract(data, '$.money') FROM run_save ORDER BY name"
+            f"json_extract(data, '$.money') FROM run_save {where} ORDER BY name", args
         ).fetchall()
     return [SaveInfo(r[0], r[1], r[2], int(r[3] or 0), int(r[4] or 0)) for r in rows]
 
