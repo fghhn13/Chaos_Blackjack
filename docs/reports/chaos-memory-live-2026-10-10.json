@@ -1,0 +1,427 @@
+{
+  "started_at": "2026-10-10T14:17:12.833345+00:00",
+  "tested_commit": "02ca3bd4e651d7a91b800165191d87ac154edc7e",
+  "model": "gpt-6-luna",
+  "base_url": "https://api2.gptsapi.net/v1",
+  "timeout_s": 45.0,
+  "video_driver": "dummy",
+  "memory_enabled": true,
+  "memory_limit": 32,
+  "seed": 7,
+  "rounds": 1,
+  "request_cap": 3,
+  "max_tokens": 256,
+  "requests": [
+    {
+      "request": 1,
+      "scenario": "shop_poke_before_round",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 890,
+        "completion_tokens": 53,
+        "total_tokens": 943
+      },
+      "finish_reason": "stop",
+      "invalid_json": true,
+      "duration_s": 0,
+      "intent": "guide",
+      "memory": [
+        {
+          "details": {
+            "item": "danger_radar",
+            "price": 10
+          },
+          "kind": "item_bought",
+          "round": 1
+        }
+      ],
+      "context_phase": "betting",
+      "bankroll": 90,
+      "shop": {
+        "catalog_prices": {
+          "danger_radar": 10,
+          "fate_oracle": 25,
+          "hole_card_hacker": 25,
+          "peek": 10,
+          "shield": 30,
+          "swap": 20
+        },
+        "offers": [
+          {
+            "item": "danger_radar",
+            "price": 10,
+            "sold": true
+          },
+          {
+            "item": "swap",
+            "price": 20,
+            "sold": false
+          },
+          {
+            "item": "hole_card_hacker",
+            "price": 25,
+            "sold": false
+          }
+        ],
+        "refresh_rounds": 2,
+        "restock_in": 2,
+        "slots": 3,
+        "stock_round": 1
+      },
+      "inventory": [
+        {
+          "count": 1,
+          "help": "Show how many 10/J/Q/K cards remain in the deck.",
+          "id": "danger_radar"
+        }
+      ],
+      "response_text": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters.",
+      "reused_paid_response": true,
+      "original_duration_s": 0.789
+    },
+    {
+      "request": 2,
+      "scenario": "memory_enabled_chaos_turn",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 1250,
+        "completion_tokens": 355,
+        "total_tokens": 1605
+      },
+      "finish_reason": "stop",
+      "action": {
+        "action": "apply_rule",
+        "rule_id": "modify_card_value"
+      },
+      "duration_s": 37.2615,
+      "intent": null,
+      "memory": [
+        {
+          "details": {
+            "item": "danger_radar",
+            "price": 10
+          },
+          "kind": "item_bought",
+          "round": 1
+        },
+        {
+          "details": {
+            "text": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters."
+          },
+          "kind": "chaos_poke_reply",
+          "round": 1
+        },
+        {
+          "details": {
+            "bet": 5,
+            "round": 1
+          },
+          "kind": "round_started",
+          "round": 1
+        }
+      ],
+      "context_phase": "chaos",
+      "bankroll": 90,
+      "shop": {
+        "catalog_prices": {
+          "danger_radar": 10,
+          "fate_oracle": 25,
+          "hole_card_hacker": 25,
+          "peek": 10,
+          "shield": 30,
+          "swap": 20
+        },
+        "offers": [
+          {
+            "item": "danger_radar",
+            "price": 10,
+            "sold": true
+          },
+          {
+            "item": "swap",
+            "price": 20,
+            "sold": false
+          },
+          {
+            "item": "hole_card_hacker",
+            "price": 25,
+            "sold": false
+          }
+        ],
+        "refresh_rounds": 2,
+        "restock_in": 2,
+        "slots": 3,
+        "stock_round": 1
+      },
+      "inventory": [
+        {
+          "count": 1,
+          "help": "Show how many 10/J/Q/K cards remain in the deck.",
+          "id": "danger_radar"
+        }
+      ],
+      "response_text": "{\"action\":\"apply_rule\",\"rule_id\":\"modify_card_value\",\"params\":{\"delta\":1},\"narration\":\"Every card is worth one more this round\u2014small margin, sharper decisions.\"}"
+    },
+    {
+      "request": 3,
+      "scenario": "poke_after_round_result",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 1531,
+        "completion_tokens": 50,
+        "total_tokens": 1581
+      },
+      "finish_reason": "stop",
+      "invalid_json": true,
+      "duration_s": 4.2451,
+      "intent": "guide",
+      "memory": [
+        {
+          "details": {
+            "item": "danger_radar",
+            "price": 10
+          },
+          "kind": "item_bought",
+          "round": 1
+        },
+        {
+          "details": {
+            "text": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters."
+          },
+          "kind": "chaos_poke_reply",
+          "round": 1
+        },
+        {
+          "details": {
+            "bet": 5,
+            "round": 1
+          },
+          "kind": "round_started",
+          "round": 1
+        },
+        {
+          "details": {
+            "text": "Every card is worth one more this round\u2014small margin, sharper decisions."
+          },
+          "kind": "chaos_narration",
+          "round": 1
+        },
+        {
+          "details": {
+            "rank": "Q",
+            "to_player": true
+          },
+          "kind": "draw_card",
+          "round": 1
+        },
+        {
+          "details": {
+            "result": {
+              "bet": 5,
+              "dealer_blackjack": false,
+              "dealer_total": 17,
+              "delta": -5,
+              "doubled": false,
+              "money_after": 85,
+              "outcome": "dealer",
+              "player_bust": true,
+              "player_total": 24,
+              "round": 1
+            }
+          },
+          "kind": "round_settled",
+          "round": 1
+        }
+      ],
+      "context_phase": "round_over",
+      "bankroll": 85,
+      "shop": {
+        "catalog_prices": {
+          "danger_radar": 10,
+          "fate_oracle": 25,
+          "hole_card_hacker": 25,
+          "peek": 10,
+          "shield": 30,
+          "swap": 20
+        },
+        "offers": [
+          {
+            "item": "danger_radar",
+            "price": 10,
+            "sold": true
+          },
+          {
+            "item": "swap",
+            "price": 20,
+            "sold": false
+          },
+          {
+            "item": "hole_card_hacker",
+            "price": 25,
+            "sold": false
+          }
+        ],
+        "refresh_rounds": 2,
+        "restock_in": 1,
+        "slots": 3,
+        "stock_round": 1
+      },
+      "inventory": [
+        {
+          "count": 1,
+          "help": "Show how many 10/J/Q/K cards remain in the deck.",
+          "id": "danger_radar"
+        }
+      ],
+      "response_text": "I\u2019d take the next round with a modest bet and keep your 10-chip danger radar for a moment when its count can guide a hit-or-stand decision; the +1-per-card rule made last round especially unforgiving."
+    }
+  ],
+  "interactions": [
+    {
+      "scenario": "shop_poke_before_round",
+      "reply": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters.",
+      "intent": "guide",
+      "rendered_frames": 1,
+      "animation_states": 1,
+      "single_request_after_eight_clicks": true
+    },
+    {
+      "scenario": "poke_after_round_result",
+      "reply": "I\u2019d take the next round with a modest bet and keep your 10-chip danger radar for a moment when its count can guide a hit-or-stand decision; the +1-per-card rule made last round especially unforgiving.",
+      "intent": "guide",
+      "rendered_frames": 259,
+      "animation_states": 4,
+      "single_request_after_eight_clicks": true
+    }
+  ],
+  "checks": {
+    "memory_survives_pre_round_disk_reload": true,
+    "previous_reply_sent_to_later_api_calls": true,
+    "shop_purchase_sent_to_all_api_calls": true,
+    "round_result_sent_to_final_poke": true,
+    "memory_survives_post_round_disk_reload": true,
+    "requests_run_off_main_thread": true
+  },
+  "purchased_item": "danger_radar",
+  "decisions": [
+    "hit"
+  ],
+  "result": {
+    "round": 1,
+    "outcome": "dealer",
+    "player_total": 24,
+    "dealer_total": 17,
+    "player_bust": true,
+    "bet": 5,
+    "delta": -5,
+    "money_after": 85,
+    "doubled": false,
+    "dealer_blackjack": false
+  },
+  "final_memory": [
+    {
+      "round": 1,
+      "kind": "item_bought",
+      "details": {
+        "item": "danger_radar",
+        "price": 10
+      }
+    },
+    {
+      "round": 1,
+      "kind": "chaos_poke_reply",
+      "details": {
+        "text": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters."
+      }
+    },
+    {
+      "round": 1,
+      "kind": "round_started",
+      "details": {
+        "round": 1,
+        "bet": 5
+      }
+    },
+    {
+      "round": 1,
+      "kind": "chaos_narration",
+      "details": {
+        "text": "Every card is worth one more this round\u2014small margin, sharper decisions."
+      }
+    },
+    {
+      "round": 1,
+      "kind": "draw_card",
+      "details": {
+        "to_player": true,
+        "rank": "Q"
+      }
+    },
+    {
+      "round": 1,
+      "kind": "round_settled",
+      "details": {
+        "result": {
+          "round": 1,
+          "outcome": "dealer",
+          "player_total": 24,
+          "dealer_total": 17,
+          "player_bust": true,
+          "bet": 5,
+          "delta": -5,
+          "money_after": 85,
+          "doubled": false,
+          "dealer_blackjack": false
+        }
+      }
+    },
+    {
+      "round": 2,
+      "kind": "chaos_poke_reply",
+      "details": {
+        "text": "I\u2019d take the next round with a modest bet and keep your 10-chip danger radar for a moment when its count can guide a hit-or-stand decision; the +1-per-card rule made last round especially unforgiving."
+      }
+    }
+  ],
+  "passed": true,
+  "finished_at": "2026-10-10T14:17:55.342579+00:00",
+  "request_count": 3,
+  "new_billed_requests": 2,
+  "timing_ms": {
+    "update": {
+      "samples": 2555,
+      "median_ms": 0.021,
+      "p95_ms": 0.038,
+      "max_ms": 0.682,
+      "over_100ms": 0
+    },
+    "render": {
+      "samples": 2555,
+      "median_ms": 2.953,
+      "p95_ms": 8.445,
+      "max_ms": 61.265,
+      "over_100ms": 0
+    },
+    "interval": {
+      "samples": 2555,
+      "median_ms": 16.0,
+      "p95_ms": 17.0,
+      "max_ms": 61.0,
+      "over_100ms": 0
+    }
+  },
+  "usage_totals": {
+    "prompt_tokens": 3671,
+    "completion_tokens": 458,
+    "total_tokens": 4129
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "started_at": "2026-10-10T14:13:20.449033+00:00",
+  "tested_commit": "1f93d002b800e2816493c35b305ce78e93944ffe",
+  "model": "gpt-6-luna",
+  "base_url": "https://api2.gptsapi.net/v1",
+  "timeout_s": 45.0,
+  "video_driver": "dummy",
+  "memory_enabled": true,
+  "memory_limit": 32,
+  "seed": 7,
+  "rounds": 1,
+  "request_cap": 4,
+  "max_tokens": 256,
+  "requests": [
+    {
+      "request": 1,
+      "scenario": "shop_poke_before_round",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 890,
+        "completion_tokens": 53,
+        "total_tokens": 943
+      },
+      "finish_reason": "stop",
+      "invalid_json": true,
+      "duration_s": 4.5611,
+      "intent": "guide",
+      "memory": [
+        {
+          "details": {
+            "item": "danger_radar",
+            "price": 10
+          },
+          "kind": "item_bought",
+          "round": 1
+        }
+      ],
+      "context_phase": "betting",
+      "bankroll": 90,
+      "shop": {
+        "catalog_prices": {
+          "danger_radar": 10,
+          "fate_oracle": 25,
+          "hole_card_hacker": 25,
+          "peek": 10,
+          "shield": 30,
+          "swap": 20
+        },
+        "offers": [
+          {
+            "item": "danger_radar",
+            "price": 10,
+            "sold": true
+          },
+          {
+            "item": "swap",
+            "price": 20,
+            "sold": false
+          },
+          {
+            "item": "hole_card_hacker",
+            "price": 25,
+            "sold": false
+          }
+        ],
+        "refresh_rounds": 2,
+        "restock_in": 2,
+        "slots": 3,
+        "stock_round": 1
+      },
+      "inventory": [
+        {
+          "count": 1,
+          "help": "Show how many 10/J/Q/K cards remain in the deck.",
+          "id": "danger_radar"
+        }
+      ]
+    }
+  ],
+  "interactions": [],
+  "checks": {},
+  "purchased_item": "danger_radar",
+  "passed": false,
+  "error": "AssertionError: Real model did not return a valid text-only reply",
+  "finished_at": "2026-10-10T14:13:25.549711+00:00",
+  "request_count": 1,
+  "timing_ms": {
+    "update": {
+      "samples": 288,
+      "median_ms": 0.018,
+      "p95_ms": 0.042,
+      "max_ms": 0.241,
+      "over_100ms": 0
+    },
+    "render": {
+      "samples": 288,
+      "median_ms": 7.943,
+      "p95_ms": 9.714,
+      "max_ms": 60.191,
+      "over_100ms": 0
+    },
+    "interval": {
+      "samples": 288,
+      "median_ms": 16.0,
+      "p95_ms": 17.0,
+      "max_ms": 60.0,
+      "over_100ms": 0
+    }
+  },
+  "usage_totals": {
+    "prompt_tokens": 890,
+    "completion_tokens": 53,
+    "total_tokens": 943
+  }
+}

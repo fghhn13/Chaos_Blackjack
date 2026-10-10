@@ -1,0 +1,119 @@
+{
+  "started_at": "2026-10-10T14:14:32.200081+00:00",
+  "tested_commit": "1f93d002b800e2816493c35b305ce78e93944ffe",
+  "model": "gpt-6-luna",
+  "base_url": "https://api2.gptsapi.net/v1",
+  "timeout_s": 45.0,
+  "video_driver": "dummy",
+  "memory_enabled": true,
+  "memory_limit": 32,
+  "seed": 7,
+  "rounds": 1,
+  "request_cap": 3,
+  "max_tokens": 256,
+  "requests": [
+    {
+      "request": 1,
+      "scenario": "shop_poke_before_round",
+      "main_thread": false,
+      "model": "gpt-6-luna",
+      "max_tokens": 256,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 890,
+        "completion_tokens": 53,
+        "total_tokens": 943
+      },
+      "finish_reason": "stop",
+      "invalid_json": true,
+      "duration_s": 0.789,
+      "intent": "guide",
+      "memory": [
+        {
+          "details": {
+            "item": "danger_radar",
+            "price": 10
+          },
+          "kind": "item_bought",
+          "round": 1
+        }
+      ],
+      "context_phase": "betting",
+      "bankroll": 90,
+      "shop": {
+        "catalog_prices": {
+          "danger_radar": 10,
+          "fate_oracle": 25,
+          "hole_card_hacker": 25,
+          "peek": 10,
+          "shield": 30,
+          "swap": 20
+        },
+        "offers": [
+          {
+            "item": "danger_radar",
+            "price": 10,
+            "sold": true
+          },
+          {
+            "item": "swap",
+            "price": 20,
+            "sold": false
+          },
+          {
+            "item": "hole_card_hacker",
+            "price": 25,
+            "sold": false
+          }
+        ],
+        "refresh_rounds": 2,
+        "restock_in": 2,
+        "slots": 3,
+        "stock_round": 1
+      },
+      "inventory": [
+        {
+          "count": 1,
+          "help": "Show how many 10/J/Q/K cards remain in the deck.",
+          "id": "danger_radar"
+        }
+      ],
+      "response_text": "You\u2019ve got 90 chips and need to keep enough for a bet, so skip the 20-chip swap and 25-chip hacker; place a bet you can afford and save your radar for a round when knowing the remaining high cards matters."
+    }
+  ],
+  "interactions": [],
+  "checks": {},
+  "purchased_item": "danger_radar",
+  "passed": false,
+  "error": "AssertionError: Real model did not return a valid text-only reply",
+  "finished_at": "2026-10-10T14:14:33.525555+00:00",
+  "request_count": 1,
+  "timing_ms": {
+    "update": {
+      "samples": 58,
+      "median_ms": 0.017,
+      "p95_ms": 0.04,
+      "max_ms": 0.08,
+      "over_100ms": 0
+    },
+    "render": {
+      "samples": 58,
+      "median_ms": 7.89,
+      "p95_ms": 10.429,
+      "max_ms": 59.676,
+      "over_100ms": 0
+    },
+    "interval": {
+      "samples": 58,
+      "median_ms": 17.0,
+      "p95_ms": 17.0,
+      "max_ms": 60.0,
+      "over_100ms": 0
+    }
+  },
+  "usage_totals": {
+    "prompt_tokens": 890,
+    "completion_tokens": 53,
+    "total_tokens": 943
+  }
+}
