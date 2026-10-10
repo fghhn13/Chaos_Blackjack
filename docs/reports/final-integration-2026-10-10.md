@@ -78,6 +78,10 @@ The workflow runs on push, pull requests to `main` and manual dispatch.
 - The optional simulator remains a separate repository, checked locally rather
   than downloaded by this workflow.
 
-GitHub-hosted CI has not run for these new local commits. It starts when they
-are pushed. Local runtime checks and the installed-wheel gate passed; that is
-distinct from a hosted CI result.
+The integrated version was pushed to `origin/main`. The first hosted run
+passed Windows and the installed-wheel job, while both Ubuntu jobs exposed a
+font-dependent fixture in the history scrolling test: forty items wrapped
+into eighteen lines, without overflowing the viewport. The fixture now uses
+one hundred items and checks the actual visible capacity and last visible
+item, rather than a Windows-specific line count. The correction is validated
+locally and pushed for another complete hosted run.

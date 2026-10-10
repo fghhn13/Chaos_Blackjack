@@ -205,11 +205,13 @@ def test_player_action_checkpoint_survives_gui_shutdown(app):
 def test_long_history_summary_can_be_scrolled_to_the_last_item(app):
     scene = open_screen(app, "history", player_id=player_id())
     scene.selected = replace(scene.selected, summary={
-        "items_used": {f"very_long_custom_item_{i}": 1 for i in range(40)}})
-    assert len(scene.detail_lines()) > 20
+        "items_used": {f"very_long_custom_item_{i}": 1 for i in range(100)}})
+    capacity = 222 // app.assets.font(16).get_linesize()
+    assert len(scene.detail_lines()) > capacity
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, y=-100))
     assert scene.detail_scroll > 0
-    assert "custom item 39" in " ".join(scene.detail_lines()[scene.detail_scroll:])
+    visible = scene.detail_lines()[scene.detail_scroll:scene.detail_scroll + capacity]
+    assert "custom item 99" in " ".join(visible)
     app._render()
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, y=100))
     assert scene.detail_scroll == 0
