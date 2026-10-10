@@ -78,7 +78,7 @@ def test_export_round_trips_through_a_seed(conn) -> None:
         for statement in _statements(text):
             fresh.execute(statement, {"profile": pid})
     assert load_balance("imported", fresh).fingerprint == load_balance("tune", conn).fingerprint
-    assert admin.export_seed(connect(":memory:"), "default").count("INSERT") == 3
+    assert admin.export_seed(connect(":memory:"), "default").count("INSERT") == 4
 
 
 def test_default_export_matches_the_shipped_values(conn) -> None:

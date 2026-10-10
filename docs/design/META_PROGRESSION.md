@@ -29,7 +29,10 @@ player (slot 1-3) ── tokens, permanent upgrades (with level), consumables (w
    └─ finish run ──────► tokens (win or consolation), run_history row, codex_seen updates
 ```
 
-## 3. Data model (migration 0003, owner: agent A)
+## 3. Data model (migration 0004, owner: agent A)
+
+Implemented in `chaos_blackjack/data/migrations/0004_meta_progression.sql`
+(0003 was taken by the Chaos AI settings). Sketch:
 
 ```sql
 CREATE TABLE player (
@@ -114,17 +117,28 @@ meta_shop(player_id, profile: str | None = None) -> list[UpgradeOffer]
     # UpgradeOffer(upgrade_id, name, description, kind, owned, max_level, next_cost, can_buy, reason)
 buy_upgrade(player_id, upgrade_id) -> Player        # MetaError with a player-readable message
 
-modes() -> list[GameMode]
-start_run(player_id, mode_id, *, consumables: list[str] = (), profile=None, seed=None) -> RunStart
-    # RunStart(run_id, config: RunConfig, applied: dict[str, int]); consumables are used up here
-finish_run(run_id, controller) -> RunReward         # RunReward(tokens, breakdown: list[tuple[str, int]], player)
+modes(player_id=None) -> list[ModeOption]          # ModeOption(mode: GameMode, unlocked: bool)
+start_run(player_id, mode_id, *, consumables=(), profile=None, seed=None, loop_factory=None) -> RunStart
+    # RunStart(run_id, mode, config, applied: dict[str, int], controller: GameController)
+    # consumables (one entry per copy) are used up here; the controller is
+    # tracked and saves into the player's run (controller.save(name))
+resume_run(player_id, *, loop_factory=None) -> RunStart | None   # unfinished run with a save
+finish_run(run_id, controller) -> RunReward
+    # RunReward(tokens, breakdown: tuple[(label, tokens)], result, player); only once the run is over
 abandon_run(run_id) -> None                          # quitting mid-run: result "abandoned", no tokens
 history(player_id, limit=50) -> list[RunRecord]
+codex_seen(player_id) -> dict[(kind, entry_id), times]
 ```
 
-A ships the signatures plus an in-memory fake (`meta/fake.py`, same behaviour,
-no database) in its first commit so B can build screens before the real
-store lands.
+Errors are `MetaError` (a `ValueError`) with a player-readable message.
+
+**Fake for GUI work:** `chaos_blackjack.meta.fake.install_fake()` installs the
+real service on an in-memory database with demo data (slot 1 "Ace" with
+tokens, upgrades and three past runs; slot 2 "Rookie"; slot 3 empty). Nothing
+is written to disk; behaviour is identical. `chaos_blackjack.meta.use_service(None)`
+switches back to `data/game.db`.
+
+Tools: `python -m chaos_blackjack.data players | history SLOT | grant SLOT TOKENS`.
 
 ### 5.2 Controller hook (owner A)
 

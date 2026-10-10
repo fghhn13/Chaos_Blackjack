@@ -10,8 +10,14 @@ Balance profiles
   delete PROFILE                    remove an unlocked profile
 
   KEY is a setting (run.start_money, bet.max_fraction, ...), item.<id>.<field>
-  (price, enabled, weight, params, price_mode) or rule.<id>.<field>
-  (enabled, params, stub_weight, stub_params). JSON values: '{"ten_value": 5}'.
+  (price, enabled, weight, params, price_mode), rule.<id>.<field>
+  (enabled, params, stub_weight, stub_params) or upgrade.<id>.<field>
+  (cost, cost_step, max_level, enabled, params, requires). JSON values: '{"ten_value": 5}'.
+
+Players (meta progression)
+  players                           the 3 player slots: tokens, upgrades, record
+  history SLOT [-n N]               the player's last runs
+  grant SLOT TOKENS                 add tokens (development and testing)
 
 Saves
   saves                             list saves
@@ -94,6 +100,51 @@ def _delete(conn, a) -> int:
     return 0
 
 
+def _meta(conn):
+    from chaos_blackjack.meta import MetaService
+
+    return MetaService(conn)
+
+
+def _slot_player(conn, slot: int):
+    from chaos_blackjack.meta import MetaError
+
+    found = next((s.player for s in _meta(conn).list_slots() if s.slot == slot), None)
+    if found is None:
+        raise MetaError(f"Slot {slot} is empty")
+    return found
+
+
+def _players(conn, a) -> int:
+    for s in _meta(conn).list_slots():
+        p = s.player
+        if p is None:
+            print(f"  slot {s.slot}: (empty)")
+            continue
+        st = p.stats
+        ups = ", ".join(f"{k} {v}" for k, v in sorted(p.upgrades.items())) or "-"
+        print(f"  slot {s.slot}: {p.name:16s} tokens {p.tokens:<5d} runs {st.runs} "
+              f"(won {st.victories}, lost {st.defeats}, quit {st.abandoned})  upgrades: {ups}")
+    return 0
+
+
+def _history(conn, a) -> int:
+    player = _slot_player(conn, a.slot)
+    runs = _meta(conn).history(player.id, a.n)
+    for r in runs:
+        print(f"  #{r.id:<4d} {r.started_at}  {r.mode:7s} {r.result or 'running':9s} rounds {r.rounds or 0:<4d} "
+              f"money {r.final_money or 0:<5d} peak {r.peak_money or 0:<5d} tokens +{r.tokens_earned or 0}")
+    if not runs:
+        print("  (no runs)")
+    return 0
+
+
+def _grant(conn, a) -> int:
+    player = _meta(conn).grant_tokens(_slot_player(conn, a.slot).id, a.tokens)
+    print(f"  {player.name}: {player.tokens} tokens")
+    return 0
+
+
 def _saves(conn, a) -> int:
     runs = list_runs(conn=conn)
     for s in runs:
@@ -143,6 +194,15 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("delete")
     s.add_argument("profile")
     s.set_defaults(fn=_delete)
+    sub.add_parser("players").set_defaults(fn=_players)
+    s = sub.add_parser("history")
+    s.add_argument("slot", type=int)
+    s.add_argument("-n", type=int, default=20)
+    s.set_defaults(fn=_history)
+    s = sub.add_parser("grant")
+    s.add_argument("slot", type=int)
+    s.add_argument("tokens", type=int)
+    s.set_defaults(fn=_grant)
     sub.add_parser("saves").set_defaults(fn=_saves)
     s = sub.add_parser("import-saves")
     s.add_argument("folder", nargs="?", default=str(LEGACY_SAVE_DIR))
@@ -155,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     conn = connect()
     try:
         return a.fn(conn, a)
-    except BalanceError as e:
+    except (ValueError, LookupError) as e:  # BalanceError, MetaError, SaveNotFound
         print(f"error: {e}", file=sys.stderr)
         return 1
     finally:
