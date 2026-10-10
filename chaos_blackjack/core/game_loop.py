@@ -14,7 +14,8 @@ from chaos_blackjack.rules.modifiers import ActiveModifiers
 from chaos_blackjack.rules.rule_engine import DefaultBlackjackRules, RuleContext, RuleEngine
 
 
-# What the offline stub "AI" answers every time (no network, no cost).
+# What the offline stub "AI" answers by default (no network, no cost). The
+# game's offline Chaos AI is `OfflineChaosStub`, configured from the balance profile.
 STUB_CHAOS_RESPONSE = '{"action":"apply_rule","rule_id":"modify_card_value","params":{"delta":-1}}'
 
 
@@ -22,7 +23,7 @@ def _default_llm() -> LLMBackend:
     # Lazy imports avoid circular import: core → ai → pipeline → contracts → core
     from chaos_blackjack.ai.env import env_truthy, load_dotenv_from_project_root
     from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
-    from chaos_blackjack.ai.pipeline import StubLLM
+    from chaos_blackjack.ai.pipeline import OfflineChaosStub
 
     # Default: stub only (no network). Set CHAOS_USE_LLM=1 (+ GPTSAPI_* in .env)
     # to let the GPTsAPI relay drive the Chaos AI.
@@ -31,7 +32,7 @@ def _default_llm() -> LLMBackend:
         llm = try_create_gptsapi_llm()
         if llm is not None:
             return llm
-    return StubLLM(response_json=STUB_CHAOS_RESPONSE)
+    return OfflineChaosStub()
 
 
 def _default_pipeline() -> "ChaosPipeline":

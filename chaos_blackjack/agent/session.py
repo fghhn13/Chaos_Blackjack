@@ -23,7 +23,7 @@ import zlib
 from typing import Any
 
 from chaos_blackjack.agent.observation import build_observation, card_str, event_texts, round_result_dict
-from chaos_blackjack.app.config import DEFAULT_SHOP_PRICES, RunConfig
+from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.persistence import build_save_data
@@ -63,10 +63,10 @@ def _make_loop_factory(use_llm: bool):
 
     def make(dispatcher):
         from chaos_blackjack.ai.gptsapi_llm import try_create_gptsapi_llm
-        from chaos_blackjack.ai.pipeline import ChaosPipeline, StubLLM
-        from chaos_blackjack.core.game_loop import STUB_CHAOS_RESPONSE, GameLoop
+        from chaos_blackjack.ai.pipeline import ChaosPipeline, OfflineChaosStub
+        from chaos_blackjack.core.game_loop import GameLoop
 
-        backend = try_create_gptsapi_llm() if use_llm else StubLLM(response_json=STUB_CHAOS_RESPONSE)
+        backend = try_create_gptsapi_llm() if use_llm else OfflineChaosStub()
         if backend is None:
             raise LlmUnavailable("Real LLM requested but GPTSAPI_API_KEY is not configured")
         pipeline = ChaosPipeline.from_profile_name("easy", "chaotic", backend)
@@ -236,16 +236,7 @@ class AgentSession:
         hidden = {
             "save": save.to_dict(),
             "rng": _rng_to_json(c.rng.getstate()),
-            "config": {
-                "shop_prices": dict(c.config.shop_prices),
-                "shop_slots": c.config.shop_slots,
-                "shop_refresh_rounds": c.config.shop_refresh_rounds,
-                "dealer_stand_on": c.config.dealer_stand_on,
-                "blackjack_pays": list(c.config.blackjack_pays),
-                "allow_double": c.config.allow_double,
-                "allow_surrender": c.config.allow_surrender,
-                "balance_profile": c.config.balance_profile,
-            },
+            "config": c.config.to_dict(),
         }
         return {
             "version": STATE_VERSION,
@@ -265,18 +256,10 @@ class AgentSession:
         if int(data.get("version", 0)) != STATE_VERSION:
             raise ValueError(f"Unsupported state version {data.get('version')!r}")
         hidden = json.loads(zlib.decompress(base64.b64decode(data["packed"])).decode("utf-8"))
-        cfg_extra = hidden.get("config", {})
-        cfg = RunConfig(
+        cfg = RunConfig.from_dict(
+            hidden.get("config", {}),
             enable_chaos=bool(data.get("chaos")),
             seed=data.get("seed"),
-            shop_prices={str(k): int(v) for k, v in cfg_extra.get("shop_prices", DEFAULT_SHOP_PRICES).items()},
-            shop_slots=int(cfg_extra.get("shop_slots", RunConfig.shop_slots)),
-            shop_refresh_rounds=int(cfg_extra.get("shop_refresh_rounds", RunConfig.shop_refresh_rounds)),
-            dealer_stand_on=int(cfg_extra.get("dealer_stand_on", RunConfig.dealer_stand_on)),
-            blackjack_pays=tuple(cfg_extra.get("blackjack_pays", RunConfig.blackjack_pays)),  # type: ignore[arg-type]
-            allow_double=bool(cfg_extra.get("allow_double", True)),
-            allow_surrender=bool(cfg_extra.get("allow_surrender", True)),
-            balance_profile=str(cfg_extra.get("balance_profile", RunConfig.balance_profile)),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(

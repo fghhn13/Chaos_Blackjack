@@ -37,6 +37,18 @@ class ShopItemBalance:
     params: tuple[tuple[str, Any], ...] = ()
 
 
+Params = tuple[tuple[str, Any], ...]  # a JSON object as sorted (key, value) pairs
+
+
+@dataclass(frozen=True)
+class ChaosRuleBalance:
+    rule_id: str
+    enabled: bool = True
+    params: Params = ()        # fixed tuning; wins over the AI's params
+    stub_weight: float = 0.0   # how often the offline Chaos AI picks it
+    stub_params: Params = ()   # what the offline Chaos AI sends with it
+
+
 @dataclass(frozen=True)
 class Balance:
     profile: str
@@ -49,11 +61,33 @@ class Balance:
     allow_surrender: bool
     shop_slots: int
     shop_refresh_rounds: int
+    min_bet: int
+    max_bet_fraction: float
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
+    item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
+    chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
 
     @property
     def shop_prices(self) -> dict[str, int]:
         return {i.item_id: i.price for i in self.shop_items}
+
+    @property
+    def item_params(self) -> dict[str, dict[str, Any]]:
+        return {item: dict(p) for item, p in self.item_tuning if p}
+
+    @property
+    def chaos_rule_params(self) -> dict[str, dict[str, Any]]:
+        return {r.rule_id: dict(r.params) for r in self.chaos_rules if r.params}
+
+    @property
+    def disabled_rules(self) -> tuple[str, ...]:
+        return tuple(r.rule_id for r in self.chaos_rules if not r.enabled)
+
+    @property
+    def chaos_stub(self) -> tuple[tuple[str, dict[str, Any], float], ...]:
+        """(rule_id, params, weight) for the offline Chaos AI; enabled rules only."""
+        return tuple((r.rule_id, dict(r.stub_params), r.stub_weight)
+                     for r in self.chaos_rules if r.enabled and r.stub_weight > 0)
 
     @property
     def fingerprint(self) -> str:
@@ -77,7 +111,21 @@ _SETTINGS: dict[str, str] = {
     "table.allow_surrender": "allow_surrender",
     "shop.slots": "shop_slots",
     "shop.refresh_rounds": "shop_refresh_rounds",
+    "bet.min": "min_bet",
+    "bet.max_fraction": "max_bet_fraction",
 }
+
+
+def _params(where: str, raw: str | None) -> Params:
+    if not raw:
+        return ()
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise BalanceError(f"{where}: params are not valid JSON ({e.msg})") from None
+    if not isinstance(value, dict):
+        raise BalanceError(f"{where}: params must be a JSON object")
+    return tuple(sorted(value.items()))
 
 
 def _parse(key: str, raw: str, typ: str, lo: float | None, hi: float | None) -> Any:
@@ -145,13 +193,28 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
             raise BalanceError(f"Profile {name!r}: price mode {mode!r} for {item_id} is not supported yet")
         if price != int(price):
             raise BalanceError(f"Profile {name!r}: fixed price of {item_id} must be a whole number")
-        p = json.loads(params) if params else {}
-        items.append(ShopItemBalance(item_id, int(price), mode, float(weight), tuple(sorted(p.items()))))
+        items.append(ShopItemBalance(item_id, int(price), mode, float(weight),
+                                     _params(f"Profile {name!r}, item {item_id}", params)))
+    tuning = tuple(
+        (item_id, _params(f"Profile {name!r}, item {item_id}", params))
+        for item_id, params in conn.execute(
+            "SELECT item_id, params FROM shop_item WHERE profile_id = ? ORDER BY item_id", (pid,))
+    )
+    rules = tuple(
+        ChaosRuleBalance(
+            rule_id, bool(enabled), _params(f"Profile {name!r}, rule {rule_id}", params),
+            float(weight), _params(f"Profile {name!r}, rule {rule_id} stub", stub_params),
+        )
+        for rule_id, enabled, params, weight, stub_params in conn.execute(
+            "SELECT rule_id, enabled, params, stub_weight, stub_params FROM chaos_rule "
+            "WHERE profile_id = ? ORDER BY rule_id", (pid,))
+    )
 
     if values["target_money"] <= values["start_money"]:
         raise BalanceError(f"Profile {name!r}: run.target_money must be above run.start_money")
     num, den = values.pop("_bj_num"), values.pop("_bj_den")
-    return Balance(profile=name, blackjack_pays=(num, den), shop_items=tuple(items), **values)
+    return Balance(profile=name, blackjack_pays=(num, den), shop_items=tuple(items),
+                   item_tuning=tuning, chaos_rules=rules, **values)
 
 
 def clone_profile(conn: sqlite3.Connection, source: str, name: str, description: str = "") -> int:
@@ -175,8 +238,9 @@ def clone_profile(conn: sqlite3.Connection, source: str, name: str, description:
             "SELECT ?, item_id, enabled, price_mode, price, weight, params FROM shop_item WHERE profile_id = ?",
             (pid, src[0]))
         conn.execute(
-            "INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight) "
-            "SELECT ?, rule_id, enabled, params, stub_weight FROM chaos_rule WHERE profile_id = ?", (pid, src[0]))
+            "INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_params) "
+            "SELECT ?, rule_id, enabled, params, stub_weight, stub_params FROM chaos_rule WHERE profile_id = ?",
+            (pid, src[0]))
     return int(pid)
 
 

@@ -1,4 +1,7 @@
-"""Chaos rule: Odd-Even Chaos — even ranks get +2, odd ranks get -1."""
+"""Chaos rule: Odd-Even Chaos — even ranks get +2, odd ranks get -1.
+
+Only the numeric ranks 2-9 change. Params: `even_delta`, `odd_delta` (balance profile).
+"""
 
 from __future__ import annotations
 
@@ -10,29 +13,22 @@ from chaos_blackjack.registry import register_rule
 from chaos_blackjack.rules.modifiers import RuleModifier
 
 
+_EVEN = {"2", "4", "6", "8"}
+_ODD = {"3", "5", "7", "9"}
+
+
 @dataclass(frozen=True)
 class OddEvenChaosModifier:
     id: str = "odd_even_chaos"
+    even_delta: int = 2
+    odd_delta: int = -1
 
     def adjust_rank_value(self, card: Card, base_value: int) -> int:
         r = card.rank.upper()
-        # Only apply to the numeric ranks mentioned in the spec.
-        if r == "2":
-            return base_value + 2
-        if r == "4":
-            return base_value + 2
-        if r == "6":
-            return base_value + 2
-        if r == "8":
-            return base_value + 2
-        if r == "3":
-            return base_value - 1
-        if r == "5":
-            return base_value - 1
-        if r == "7":
-            return base_value - 1
-        if r == "9":
-            return base_value - 1
+        if r in _EVEN:
+            return base_value + self.even_delta
+        if r in _ODD:
+            return base_value + self.odd_delta
         return base_value
 
 
@@ -41,8 +37,11 @@ class OddEvenChaosPlugin:
 
     @classmethod
     def from_params(cls, params: dict[str, Any]) -> RuleModifier:
-        # Params intentionally ignored: this rule is fully deterministic.
-        return OddEvenChaosModifier(id=cls.id)
+        return OddEvenChaosModifier(
+            id=cls.id,
+            even_delta=int(params.get("even_delta", 2)),
+            odd_delta=int(params.get("odd_delta", -1)),
+        )
 
 
 register_rule("odd_even_chaos", OddEvenChaosPlugin)

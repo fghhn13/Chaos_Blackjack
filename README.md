@@ -59,10 +59,15 @@ Natural blackjack, double down, surrender and the shop are implemented in `GameC
 
 ### Balance profiles (SQLite)
 
-Every tunable number of a run (bankroll, target, payouts, dealer rule, shop
-slots, restock interval, item prices) is stored as a **balance profile** in
+Every tunable number of a run is stored as a **balance profile** in
 `data/game.db` (SQLite, created on first run, git-ignored; `CHAOS_DB` points
 elsewhere).
+
+| Table | Holds |
+| ----- | ----- |
+| `setting` | bankroll and target, payout ratio, dealer stand total, double / surrender, bet range (`bet.min`, `bet.max_fraction`), shop slots and restock interval |
+| `shop_item` | price, on sale or not, item tuning (`params`, e.g. Fate Oracle `{"cards": 3}`) |
+| `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
 
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
@@ -239,7 +244,7 @@ Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed
 
 ## Extending
 
-1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
+1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Read tunable numbers from `params` with a default, and add a `chaos_rule` row (its `params`, `stub_weight`) to `data/seed/default.sql`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
 2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it in `app/help_text.py` (`ITEM_HELP`) and give it a shop price in `DEFAULT_SHOP_PRICES` (`app/config.py`).
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.

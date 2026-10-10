@@ -1,4 +1,7 @@
-"""Chaos rule: Suit Power — red suits +1, black suits -1."""
+"""Chaos rule: Suit Power — red suits +1, black suits -1.
+
+Params: `red_delta`, `black_delta` (balance profile).
+"""
 
 from __future__ import annotations
 
@@ -19,14 +22,16 @@ _BLACK_SUITS_ALT = {"s", "c"}
 @dataclass(frozen=True)
 class SuitPowerModifier:
     id: str = "suit_power"
+    red_delta: int = 1
+    black_delta: int = -1
 
     def adjust_rank_value(self, card: Card, base_value: int) -> int:
         suit = (card.suit or "").strip()
         suit_lower = suit.lower()
         if suit in _RED_SUITS or suit_lower in _RED_SUITS_ALT:
-            return base_value + 1
+            return base_value + self.red_delta
         if suit in _BLACK_SUITS or suit_lower in _BLACK_SUITS_ALT:
-            return base_value - 1
+            return base_value + self.black_delta
         return base_value
 
 
@@ -35,8 +40,11 @@ class SuitPowerPlugin:
 
     @classmethod
     def from_params(cls, params: dict[str, Any]) -> RuleModifier:
-        # Params intentionally ignored: this rule is fully deterministic.
-        return SuitPowerModifier(id=cls.id)
+        return SuitPowerModifier(
+            id=cls.id,
+            red_delta=int(params.get("red_delta", 1)),
+            black_delta=int(params.get("black_delta", -1)),
+        )
 
 
 register_rule("suit_power", SuitPowerPlugin)

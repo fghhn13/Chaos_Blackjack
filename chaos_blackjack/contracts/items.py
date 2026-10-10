@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 
 from chaos_blackjack.core.game_state import GameState
 
@@ -24,11 +24,13 @@ class ItemContext:
         emit_event: Callable[..., None],
         peek_next_card_rank: Callable[[], str | None],
         active_rule_ids: tuple[str, ...] = (),
+        params: Mapping[str, Any] | None = None,
     ) -> None:
         self.state = state
         self.emit_event = emit_event
         self.peek_next_card_rank = peek_next_card_rank
         self.active_rule_ids = active_rule_ids  # chaos rules in force this round
+        self.params = dict(params or {})  # item tuning from the balance profile
 
 
 @runtime_checkable

@@ -7,6 +7,7 @@ load a `Balance` and build a `RunConfig` from it.
 from chaos_blackjack.data.balance import (
     Balance,
     BalanceError,
+    ChaosRuleBalance,
     ShopItemBalance,
     active_profile,
     clone_profile,
@@ -16,6 +17,6 @@ from chaos_blackjack.data.balance import (
 from chaos_blackjack.data.db import connect, db_path
 
 __all__ = [
-    "Balance", "BalanceError", "ShopItemBalance", "active_profile", "clone_profile", "connect", "db_path",
+    "Balance", "BalanceError", "ChaosRuleBalance", "ShopItemBalance", "active_profile", "clone_profile", "connect", "db_path",
     "default_balance", "load_balance",
 ]

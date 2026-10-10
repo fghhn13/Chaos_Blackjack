@@ -78,10 +78,12 @@ def deserialize_active_modifiers(
     mods: list[ModifierSnapshot],
     *,
     registry,
+    rule_params: dict[str, dict] | None = None,
 ) -> ActiveModifiers:
+    """`rule_params` are the balance profile's fixed params per rule."""
     built: list[object] = []
     for m in mods:
-        inst = registry.build_chaos_rule(m.id, m.params)
+        inst = registry.build_chaos_rule(m.id, {**m.params, **(rule_params or {}).get(m.id, {})})
         if inst is None:
             raise ValueError(f"Unknown chaos rule id in save: {m.id}")
         built.append(inst)

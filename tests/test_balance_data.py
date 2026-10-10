@@ -52,7 +52,7 @@ def test_run_config_defaults_come_from_the_seed() -> None:
 
 def test_database_is_created_migrated_and_seeded(db, tmp_path) -> None:
     assert (tmp_path / "game.db").is_file()
-    assert schema_version(db) == 1
+    assert schema_version(db) == 2
     row = db.execute("SELECT locked, source_hash FROM balance_profile WHERE name = 'default'").fetchone()
     assert row["locked"] == 1 and row["source_hash"]
     again = connect(tmp_path / "game.db")  # idempotent
@@ -157,3 +157,184 @@ def test_loading_a_save_keeps_table_rules() -> None:
     loaded = GameController.from_save(data, cfg)
     assert loaded.config.blackjack_pays == (6, 5)
     assert loaded.config.allow_double is False and loaded.config.shop_slots == 2
+
+
+# ------------------------------------------------- phase 2: tuning in data
+
+
+def _profile(db, name: str) -> int:
+    clone_profile(db, "default", name)
+    return db.execute("SELECT id FROM balance_profile WHERE name = ?", (name,)).fetchone()[0]
+
+
+def _rule(db, pid: int, rule_id: str, **cols) -> None:
+    sets = ", ".join(f"{k} = ?" for k in cols)
+    with db:
+        db.execute(f"UPDATE chaos_rule SET {sets} WHERE profile_id = ? AND rule_id = ?",
+                   (*cols.values(), pid, rule_id))
+
+
+def _only_stub(db, pid: int, rule_id: str, stub_params: str | None = None) -> None:
+    with db:
+        db.execute("UPDATE chaos_rule SET stub_weight = 0 WHERE profile_id = ?", (pid,))
+    _rule(db, pid, rule_id, stub_weight=1, stub_params=stub_params)
+
+
+def _chaos_ctrl(balance, seed: int = 5) -> GameController:
+    return GameController(RunConfig.from_balance(balance, enable_chaos=True, seed=seed))
+
+
+def test_old_databases_are_migrated(tmp_path) -> None:
+    import sqlite3
+    from importlib import resources
+
+    path = tmp_path / "v1.db"
+    raw = sqlite3.connect(path)
+    raw.executescript(resources.files("chaos_blackjack.data").joinpath("migrations/0001_init.sql")
+                      .read_text(encoding="utf-8"))
+    raw.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    raw.execute("INSERT INTO schema_version VALUES (1)")
+    raw.commit()
+    raw.close()
+    conn = connect(path)
+    assert schema_version(conn) == 2
+    assert load_balance("default", conn).chaos_stub == (("modify_card_value", {"delta": -1}, 1.0),)
+    conn.close()
+
+
+def test_shipped_phase_two_values() -> None:
+    b = default_balance()
+    assert (b.min_bet, b.max_bet_fraction) == (1, 0.5)
+    assert b.chaos_rule_params == {
+        "fragile_bust": {"bust_limit": 18}, "great_crash": {"ten_value": 1},
+        "odd_even_chaos": {"even_delta": 2, "odd_delta": -1}, "suit_power": {"red_delta": 1, "black_delta": -1},
+    }
+    assert b.disabled_rules == () and b.item_params == {"fate_oracle": {"cards": 3}}
+
+
+def test_bet_limits_come_from_the_profile(db) -> None:
+    from chaos_blackjack.app.economy import bet_limits
+
+    assert bet_limits(100, max_fraction=0.29) == (1, 29)  # exact, no float rounding
+    _profile(db, "tight")
+    _set(db, "tight", "bet.min", "5")
+    _set(db, "tight", "bet.max_fraction", "0.25")
+    v = GameController(RunConfig.from_balance(load_balance("tight", db))).view()
+    assert (v.bet_min, v.bet_max) == (5, 25)
+    s = AgentSession.new(seed=1, profile="tight")
+    assert s.observe()["bet_range"] == [5, 25]
+
+
+def test_rule_params_override_the_ai(db) -> None:
+    pid = _profile(db, "crash5")
+    _only_stub(db, pid, "great_crash")
+    _rule(db, pid, "great_crash", params='{"ten_value": 5}')
+    c = _chaos_ctrl(load_balance("crash5", db))
+    c.place_bet(5)
+    c.resolve_chaos()
+    mod = c.loop.modifiers.items[0]
+    assert mod.id == "great_crash" and mod.ten_value == 5
+
+
+def test_fragile_bust_limit_is_tunable() -> None:
+    from chaos_blackjack.registry import get_registry
+    from chaos_blackjack.rules.modifiers import ActiveModifiers
+    from chaos_blackjack.rules.rule_engine import DefaultBlackjackRules, RuleContext
+
+    mod = get_registry().build_chaos_rule("fragile_bust", {"bust_limit": 19})
+    ctx = RuleContext(ActiveModifiers((mod,)))
+    rules = DefaultBlackjackRules()
+    assert not rules.is_bust(19, ctx) and rules.is_bust(20, ctx)
+
+
+def test_disabled_rules_are_refused(db) -> None:
+    from chaos_blackjack.ai.pipeline import StubLLM
+    from chaos_blackjack.app.notices import NoticeKind
+
+    pid = _profile(db, "nocrash")
+    _only_stub(db, pid, "great_crash")
+    _rule(db, pid, "great_crash", enabled=0)
+    b = load_balance("nocrash", db)
+    assert b.disabled_rules == ("great_crash",) and b.chaos_stub == ()  # never picked offline
+    c = _chaos_ctrl(b)
+    # A real model may still ask for it: the pipeline refuses.
+    c.loop.pipeline.llm = StubLLM('{"action":"apply_rule","rule_id":"great_crash","params":{}}')
+    c.place_bet(5)
+    c.resolve_chaos()
+    assert c.loop.modifiers.items == ()
+    rejected = [n for n in c.drain_notices() if n.kind == NoticeKind.CHAOS_ACTION_REJECTED]
+    assert rejected and rejected[0].data["reason"] == "rule_disabled"
+
+
+def test_offline_stub_draws_by_weight_and_replays(db) -> None:
+    pid = _profile(db, "mixed")
+    with db:
+        db.execute("UPDATE chaos_rule SET stub_weight = 1 WHERE profile_id = ? AND rule_id IN "
+                   "('great_crash', 'suit_power', 'reverse_bust')", (pid,))
+    b = load_balance("mixed", db)
+
+    def picks(seed: int) -> list[str]:
+        c = _chaos_ctrl(b, seed)
+        out = []
+        for _ in range(12):
+            c.place_bet(2)
+            if c.phase.value == "chaos":
+                c.resolve_chaos()
+            out.append(c.loop.modifiers.items[0].id if c.loop.modifiers.items else "-")
+            if c.phase.value == "player_turn":
+                c.stand()
+            c.finish_dealer()
+            if c.phase.value == "round_over":
+                c.next_round()
+        return out
+
+    first = picks(11)
+    assert first == picks(11)
+    assert len(set(first) - {"-"}) >= 3
+
+
+def test_offline_stub_without_weights_does_nothing(db) -> None:
+    pid = _profile(db, "calm")
+    with db:
+        db.execute("UPDATE chaos_rule SET stub_weight = 0 WHERE profile_id = ?", (pid,))
+    c = _chaos_ctrl(load_balance("calm", db))
+    c.place_bet(5)
+    c.resolve_chaos()
+    assert c.loop.modifiers.items == ()
+
+
+def test_item_params_reach_the_item(db) -> None:
+    pid = _profile(db, "oracle2")
+    with db:
+        db.execute("UPDATE shop_item SET params = '{\"cards\": 2}' WHERE profile_id = ? AND item_id = 'fate_oracle'",
+                   (pid,))
+    c = GameController(RunConfig.from_balance(load_balance("oracle2", db), seed=3))
+    c.run.items = ("fate_oracle",)
+    c.place_bet(5)
+    if c.phase.value != "player_turn":
+        pytest.skip("seed dealt a natural")
+    assert c.use_item("fate_oracle").message.startswith("Top 2 cards")
+
+
+def test_bad_params_are_rejected(db) -> None:
+    pid = _profile(db, "badjson")
+    _rule(db, pid, "great_crash", params="{ten_value: 5}")
+    with pytest.raises(BalanceError, match="not valid JSON"):
+        load_balance("badjson", db)
+    _rule(db, pid, "great_crash", params="[5]")
+    with pytest.raises(BalanceError, match="JSON object"):
+        load_balance("badjson", db)
+
+
+def test_rule_params_survive_save_and_agent_reload(db) -> None:
+    pid = _profile(db, "crash7")
+    _only_stub(db, pid, "great_crash")
+    _rule(db, pid, "great_crash", params='{"ten_value": 7}')
+    s = AgentSession.new(seed=4, chaos=True, profile="crash7")
+    s.execute({"cmd": "bet", "amount": 5})
+    if s.controller.phase.value != "player_turn":
+        pytest.skip("seed dealt a natural")
+    again = AgentSession.from_state(s.to_state())
+    mod = again.controller.loop.modifiers.items[0]
+    assert mod.id == "great_crash" and mod.ten_value == 7
+    assert again.controller.config.chaos_stub == (("great_crash", {}, 1.0),)

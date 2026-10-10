@@ -7,7 +7,7 @@ the player's chosen profile with `RunConfig.from_balance(load_balance())`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 from chaos_blackjack.data.balance import Balance, default_balance
@@ -39,6 +39,14 @@ class RunConfig:
     blackjack_pays: tuple[int, int] = DEFAULT_BLACKJACK_PAYS  # natural 21 payout ratio
     allow_double: bool = _DEFAULTS.allow_double
     allow_surrender: bool = _DEFAULTS.allow_surrender
+    min_bet: int = _DEFAULTS.min_bet
+    max_bet_fraction: float = _DEFAULTS.max_bet_fraction  # of the bankroll, rounded down
+    # Chaos: fixed params per rule (win over the AI's), rules switched off, and
+    # what the offline Chaos AI picks: (rule_id, AI params, weight).
+    chaos_rule_params: dict[str, dict[str, Any]] = field(default_factory=lambda: _DEFAULTS.chaos_rule_params)
+    disabled_rules: tuple[str, ...] = _DEFAULTS.disabled_rules
+    chaos_stub: tuple[tuple[str, dict[str, Any], float], ...] = _DEFAULTS.chaos_stub
+    item_params: dict[str, dict[str, Any]] = field(default_factory=lambda: _DEFAULTS.item_params)
     enable_chaos: bool = False
     seed: int | None = None
     balance_profile: str = _DEFAULTS.profile  # where the numbers came from (for saves / reports)
@@ -58,7 +66,31 @@ class RunConfig:
             "blackjack_pays": balance.blackjack_pays,
             "allow_double": balance.allow_double,
             "allow_surrender": balance.allow_surrender,
+            "min_bet": balance.min_bet,
+            "max_bet_fraction": balance.max_bet_fraction,
+            "chaos_rule_params": balance.chaos_rule_params,
+            "disabled_rules": balance.disabled_rules,
+            "chaos_stub": balance.chaos_stub,
+            "item_params": balance.item_params,
             "balance_profile": balance.profile,
         }
+        values.update(overrides)
+        return cls(**values)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready copy (agent run files keep the numbers a run started with)."""
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], **overrides: Any) -> "RunConfig":
+        """Inverse of `to_dict`; unknown keys are ignored, missing ones use defaults."""
+        known = {f.name for f in fields(cls)}
+        values = {k: v for k, v in data.items() if k in known}
+        if "blackjack_pays" in values:
+            values["blackjack_pays"] = tuple(int(x) for x in values["blackjack_pays"])
+        if "disabled_rules" in values:
+            values["disabled_rules"] = tuple(values["disabled_rules"])
+        if "chaos_stub" in values:
+            values["chaos_stub"] = tuple((str(r), dict(p), float(w)) for r, p, w in values["chaos_stub"])
         values.update(overrides)
         return cls(**values)

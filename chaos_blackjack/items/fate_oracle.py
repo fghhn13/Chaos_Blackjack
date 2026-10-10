@@ -1,4 +1,7 @@
-"""Item: Fate Oracle — peek the top 3 cards of the deck."""
+"""Item: Fate Oracle — peek the top cards of the deck (3 by default).
+
+Params: `cards` (balance profile).
+"""
 
 from __future__ import annotations
 
@@ -14,8 +17,8 @@ class FateOracle:
         if not ctx.state.deck:
             return ItemResult(ok=False, message="Deck is empty")
 
-        top3 = ctx.state.deck[:3]
-        ranks = [c.rank for c in top3]
+        n = max(1, int(ctx.params.get("cards", 3)))
+        ranks = [c.rank for c in ctx.state.deck[:n]]
         ctx.emit_event(
             Event(
                 EventType.ITEM_USED,
