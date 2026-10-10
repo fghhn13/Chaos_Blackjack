@@ -38,7 +38,16 @@ def ask_chaos(llm: LLMBackend, request: PokeRequest) -> PokeReply:
                       ensure_ascii=False)
     try:
         raw = llm.complete(load_prompt("poke"), user)
-        data = json.loads(_strip_json_fence(raw))
+        content = _strip_json_fence(raw)
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            # Some real backends return the requested suggestion as prose.
+            # Accept text without repairing/billing again, while rejecting broken
+            # structured responses. Neither format can execute gameplay actions.
+            if content.startswith(("{", "[", "```")):
+                raise ValueError("Malformed structured interaction reply")
+            data = {"reply": content}
         # No gameplay actions can pass through this reply contract.
         if not isinstance(data, dict) or set(data) != {"reply"}:
             raise ValueError("Unexpected interaction reply")

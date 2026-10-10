@@ -97,6 +97,8 @@ billed completion, with no repair or automatic retry.
 The AI receives a private snapshot containing hands, hidden cards, ordered deck,
 effective totals and rules, bankroll, inventory, and shop stock/prices/restocking.
 Replies only provide text; they cannot buy items, play cards, or change rules.
+The reply parser accepts the requested `{"reply": "..."}` object or plain prose
+from a backend, without an extra repair request; gameplay-action JSON is rejected.
 Public player observations continue to hide private cards. Run-local memory is
 implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
 no history is collected, included in prompts, or written to saves. A future opt-in

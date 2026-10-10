@@ -107,7 +107,7 @@ def test_poke_rejected_with_chaos_off():
         GameController().prepare_poke()
 
 
-@pytest.mark.parametrize("raw", ["not JSON", '[]', '{"reply":"hit","action":"apply_rule"}',
+@pytest.mark.parametrize("raw", ["{not JSON", '[]', '{"reply":"hit","action":"apply_rule"}',
                                '{"reply":" "}', '{"reply":2}',
                                json.dumps({"reply": "x" * 321}), RuntimeError("private error")])
 def test_invalid_or_failed_reply_uses_one_request(raw):
@@ -115,6 +115,16 @@ def test_invalid_or_failed_reply_uses_one_request(raw):
     reply = ask_chaos(llm, controller().prepare_poke())
     assert reply == PokeReply(UNAVAILABLE_REPLY, ok=False)
     assert len(llm.calls) == 1
+
+
+def test_real_backend_plain_prose_is_accepted_without_extra_billing():
+    c = controller()
+    before = c.view()
+    text = "Keep enough chips for a bet and save your radar for the next hand."
+    llm = FakeLLM(text)
+    reply = ask_chaos(llm, c.prepare_poke())
+    assert reply == PokeReply(text) and len(llm.calls) == 1
+    assert c.view() == before
 
 
 @pytest.mark.parametrize("intent", ["guide", "mislead"])
