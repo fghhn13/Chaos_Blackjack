@@ -1,0 +1,228 @@
+{
+  "pack": "Kenney Casino Audio",
+  "version": "1.1",
+  "license": "CC0-1.0",
+  "source_url": "https://kenney.nl/assets/casino-audio",
+  "download_url": "https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip",
+  "retrieved_date": "2026-10-10",
+  "archive_sha256": "f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18",
+  "modifications": "None. Original OGG files copied byte-for-byte; application cue names are semantic mappings.",
+  "files": {
+    "card-fan-1.ogg": {
+      "sha256": "7a9758ccad8899baef1b9f60b4064e4baa724a548293832fdaea07e6e07e638d",
+      "bytes": 12489
+    },
+    "card-fan-2.ogg": {
+      "sha256": "5743373c9dde00c6eee949a2c8e65d75946522768999167e1f5632451630e848",
+      "bytes": 18363
+    },
+    "card-place-1.ogg": {
+      "sha256": "d8f26c33a665dcbdcc6f632f6050bc9dd548feb0d4942d4547615926d3926810",
+      "bytes": 9624
+    },
+    "card-place-2.ogg": {
+      "sha256": "903d5050718595e87864dd755643b476ab1a5533080dcc2dddc72570d33ba9f8",
+      "bytes": 8046
+    },
+    "card-place-3.ogg": {
+      "sha256": "1d988631a6e5201ed1bb0d728f2e43a3ec79401258426858793598044ac95841",
+      "bytes": 11503
+    },
+    "card-place-4.ogg": {
+      "sha256": "18e3ba713b7259605fd27cdc048085ed56cf86b32403f070b6cb125019f77183",
+      "bytes": 9618
+    },
+    "card-shove-1.ogg": {
+      "sha256": "1ea667aa6795d5f14239192116ebcbd8f3f47eb1c7faaf2ec56844b9067b8b06",
+      "bytes": 10690
+    },
+    "card-shove-2.ogg": {
+      "sha256": "8e95c1d3ae94b5b91bc663432ad7c3bf4e03a541c22ec10fa51c65fe0e29054b",
+      "bytes": 10445
+    },
+    "card-shove-3.ogg": {
+      "sha256": "399520d483a1466fcaa850b9c407b4edbd5c7f0cbdf17e84dea12e9636326d0d",
+      "bytes": 9948
+    },
+    "card-shove-4.ogg": {
+      "sha256": "0a1ad3a2f16bd2ed73349e6342426ca7a59a6e26b7e26e36d51d51c2c2349d6f",
+      "bytes": 10875
+    },
+    "card-shuffle.ogg": {
+      "sha256": "96c84883a30845ede723a4cf2e8369e9837e7dd4e0d4eb0212b0a7ed21b0f544",
+      "bytes": 30002
+    },
+    "card-slide-1.ogg": {
+      "sha256": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+      "bytes": 8833
+    },
+    "card-slide-2.ogg": {
+      "sha256": "e674a1679ec87b507047fe012d068ad2c412125f56186f0e732684705c2a6888",
+      "bytes": 9042
+    },
+    "card-slide-3.ogg": {
+      "sha256": "af2ab62656cb3df73316ce5771b8ee1111a840962b21607e3202151e7413c52c",
+      "bytes": 9164
+    },
+    "card-slide-4.ogg": {
+      "sha256": "b9c82bcdbe6b7d00a06e2546bd2683a9ab082ca5fd090a42882f33eddd925b7f",
+      "bytes": 7912
+    },
+    "card-slide-5.ogg": {
+      "sha256": "8638ab0c17f029aded0e27a4f9b9bb9f8c621b19a6e9975e855cb40ea63e2201",
+      "bytes": 9180
+    },
+    "card-slide-6.ogg": {
+      "sha256": "be85da181ac879c20cb667d0f9f156dbdc236d3751737ad27359a15e946430a0",
+      "bytes": 8780
+    },
+    "card-slide-7.ogg": {
+      "sha256": "bda2040194f43484d03ee3c65ed6fff57251882ea7227abce4214bfa30bf2705",
+      "bytes": 9580
+    },
+    "card-slide-8.ogg": {
+      "sha256": "95d9aa26f8c63af9934f27a8e3b7e9b583f177640f0bbd6982f12dba52b9ae6b",
+      "bytes": 9863
+    },
+    "cards-pack-open-1.ogg": {
+      "sha256": "1214059fdfbf1c396c0702244fc833739cc346d326a71e450b731f456e54d6fb",
+      "bytes": 12715
+    },
+    "cards-pack-open-2.ogg": {
+      "sha256": "49e02479815c69cd303e0d8f12952c0492d5b3e555838f3485cc25a09818e6fb",
+      "bytes": 10918
+    },
+    "cards-pack-take-out-1.ogg": {
+      "sha256": "6d38b979f64d20e4153173187ed67b04c6c004767c0a43eddb65c75fa925a1c4",
+      "bytes": 8269
+    },
+    "cards-pack-take-out-2.ogg": {
+      "sha256": "d991829eeaf7e5a6f8462594e5be0d91535309ffd6249278f34eec70470395a4",
+      "bytes": 9424
+    },
+    "chip-lay-1.ogg": {
+      "sha256": "4b2111252ccb64eed67f171e061053849cfbb29873536c03948646f244a3905c",
+      "bytes": 5720
+    },
+    "chip-lay-2.ogg": {
+      "sha256": "8ca8b2d450741c04ed7b4ba51ed3f73c2400c8b3dbe83b974be4fe4774a76712",
+      "bytes": 6123
+    },
+    "chip-lay-3.ogg": {
+      "sha256": "bf24ebb417b6279568800dffdb0205d3ec8854c7efe179e8964755a6341727aa",
+      "bytes": 6327
+    },
+    "chips-collide-1.ogg": {
+      "sha256": "f41b3d106360fc68ebc061a211d4265b4cb5fa1fbe86e4d57d3673510e2c3784",
+      "bytes": 6356
+    },
+    "chips-collide-2.ogg": {
+      "sha256": "2a10c5ff4b2fbaa55a317fc258ddce3fec85bd26db2d3c2ad298b3b33ce23bc6",
+      "bytes": 5987
+    },
+    "chips-collide-3.ogg": {
+      "sha256": "1c5e885f72b64c38fff7ef05579e49310e7acf026cf123ffb65fffb57fb06e1c",
+      "bytes": 6301
+    },
+    "chips-collide-4.ogg": {
+      "sha256": "1ffa34af64adc62fce583c5aa9a3c98287b1673ef191576a5571f1ffd39529dd",
+      "bytes": 6038
+    },
+    "chips-handle-1.ogg": {
+      "sha256": "a2c495237fb0dc0dc96ccc2c9840572edd226e6459398ecb631c6c9f9e5408f0",
+      "bytes": 9374
+    },
+    "chips-handle-2.ogg": {
+      "sha256": "099b6d7d3a71e7d22171a93d124e7366e326d32eb85d718ba29abded8a49c329",
+      "bytes": 8639
+    },
+    "chips-handle-3.ogg": {
+      "sha256": "7c5a86e27b2bef839ae096dd655506cf46a82494bd01cc28f51bed6ab26cc342",
+      "bytes": 6261
+    },
+    "chips-handle-4.ogg": {
+      "sha256": "0d171ea00224709cbe31ef95a111eabaf1382606a4836c5717043b339cbed8e9",
+      "bytes": 7347
+    },
+    "chips-handle-5.ogg": {
+      "sha256": "589753ea21b1955626e82975be8979f42140f5b0645a8c33c2d1f7e33fba68cb",
+      "bytes": 11273
+    },
+    "chips-handle-6.ogg": {
+      "sha256": "527d4d3de55cc261dc476329b71a750c296f3ad633ac50318d913976bb89857c",
+      "bytes": 8909
+    },
+    "chips-stack-1.ogg": {
+      "sha256": "12bf175b9afcea112175b241ad3336c6244ac5fdcdff8b5942ecc03f2225e0c4",
+      "bytes": 6469
+    },
+    "chips-stack-2.ogg": {
+      "sha256": "9f985e766c3557eef1764240b48e30b2f0ffa870a99f05de85cd6bf0ea758ef5",
+      "bytes": 5642
+    },
+    "chips-stack-3.ogg": {
+      "sha256": "48cc0f01e2b62be7677f2e8c02177906cab80e96fa8176fa05b3ced35bc2a9c2",
+      "bytes": 7203
+    },
+    "chips-stack-4.ogg": {
+      "sha256": "129a3af12f096ef9d8326b32c3c674d687f1a0b447157ccd02fb431ba134b580",
+      "bytes": 6095
+    },
+    "chips-stack-5.ogg": {
+      "sha256": "42dd800e3e24bbd07d3ebfc86c44b6500d376641e30270dc363d95a73e90b56e",
+      "bytes": 5749
+    },
+    "chips-stack-6.ogg": {
+      "sha256": "5ec35171aa65bf5edd977e293523a649227accf36e682bf1ac9a84286f04c682",
+      "bytes": 5821
+    },
+    "dice-grab-1.ogg": {
+      "sha256": "1952cf1987b2c1ebb035b30b5f0caf23604b6ce4c88b6a226fe6e6257ce730f3",
+      "bytes": 10278
+    },
+    "dice-grab-2.ogg": {
+      "sha256": "4eb4940d1e71aa3f6ac5f865b6b47748a492adf6a83d622c8efe6284dbebbd2c",
+      "bytes": 11437
+    },
+    "dice-shake-1.ogg": {
+      "sha256": "ba603441c857204dbe3ff3345902c7e1c3f523bf1bd314acf088609bc6c1e4e5",
+      "bytes": 19388
+    },
+    "dice-shake-2.ogg": {
+      "sha256": "47e8e2cb0adb95bcd7348b58db8dc2bbfe3c553e50a4e9ef007e67891ed51ca2",
+      "bytes": 19976
+    },
+    "dice-shake-3.ogg": {
+      "sha256": "aecd1dd0de6e42ebb510d1f9bfe91a580a8af238dd73bdfda368b90b894b5c09",
+      "bytes": 19722
+    },
+    "dice-throw-1.ogg": {
+      "sha256": "4e6581c73465cdd7ec32e86a709b4ea5c682e819c9bdb7989d1df1880ba67886",
+      "bytes": 9523
+    },
+    "dice-throw-2.ogg": {
+      "sha256": "e0b8c370503b2c5c2a72d311cccae30fe63a6afd48f2be32e771fcf1a98585d6",
+      "bytes": 7545
+    },
+    "dice-throw-3.ogg": {
+      "sha256": "09c13d35a9a30bfce31a5e9bca94adc5be189ddecd0b4500237d54c7fd05227c",
+      "bytes": 9231
+    },
+    "die-throw-1.ogg": {
+      "sha256": "b31d716165be60e442da3c1ca25a3968aad1e0851a7f0859f495aecc02fd9e13",
+      "bytes": 8410
+    },
+    "die-throw-2.ogg": {
+      "sha256": "a2702cfe14d24aab302483a1499daa88474a4af4acd794b58d97f4af16333b3d",
+      "bytes": 9824
+    },
+    "die-throw-3.ogg": {
+      "sha256": "52fc44c7bb89328a147738574c925508c34abf4c19a014575b37ffb8c6b02437",
+      "bytes": 10018
+    },
+    "die-throw-4.ogg": {
+      "sha256": "6253cabcb10c4152548cbc9d3ea87c1bf1bd484f0bd8d6b73c542e690509c0fd",
+      "bytes": 8159
+    }
+  }
+}

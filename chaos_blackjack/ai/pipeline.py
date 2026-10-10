@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from chaos_blackjack.contracts.ai_action import StructuredAIAction, parse_structured_action
-from chaos_blackjack.contracts.items import ItemContext
 from chaos_blackjack.contracts.llm import LLMBackend
 from chaos_blackjack.events.event import Event, EventType
 from chaos_blackjack.ai.permissions_loader import load_permission_profile
@@ -19,6 +18,8 @@ from chaos_blackjack.ai.chaos_scheduler import ChaosScheduler
 from chaos_blackjack.contracts.observation import ChaosObservation
 from chaos_blackjack.registry.registry import Registry, get_registry
 from chaos_blackjack.rules.modifiers import RuleModifier
+from chaos_blackjack.core.game_state import GameState
+from chaos_blackjack.items.runtime import execute_item
 
 
 def _strip_json_fence(raw: str) -> str:
@@ -35,6 +36,7 @@ class ChaosEffect:
     consume_item_id: str | None = None
     log_message: str | None = None
     narration: str | None = None
+    state_after: GameState | None = None
 
 
 @dataclass
@@ -52,6 +54,7 @@ class ChaosPipeline:
     rule_params: dict[str, dict[str, Any]] = field(default_factory=dict)
     disabled_rules: frozenset[str] = frozenset()
     item_params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    system_prompt: str | None = None
 
     def __post_init__(self) -> None:
         if self.registry is None:
@@ -82,7 +85,7 @@ class ChaosPipeline:
         emit: Callable[[Event], None],
         peek_next_card_rank: Callable[[], str | None],
     ) -> ChaosEffect:
-        system = (load_prompt(self.prompt_name) + "\n\nAuthoritative run-specific action constraints:\n"
+        system = ((self.system_prompt if self.system_prompt is not None else load_prompt(self.prompt_name)) + "\n\nAuthoritative run-specific action constraints:\n"
                   + json.dumps(self.action_constraints(), ensure_ascii=False)
                   + "\nUse only these allowed ids. Fixed rule_params override any parameters you choose.")
         user = self._build_user_prompt(obs)
@@ -207,19 +210,18 @@ class ChaosPipeline:
                 )
                 return ChaosEffect()
 
-            ctx = ItemContext(
-                state=obs.state,
-                emit_event=lambda e: emit(e),
-                peek_next_card_rank=peek_next_card_rank,
+            after, result = execute_item(
+                self.registry, obs.state, iid,
+                emit=emit, peek_next_card_rank=peek_next_card_rank,
                 params=self.item_params.get(iid),
+                active_rule_ids=tuple(str(m.id) for m in obs.modifiers.items),
             )
-            inst = cls()
-            result = inst.use(ctx)
             if result.ok:
                 return ChaosEffect(
                     consume_item_id=iid,
                     log_message=result.message,
                     narration=narration,
+                    state_after=after,
                 )
             emit(
                 Event(
@@ -244,16 +246,23 @@ class ChaosPipeline:
     def _build_user_prompt(self, obs: ChaosObservation) -> str:
         if obs.context_json is not None:
             return "Full private game context:\n" + obs.context_json + "\nChoose your JSON action."
-        pv = sum(1 for _ in obs.state.player_hand)
-        dv = sum(1 for _ in obs.state.dealer_hand)
-        return (
-            f"Player hand size: {pv}, dealer up-cards visible count: {dv}. "
-            f"Deck remaining: {len(obs.state.deck)}. "
-            f"Chaos budget left: {obs.chaos_budget_remaining}. "
-            f"Chaos actions this turn: {obs.chaos_actions_this_turn}. "
-            f"Inventory: {list(obs.state.inventory)}. "
-            "Choose your JSON action."
-        )
+        # Offline strategies and models share one documented, visible-state input.
+        # Neither the hidden dealer card nor deck order is sent to the backend.
+        return json.dumps({
+            "schema": 1,
+            "player_cards": [{"rank": str(c.rank), "suit": c.suit} for c in obs.state.player_hand],
+            "dealer_up_card": (
+                {"rank": str(obs.state.dealer_hand[0].rank), "suit": obs.state.dealer_hand[0].suit}
+                if obs.state.dealer_hand else None
+            ),
+            "deck_remaining": len(obs.state.deck),
+            "chaos_budget_remaining": obs.chaos_budget_remaining,
+            "chaos_actions_this_turn": obs.chaos_actions_this_turn,
+            "inventory": list(obs.state.inventory),
+            "active_rules": [str(m.id) for m in obs.modifiers.items],
+            "allowed_rules": self.action_constraints()["allowed_rules"],
+            "allowed_items": None if self.policy.allowed_items is None else list(self.policy.allowed_items),
+        }, ensure_ascii=False)
 
 
 @dataclass

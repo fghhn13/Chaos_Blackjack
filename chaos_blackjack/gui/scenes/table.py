@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import Future
 from threading import Thread
+from dataclasses import replace
 
 import pygame
 
@@ -82,7 +83,7 @@ class TableScene(Scene):
     def on_enter(self, controller: GameController | None = None, **params) -> None:
         a = self.app.assets
         self.controller = controller or GameController(
-            RunConfig.from_balance(self.app.balance, enable_chaos=self.app.prefs.enable_chaos)
+            replace(self.app.run_config, enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
         self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke)
@@ -107,6 +108,7 @@ class TableScene(Scene):
         self._handlers: dict[str, list[NoticeHandler]] = {}
         self.subscribe("*", self._feed_notice)
         self.subscribe("*", self.chaos_panel.react)
+        self.subscribe("*", self.app.audio.handle_notice)
         self._timer = 0.0
         self._chaos_future: Future[None] | None = None
         self._chaos_failed = False
@@ -121,6 +123,7 @@ class TableScene(Scene):
         # against its old controller without touching this scene or delaying exit.
         self._closed = True
         self._chaos_future = None
+        self.app.audio.stop()
 
     # ----------------------------------------------------------- notices
 
@@ -139,6 +142,9 @@ class TableScene(Scene):
             self.feed.push(*line)
 
     # ---------------------------------------------------------- commands
+
+    def _open_items(self) -> None:
+        self.app.scenes.push("items", controller=self.controller)
 
     def _command(self, method: str) -> Callable[[], None]:
         def run() -> None:
@@ -198,9 +204,6 @@ class TableScene(Scene):
         self.controller.accept_poke_reply(outcome.request, outcome.reply)
         self._after_command()
 
-    def on_resume(self, result=None) -> None:
-        self._after_command()
-
     def _after_command(self) -> None:
         # Shop callbacks and modal resumes share this refresh path. A worker
         # owns the controller until update() consumes its completed result.
@@ -211,10 +214,17 @@ class TableScene(Scene):
         self.view = self.controller.view()
         self._sync_widgets()
 
+    def on_resume(self, result=None) -> None:
+        self._after_command()
+
     # ------------------------------------------------------------- frame
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if self._closed or self._poke_pending:
+            return
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_i
+                and self.view.can(Action.USE_ITEM) and self.view.items):
+            self._open_items()
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.push(

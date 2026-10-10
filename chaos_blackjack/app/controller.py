@@ -71,7 +71,6 @@ from chaos_blackjack.logic.run_end_policy import (
     RunEndPolicy,
     RunEndResult,
 )
-from chaos_blackjack.registry import get_registry
 from chaos_blackjack.ui.descriptions import describe_modifier
 
 
@@ -110,13 +109,31 @@ class GameController:
 
         auto_load_plugins()
         self.config = config or RunConfig()
+        from chaos_blackjack.content.loader import load_content_packs
+        from chaos_blackjack.content.ai_profile import build_pipeline
+
+        content = load_content_packs(self.config.content_packs)
+        self.registry = content.registry
+        self.config = replace(self.config, shop_prices={
+            item: price for item, price in self.config.shop_prices.items()
+            if self.registry.resolve_item(item) is not None
+        })
+        if self.config.ai_id not in self.registry.ai_ids():
+            raise ValueError(f"Unknown AI id: {self.config.ai_id}")
+        for item_id in (*self.config.starting_items, *content.starting_items):
+            if self.registry.resolve_item(item_id) is None:
+                raise ValueError(f"Unknown configured item id: {item_id}")
         self._translator = EventTranslator()
         self._notices: list[Notice] = []
         self._dispatcher = EventDispatcher()
         self._dispatcher.set_default(self._on_core_event)
 
-        factory = loop_factory or (lambda d: GameLoop(dispatcher=d))
+        factory = loop_factory or (lambda d: GameLoop(
+            dispatcher=d,
+            pipeline=build_pipeline(self.config.ai_id, self.registry, use_llm=self.config.use_llm),
+        ))
         self.loop = factory(self._dispatcher)
+        self.loop.pipeline.registry = self.registry
         self.loop.initial_inventory = ()
         self._configure_chaos()
         self.rng = random.Random(self.config.seed)
@@ -134,7 +151,7 @@ class GameController:
             objective=self.config.objective,
             win_streak=0,
             current_bet=0,
-            items=(),
+            items=(*self.config.starting_items, *content.starting_items),
         )
         self.state: GameState | None = None
         self.phase = TablePhase.BETTING
@@ -195,7 +212,7 @@ class GameController:
         c.state = snapshot_to_game_state(data.game_state)
         if data.active_modifiers:
             c.loop.modifiers = deserialize_active_modifiers(
-                data.active_modifiers, registry=get_registry(), rule_params=cfg.chaos_rule_params,
+                data.active_modifiers, registry=c.registry, rule_params=cfg.chaos_rule_params,
             )
         if c.state.phase == GamePhase.PLAYER_TURN:
             c._set_phase(TablePhase.PLAYER_TURN)
@@ -423,7 +440,7 @@ class GameController:
             player_total=player_total,
             dealer_total=dealer_total,
             deck_count=len(st.deck) if st is not None else 0,
-            items=tuple(ItemView(i, n) for i, n in inventory_counts(inventory)),
+            items=tuple(ItemView(i, n, self.registry.describe_item(i)) for i, n in inventory_counts(inventory)),
             shop_offers=tuple(
                 ShopOfferView(o.item, o.price, o.sold, not o.sold and self.can_bet(self.run.money - o.price))
                 for o in self.shop.offers

@@ -44,6 +44,7 @@ class CardView:
 class ItemView:
     id: str
     count: int
+    description: str = ""
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "id": "example",
+  "starting_items": [
+    "example_trim"
+  ],
+  "shop_items": [
+    "example_trim"
+  ],
+  "default_ai": "example_dealer"
+}

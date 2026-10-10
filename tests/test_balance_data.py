@@ -39,7 +39,7 @@ def test_shipped_values_are_unchanged() -> None:
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
     assert b.shop_prices == {"peek": 10, "danger_radar": 10, "swap": 20, "hole_card_hacker": 25,
-                             "fate_oracle": 25, "shield": 30}
+                             "fate_oracle": 25, "shield": 30, "example_trim": 20}
 
 
 def test_run_config_defaults_come_from_the_seed() -> None:

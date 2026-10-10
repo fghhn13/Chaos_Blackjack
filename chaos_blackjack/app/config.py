@@ -49,6 +49,10 @@ class RunConfig:
     item_params: dict[str, dict[str, Any]] = field(default_factory=lambda: _DEFAULTS.item_params)
     enable_chaos: bool = False
     seed: int | None = None
+    content_packs: tuple[str, ...] = ()
+    ai_id: str = "default"
+    starting_items: tuple[str, ...] = ()
+    use_llm: bool | None = None
     chaos_guidance_probability: float = _DEFAULTS.chaos_guidance_probability
     chaos_memory_enabled: bool = _DEFAULTS.chaos_memory_enabled
     chaos_memory_limit: int = _DEFAULTS.chaos_memory_limit
@@ -107,6 +111,9 @@ class RunConfig:
             values["blackjack_pays"] = tuple(int(x) for x in values["blackjack_pays"])
         if "disabled_rules" in values:
             values["disabled_rules"] = tuple(values["disabled_rules"])
+        for key in ("content_packs", "starting_items"):
+            if key in values:
+                values[key] = tuple(values[key])
         if "chaos_stub" in values:
             values["chaos_stub"] = tuple((str(r), dict(p), float(w)) for r, p, w in values["chaos_stub"])
         values.update(overrides)

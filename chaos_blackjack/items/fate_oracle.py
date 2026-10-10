@@ -12,6 +12,7 @@ from chaos_blackjack.registry import register_item
 
 class FateOracle:
     name = "fate_oracle"
+    description = "Reveal the ranks of the next 3 cards in the deck."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         if not ctx.state.deck:

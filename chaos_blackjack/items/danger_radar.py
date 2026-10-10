@@ -12,6 +12,7 @@ _HIGH_RANKS = {"10", "J", "Q", "K"}
 
 class DangerRadar:
     name = "danger_radar"
+    description = "Show how many 10/J/Q/K cards remain in the deck."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         total = len(ctx.state.deck)

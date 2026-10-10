@@ -25,7 +25,7 @@ DEFAULT_PROFILE = "default"
 
 
 # RunConfig keys that describe a run rather than the balance.
-_NOT_BALANCE = frozenset({"enable_chaos", "seed", "balance_profile"})
+_NOT_BALANCE = frozenset({"enable_chaos", "seed", "balance_profile", "use_llm", "ai_id", "content_packs"})
 
 
 def config_fingerprint(config: dict[str, Any]) -> str:

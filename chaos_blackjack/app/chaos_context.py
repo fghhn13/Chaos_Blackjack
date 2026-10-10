@@ -46,9 +46,9 @@ def build_chaos_context(controller: "GameController") -> str:
         "hole_revealed_to_player": c.hole_revealed,
         "deck": cards(st.deck) if st else [],
         "next_hit": hand(st.player_hand + st.deck[:1]) if st and st.deck else None,
-        "inventory": [{"id": item, "count": count, "help": ITEM_HELP.get(item, "")}
+        "inventory": [{"id": item, "count": count, "help": c.registry.describe_item(item)}
                       for item, count in inventory_counts(st.inventory if st else c.run.items)],
-        "item_catalog": ITEM_HELP,
+        "item_catalog": {item: c.registry.describe_item(item) for item in c.registry.item_ids()},
         "item_params": c.config.item_params,
         "shop": {"stock_round": c.shop.stock_round,
             "offers": [{"item": offer.item, "price": offer.price, "sold": offer.sold,

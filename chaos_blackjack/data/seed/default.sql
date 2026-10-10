@@ -33,6 +33,11 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
     (:profile, 'fate_oracle',      'fixed', 25, '{"cards": 3}'),
     (:profile, 'shield',           'fixed', 30, NULL);
 
+-- Sold only when the example content pack is loaded; unused plugin ids are
+-- filtered by the run-scoped registry before the controller rolls stock.
+INSERT INTO shop_item (profile_id, item_id, price_mode, price) VALUES
+    (:profile, 'example_trim', 'fixed', 20);
+
 -- Chaos rules. `params`: fixed tuning that wins over the AI's params.
 -- `stub_weight` / `stub_params`: how often the offline Chaos AI (no LLM) picks
 -- the rule and what it sends. Today it always applies "values -1".

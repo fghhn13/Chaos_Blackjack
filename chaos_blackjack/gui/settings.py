@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from chaos_blackjack.audio.catalog import DEFAULT_MASTER_VOLUME
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Everything is laid out on this fixed canvas, then scaled to the window.
@@ -34,3 +36,5 @@ class GuiSettings:
     fullscreen: bool = False
     asset_dirs: tuple[Path, ...] = field(default_factory=default_asset_dirs)
     balance_profile: str | None = None  # None = $CHAOS_PROFILE, else "default"
+    master_volume: float = DEFAULT_MASTER_VOLUME
+    audio_muted: bool = False

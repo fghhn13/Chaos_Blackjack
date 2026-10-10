@@ -154,6 +154,13 @@ Public player observations continue to hide private cards. Run-local memory is
 implemented but **disabled by default** (`RunConfig.chaos_memory_enabled=False`):
 no history is collected, included in prompts, or written to saves. A future opt-in
 can retain at most `chaos_memory_limit` events (default 32) across save/load.
+**Sound**: bundled [Kenney Casino Audio](https://kenney.nl/assets/casino-audio) (CC0)
+provides deal, chips, win, lose and successful Chaos cues. Master volume defaults
+to 40%. Use the main-menu Sound button or **M** to mute; **+/-** adjusts volume
+by 10 percentage points. Start with `--volume 0.3` or `--mute`. Missing audio
+devices degrade to silence. [Audio integration and agent handoff](docs/AUDIO_GUIDE.md)
+documents cue ids, interfaces, original licenses and the offline
+`python -m chaos_blackjack.audio validate` command.
 
 **Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
@@ -297,8 +304,24 @@ Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed
 
 ## Extending
 
-1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Read tunable numbers from `params` with a default, and add a `chaos_rule` row (its `params`, `stub_weight`) to `data/seed/default.sql`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
-2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it in `app/help_text.py` (`ITEM_HELP`) and give it a shop price in `DEFAULT_SHOP_PRICES` (`app/config.py`).
+**Standard item / Chaos AI workflow:** [Content pack guide](docs/CONTENT_WORKFLOW.md).
+Generate, validate, and launch a pack without changing the game loop:
+
+```bash
+python -m chaos_blackjack.content init lucky
+python -m chaos_blackjack.content validate lucky
+python -m chaos_blackjack.data clone default lucky
+python -m chaos_blackjack.content install-shop lucky --profile lucky
+python -m chaos_blackjack.content play lucky --profile lucky
+```
+
+The bundled `example` pack can be launched immediately. Add `--agent` for JSON
+streaming play. Packs load into a registry scoped to the run; their item help,
+starting inventory, balance-profile shop prices and selected AI are wired automatically.
+Pack items are sold only when their plugin is loaded; win streaks grant no items.
+
+1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
+2. **Item**: preferably add it through a content pack. Implement `ItemProtocol` and return `ItemResult.effects` for state changes. Players and Chaos AI use the same executor. Built-in items can still self-register under `items/`; expose a `description` for shared help.
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.
 5. **LLM provider**: implement `LLMBackend.complete(system, user) -> str` returning JSON, or reuse `GptsApiLLM` for any OpenAI-compatible relay.

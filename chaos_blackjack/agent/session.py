@@ -110,8 +110,13 @@ class AgentSession:
         `config` overrides any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
-        cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, **config)
-        ctrl = GameController(cfg, loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n)
+        cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, use_llm=use_llm, **config)
+        try:
+            ctrl = GameController(cfg, save_fn=lambda d, n: n)
+        except ValueError as exc:
+            if use_llm and "GPTSAPI_API_KEY" in str(exc):
+                raise LlmUnavailable(str(exc)) from exc
+            raise
         ctrl.drain_notices()
         return cls(ctrl, seed=seed, use_llm=use_llm, max_steps=max_steps)
 
@@ -261,12 +266,12 @@ class AgentSession:
         cfg = RunConfig.from_dict(
             hidden.get("config", {}),
             enable_chaos=bool(data.get("chaos")),
-            seed=data.get("seed"),
+            seed=data.get("seed"), use_llm=bool(data.get("use_llm")),
         )
         use_llm = bool(data.get("use_llm"))
         ctrl = GameController.from_save(
             RunSaveData.from_dict(hidden["save"]), cfg,
-            loop_factory=_make_loop_factory(use_llm), save_fn=lambda d, n: n,
+            save_fn=lambda d, n: n,
         )
         ctrl.rng.setstate(_rng_from_json(hidden["rng"]))
         if data.get("run_end"):

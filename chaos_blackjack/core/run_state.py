@@ -6,7 +6,7 @@ It does not import UI modules and does not depend on live game objects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 
