@@ -20,7 +20,9 @@ from chaos_blackjack.meta.effects import Effect, effect_ids, get_effect, registe
 from chaos_blackjack.meta.models import (
     SLOTS, MetaError, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart, UpgradeOffer,
 )
-from chaos_blackjack.meta.service import LoopFactory, MetaService, ModeOption, consolation_tokens
+from chaos_blackjack.meta.service import (
+    LoopFactory, MetaService, ModeOption, build_run_config, consolation_tokens, reward_tokens,
+)
 
 _service: MetaService | None = None
 
@@ -98,7 +100,8 @@ def codex_seen(player_id: int) -> dict[tuple[str, str], int]:
 
 __all__ = [
     "SLOTS", "Effect", "MetaError", "MetaService", "ModeOption", "Player", "PlayerSlot", "PlayerStats",
-    "RunRecord", "RunReward", "RunStart", "UpgradeOffer", "abandon_run", "buy_upgrade", "codex_seen",
+    "RunRecord", "RunReward", "RunStart", "UpgradeOffer", "abandon_run", "build_run_config", "buy_upgrade",
+    "codex_seen", "reward_tokens",
     "consolation_tokens", "create_player", "delete_player", "effect_ids", "finish_run", "get_effect",
     "get_player", "history", "list_slots", "meta_shop", "modes", "register_effect", "rename_player",
     "resume_run", "service", "start_run", "use_service",

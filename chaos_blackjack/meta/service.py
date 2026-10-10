@@ -53,6 +53,54 @@ def consolation_tokens(balance: Balance, rounds: int, start: int, peak: int) -> 
     return parts
 
 
+def build_run_config(
+    balance: Balance,
+    mode: GameMode,
+    owned: dict[str, int],
+    consumables: Iterable[str] = (),
+    *,
+    seed: int | None = None,
+) -> tuple[RunConfig, dict[str, int]]:
+    """A run's config: profile + mode + every owned permanent upgrade + one copy
+    of each listed consumable. Pure (no database); returns (config, applied).
+    `owned` holds levels / copies; owned upgrades the profile no longer sells
+    are skipped. Raises MetaError for consumables that cannot be brought."""
+    catalog = {u.upgrade_id: u for u in balance.meta_upgrades}
+    config = mode.apply(RunConfig.from_balance(balance, seed=seed))
+    applied: dict[str, int] = {}
+    for upgrade_id, level in sorted(owned.items()):
+        u = catalog.get(upgrade_id)
+        if u is None or u.kind != "permanent" or level < 1:
+            continue  # no longer sold in this profile, or a consumable
+        applied[upgrade_id] = min(level, u.max_level)
+        config = _apply_upgrade(u, config, applied[upgrade_id])
+    bring = list(consumables)
+    for upgrade_id in bring:
+        u = catalog.get(upgrade_id)
+        if u is None or u.kind != "consumable":
+            raise MetaError(f"{upgrade_id!r} is not a consumable you can bring")
+        if owned.get(upgrade_id, 0) < bring.count(upgrade_id):
+            raise MetaError(f"You do not have enough {upgrade_id!r}")
+        applied[upgrade_id] = applied.get(upgrade_id, 0) + 1
+        config = _apply_upgrade(u, config, 1)
+    return config, applied
+
+
+def reward_tokens(balance: Balance, result: str, rounds: int, start: int, peak: int) -> list[tuple[str, int]]:
+    """Token breakdown for a finished run: the win reward, or the consolation."""
+    if result == "victory":
+        return [("Victory", balance.meta_win_tokens)]
+    return consolation_tokens(balance, rounds, start, peak)
+
+
+def _apply_upgrade(u: MetaUpgradeBalance, config: RunConfig, amount: int) -> RunConfig:
+    try:
+        effect = get_effect(u.effect)
+    except KeyError as e:
+        raise MetaError(f"Upgrade {u.upgrade_id} uses an effect this version does not have") from e
+    return effect.apply(config, amount, dict(u.params))
+
+
 class MetaService:
     def __init__(self, conn: sqlite3.Connection | None = None) -> None:
         """`conn` keeps one open connection (e.g. ":memory:"); None opens data/game.db per call."""
@@ -191,23 +239,7 @@ class MetaService:
             if mode.unlocked_by and player.upgrades.get(mode.unlocked_by, 0) < 1:
                 raise MetaError(f"The {mode.name} mode is locked")
             balance = self._balance(db, profile)
-            catalog = {u.upgrade_id: u for u in balance.meta_upgrades}
-            config = mode.apply(RunConfig.from_balance(balance, seed=seed))
-            applied: dict[str, int] = {}
-            for upgrade_id, level in sorted(player.upgrades.items()):
-                u = catalog.get(upgrade_id)
-                if u is None or u.kind != "permanent" or level < 1:
-                    continue  # no longer sold in this profile, or a consumable
-                applied[upgrade_id] = min(level, u.max_level)
-                config = self._apply(u, config, applied[upgrade_id])
-            for upgrade_id in bring:
-                u = catalog.get(upgrade_id)
-                if u is None or u.kind != "consumable":
-                    raise MetaError(f"{upgrade_id!r} is not a consumable you can bring")
-                if player.upgrades.get(upgrade_id, 0) < bring.count(upgrade_id):
-                    raise MetaError(f"You do not have enough {upgrade_id!r}")
-                applied[upgrade_id] = applied.get(upgrade_id, 0) + 1
-                config = self._apply(u, config, 1)
+            config, applied = build_run_config(balance, mode, player.upgrades, bring, seed=seed)
             with db:
                 for upgrade_id in bring:
                     db.execute("UPDATE player_upgrade SET amount = amount - 1 WHERE player_id = ? AND upgrade_id = ?",
@@ -267,11 +299,8 @@ class MetaService:
                 raise MetaError("This run has already been settled")
             balance = self._balance(db, run["balance_profile"], fallback=True)
             result = controller.run_end.kind
-            if result == "victory":
-                breakdown = [("Victory", balance.meta_win_tokens)]
-            else:
-                breakdown = consolation_tokens(balance, summary["rounds"], controller.run.start_money,
-                                               summary["peak_money"])
+            breakdown = reward_tokens(balance, result, summary["rounds"], controller.run.start_money,
+                                      summary["peak_money"])
             tokens = max(0, sum(t for _, t in breakdown))
             player_id = run["player_id"]
             with db:
@@ -340,14 +369,6 @@ class MetaService:
             if fallback:
                 return default_balance()
             raise
-
-    @staticmethod
-    def _apply(u: MetaUpgradeBalance, config: RunConfig, amount: int) -> RunConfig:
-        try:
-            effect = get_effect(u.effect)
-        except KeyError as e:
-            raise MetaError(f"Upgrade {u.upgrade_id} uses an effect this version does not have") from e
-        return effect.apply(config, amount, dict(u.params))
 
     @staticmethod
     def _record_seen(db: sqlite3.Connection, player_id: int, mode: str, summary: dict[str, Any]) -> None:
