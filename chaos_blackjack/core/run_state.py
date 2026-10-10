@@ -98,6 +98,9 @@ class RunSaveData:
     shop_seed: int | None = None
     # The dealer's hole card was exposed by an item this round.
     hole_revealed: bool = False
+    # RunConfig.to_dict() of the run: loading restores these numbers even if
+    # the balance profile changed since. Absent in older saves.
+    config: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -117,6 +120,7 @@ class RunSaveData:
             "shop": self.shop,
             "shop_seed": self.shop_seed,
             "hole_revealed": self.hole_revealed,
+            "config": self.config,
         }
 
     @staticmethod
@@ -141,6 +145,7 @@ class RunSaveData:
             shop=d.get("shop"),
             shop_seed=None if d.get("shop_seed") is None else int(d["shop_seed"]),
             hole_revealed=bool(d.get("hole_revealed", False)),
+            config=d.get("config"),
         )
 
 

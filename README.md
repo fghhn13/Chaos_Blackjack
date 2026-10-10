@@ -79,6 +79,13 @@ elsewhere).
   A run keeps the numbers it started with.
 - Schema changes go in new `chaos_blackjack/data/migrations/NNNN_*.sql` files.
 
+The same database keeps **saves** (`run_save`: the run's JSON, including the
+numbers it was played with, so a save restores them even after its profile
+changes) and **preferences** (`preference`, e.g. the GUI's Chaos Mode switch).
+Saves from older versions (JSON files in `chaos_blackjack/saves/`) are imported
+once with `python -m chaos_blackjack.data import-saves`; `python -m
+chaos_blackjack.data saves` lists what is stored.
+
 Game logic never reads the database: front-ends load a `Balance` and build a
 `RunConfig` from it (`RunConfig.from_balance`). Tests use an in-memory database.
 
@@ -111,7 +118,7 @@ python cli/main.py --enable-chaos
 python cli/main.py demo            # one automated round, no input
 ```
 
-Type `save` during a game to write a JSON save under `chaos_blackjack/saves/`; Load Game lists them. The CLI layout follows [UX_design.md](UX_design.md).
+Type `save` during a game to store the run in `data/game.db`; Load Game lists the saves. The CLI layout follows [UX_design.md](UX_design.md).
 
 ### Agent players
 
@@ -183,7 +190,7 @@ Notes:
 | `ai/` | `ChaosPipeline`, `StubLLM`, `GptsApiLLM`, prompt + permission loaders, `.env` loading |
 | `events/` | `Event` / `EventDispatcher` |
 | `app/` | `GameController` state machine (betting → chaos → player turn → dealer → round over → run over), `GameView`, `Notice` stream, `RunConfig` |
-| `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader |
+| `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader, saves, preferences |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |
 | `ui/`, `cli/` | Text CLI |
@@ -200,13 +207,12 @@ Black_jack/
 │   ├── items/                # item plugins (self-register)
 │   ├── ai/                   # pipeline, prompts/, permissions/, gptsapi_llm.py
 │   ├── app/                  # GameController, views, notices, config
-│   ├── data/                 # SQLite: migrations/, seed/default.sql, balance loader
+│   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── agent/                # agent-player interface
 │   ├── gui/                  # Pygame client (assets/, components/, scenes/)
 │   ├── ui/                   # text CLI session
-│   └── saves/
 ├── assets/                   # drop final art here (see assets/README.md)
-├── data/game.db              # local database (git-ignored, created on first run)
+├── data/game.db              # local database: profiles, saves, prefs (git-ignored)
 ├── cli/main.py
 ├── scripts/                  # debug_smoke.py, debug_llm.py
 ├── tests/

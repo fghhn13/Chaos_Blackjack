@@ -58,7 +58,7 @@ from chaos_blackjack.contracts.items import ItemResult
 from chaos_blackjack.core.game_loop import GameLoop
 from chaos_blackjack.core.game_state import GamePhase, GameState
 from chaos_blackjack.core.run_state import RunSaveData
-from chaos_blackjack.core.save_manager import save_game
+from chaos_blackjack.data.saves import save_run
 from chaos_blackjack.events.dispatcher import EventDispatcher
 from chaos_blackjack.events.event import Event
 from chaos_blackjack.logic.run_end_policy import (
@@ -101,7 +101,7 @@ class GameController:
         *,
         loop_factory: Callable[[EventDispatcher], GameLoop] | None = None,
         run_end_policy: RunEndPolicy | None = None,
-        save_fn: Callable[[RunSaveData, str], object] = save_game,
+        save_fn: Callable[[RunSaveData, str], object] = save_run,
     ) -> None:
         from chaos_blackjack import auto_load_plugins
 
@@ -152,7 +152,14 @@ class GameController:
         config: RunConfig | None = None,
         **kwargs,
     ) -> "GameController":
-        base = config or RunConfig()
+        # A save that carries its config restores those numbers; `config` can
+        # still switch chaos on. Older saves take the numbers from `config`.
+        if data.config:
+            base = RunConfig.from_dict(data.config)
+            if config is not None and config.enable_chaos:
+                base = replace(base, enable_chaos=True)
+        else:
+            base = config or RunConfig()
         cfg = replace(
             base,
             start_money=data.start_money,
@@ -333,6 +340,7 @@ class GameController:
             shop=self.shop,
             shop_seed=self.shop_seed,
             hole_revealed=self.hole_revealed,
+            config=self.config.to_dict(),
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})

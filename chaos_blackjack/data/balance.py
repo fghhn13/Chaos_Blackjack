@@ -24,6 +24,17 @@ from chaos_blackjack.data.db import MEMORY, connect
 DEFAULT_PROFILE = "default"
 
 
+# RunConfig keys that describe a run rather than the balance.
+_NOT_BALANCE = frozenset({"enable_chaos", "seed", "balance_profile"})
+
+
+def config_fingerprint(config: dict[str, Any]) -> str:
+    """Short hash of a RunConfig.to_dict(): equal numbers -> equal hash."""
+    data = {k: v for k, v in config.items() if k not in _NOT_BALANCE}
+    blob = json.dumps(data, sort_keys=True, default=list).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:12]
+
+
 class BalanceError(ValueError):
     """A profile is missing, incomplete or holds an invalid value."""
 

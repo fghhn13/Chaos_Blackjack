@@ -450,7 +450,7 @@ def _player_turn_loop(
                 loop=loop,
                 enable_chaos=enable_chaos,
             )
-            save_game(data, name=name or "save_1.json")
+            save_game(data, name=name or "save_1")
             stdout.write("Game saved successfully.\n\n> ")
             continue
 

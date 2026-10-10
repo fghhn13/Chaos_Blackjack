@@ -9,6 +9,8 @@ Global keys: F11 fullscreen, F5 rescan asset folders.
 
 from __future__ import annotations
 
+import sqlite3
+
 from dataclasses import dataclass
 
 import pygame
@@ -17,6 +19,7 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import AssetManager
 from chaos_blackjack.gui.scene import SceneManager
 from chaos_blackjack.data.balance import load_balance
+from chaos_blackjack.data.prefs import get_pref, set_pref
 from chaos_blackjack.gui.settings import LOGICAL_SIZE, GuiSettings
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
@@ -24,9 +27,19 @@ _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONU
 
 @dataclass
 class Preferences:
-    """Choices made in menus that later scenes read."""
+    """Choices made in menus that later scenes read; kept in data/game.db."""
 
     enable_chaos: bool = False
+
+    @classmethod
+    def load(cls) -> "Preferences":
+        return cls(enable_chaos=bool(get_pref("gui.enable_chaos", False)))
+
+    def save(self) -> None:
+        try:
+            set_pref("gui.enable_chaos", self.enable_chaos)
+        except (sqlite3.Error, OSError):
+            pass  # a preference that cannot be stored is not worth a crash
 
 
 class App:
@@ -40,7 +53,7 @@ class App:
         self.clock = pygame.time.Clock()
         self.assets = AssetManager(self.settings.asset_dirs)
         self.balance = load_balance(self.settings.balance_profile)
-        self.prefs = Preferences()
+        self.prefs = Preferences.load()
         self.scenes = SceneManager(self)
         self.running = False
         self._viewport = pygame.Rect((0, 0), LOGICAL_SIZE)

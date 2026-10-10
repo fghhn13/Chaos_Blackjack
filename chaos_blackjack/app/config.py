@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import Any
 
-from chaos_blackjack.data.balance import Balance, default_balance
+from chaos_blackjack.data.balance import Balance, config_fingerprint, default_balance
 
 _DEFAULTS = default_balance()
 
@@ -76,6 +76,11 @@ class RunConfig:
         }
         values.update(overrides)
         return cls(**values)
+
+    @property
+    def balance_hash(self) -> str:
+        """Fingerprint of the numbers (not the profile name, seed or chaos switch)."""
+        return config_fingerprint(self.to_dict())
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready copy (agent run files keep the numbers a run started with)."""
