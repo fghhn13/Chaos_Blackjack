@@ -6,7 +6,7 @@ It does not import UI modules and does not depend on live game objects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 
@@ -93,6 +93,7 @@ class RunSaveData:
     game_state: GameStateSnapshot | None
     active_modifiers: list[ModifierSnapshot]
     chaos_actions_this_turn: int
+    run_config: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -109,6 +110,7 @@ class RunSaveData:
             "game_state": None if self.game_state is None else self.game_state.to_dict(),
             "active_modifiers": [m.to_dict() for m in self.active_modifiers],
             "chaos_actions_this_turn": self.chaos_actions_this_turn,
+            "run_config": self.run_config,
         }
 
     @staticmethod
@@ -130,6 +132,7 @@ class RunSaveData:
             game_state=None if gs is None else GameStateSnapshot.from_dict(gs),
             active_modifiers=[ModifierSnapshot.from_dict(x) for x in d.get("active_modifiers", [])],
             chaos_actions_this_turn=int(d.get("chaos_actions_this_turn", 0)),
+            run_config=dict(d.get("run_config") or {}),
         )
 
 

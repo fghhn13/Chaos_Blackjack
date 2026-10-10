@@ -9,6 +9,7 @@ from chaos_blackjack.registry import register_item
 
 class HoleCardHacker:
     name = "hole_card_hacker"
+    description = "Reveal the dealer's face-down card."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         # Dealer's first card is visible; second card (index 1) is the hole card.

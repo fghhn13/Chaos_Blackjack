@@ -102,7 +102,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
         "reward_every": v.reward_streak,
         "you": {"cards": [card_str(c) for c in v.player_cards], "total": v.player_total} if in_hand else None,
         "dealer": {"cards": [card_str(c) for c in v.dealer_cards], "total": v.dealer_total} if in_hand else None,
-        "items": [{"id": i.id, "count": i.count, "help": ITEM_HELP.get(i.id, "")} for i in v.items],
+        "items": [{"id": i.id, "count": i.count, "help": i.description or ITEM_HELP.get(i.id, "")} for i in v.items],
         "chaos": {
             "enabled": v.chaos_enabled,
             "budget": v.chaos_budget,

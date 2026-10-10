@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from chaos_blackjack.app.economy import RunState
+from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.core.game_loop import GameLoop
 from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
 from chaos_blackjack.core.run_state import (
@@ -93,6 +94,7 @@ def build_save_data(
     state: GameState | None,
     loop: GameLoop,
     enable_chaos: bool,
+    config: RunConfig | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -112,4 +114,5 @@ def build_save_data(
         game_state=game_state_to_snapshot(state) if state is not None else None,
         active_modifiers=active,
         chaos_actions_this_turn=chaos_actions_this_turn,
+        run_config={} if config is None else config.to_dict(),
     )

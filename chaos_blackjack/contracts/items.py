@@ -8,11 +8,19 @@ from typing import Any, Callable, Protocol, runtime_checkable
 from chaos_blackjack.core.game_state import GameState
 
 
+class ItemEffect(Protocol):
+    """A deterministic state transform applied by the shared item executor."""
+
+    def apply(self, state: GameState) -> GameState:
+        ...
+
+
 @dataclass(frozen=True)
 class ItemResult:
     ok: bool
     message: str = ""
     extra: dict[str, Any] | None = None
+    effects: tuple[ItemEffect, ...] = ()
 
 
 class ItemContext:

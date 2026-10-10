@@ -78,6 +78,8 @@ def _new_session(args: argparse.Namespace) -> AgentSession:
         config["start_money"] = args.start_money
     if args.target_money is not None:
         config["target_money"] = args.target_money
+    config["content_packs"] = tuple(args.pack)
+    config["ai_id"] = args.ai
     return AgentSession.new(seed=args.seed, chaos=args.chaos, use_llm=args.llm,
                             max_steps=args.max_steps, **config)
 
@@ -90,6 +92,8 @@ def _add_new_options(p: argparse.ArgumentParser) -> None:
     p.add_argument("--start-money", type=int, default=None)
     p.add_argument("--target-money", type=int, default=None)
     p.add_argument("--max-steps", type=int, default=2000)
+    p.add_argument("--pack", action="append", default=[], help="load a local content pack (repeatable)")
+    p.add_argument("--ai", default="default", help="registered Chaos AI id")
 
 
 def _play_stream(args: argparse.Namespace) -> int:

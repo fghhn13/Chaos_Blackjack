@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
 
 DEFAULT_START_MONEY = 100
@@ -26,3 +27,18 @@ class RunConfig:
     allow_surrender: bool = True
     enable_chaos: bool = False
     seed: int | None = None
+    content_packs: tuple[str, ...] = ()
+    ai_id: str = "default"
+    starting_items: tuple[str, ...] = ()
+    use_llm: bool | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RunConfig:
+        values = dict(data)
+        for key in ("reward_pool", "blackjack_pays", "content_packs", "starting_items"):
+            if key in values:
+                values[key] = tuple(values[key])
+        return cls(**values)

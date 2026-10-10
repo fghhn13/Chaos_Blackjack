@@ -217,8 +217,21 @@ Tests force `CHAOS_USE_LLM=0` and use fake transports, so they never make billed
 
 ## Extending
 
+**Standard item / Chaos AI workflow:** [Content pack guide](docs/CONTENT_WORKFLOW.md).
+Generate, validate, and launch a pack without changing the game loop:
+
+```bash
+python -m chaos_blackjack.content init lucky
+python -m chaos_blackjack.content validate lucky
+python -m chaos_blackjack.content play lucky
+```
+
+The bundled `example` pack can be launched immediately. Add `--agent` for JSON
+streaming play. Packs load into a registry scoped to the run; their item help,
+starting inventory, reward entries and selected AI are wired automatically.
+
 1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
-2. **Item**: add `chaos_blackjack/items/your_item.py`, implement `ItemProtocol`, call `register_item("id", YourItem)`. If it changes the table, add an effect to `ITEM_EFFECTS` in `app/item_use.py`; describe it for agents in `agent/observation.py` (`ITEM_HELP`).
+2. **Item**: preferably add it through a content pack. Implement `ItemProtocol` and return `ItemResult.effects` for state changes. Players and Chaos AI use the same executor. Built-in items can still self-register under `items/`; expose a `description` for shared help.
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.
 5. **LLM provider**: implement `LLMBackend.complete(system, user) -> str` returning JSON, or reuse `GptsApiLLM` for any OpenAI-compatible relay.

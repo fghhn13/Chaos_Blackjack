@@ -9,6 +9,7 @@ from chaos_blackjack.registry import register_item
 
 class Shield:
     name = "shield"
+    description = "Primes a shield against chaos (currently has no game effect)."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         ctx.emit_event(
