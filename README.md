@@ -105,6 +105,12 @@ Saves from older versions (JSON files in `chaos_blackjack/saves/`) are imported
 once with `python -m chaos_blackjack.data import-saves`; `python -m
 chaos_blackjack.data saves` lists what is stored.
 
+**Meta progression** (player slots, tokens, upgrades, run history) also lives
+there; see [docs/design/META_PROGRESSION.md](docs/design/META_PROGRESSION.md).
+Upgrade costs, rewards and the catalog are part of the balance profile
+(`meta.*` settings, `upgrade.<id>.<field>` keys). `python -m chaos_blackjack.data
+players` and `history SLOT` show the players.
+
 Game logic never reads the database: front-ends load a `Balance` and build a
 `RunConfig` from it (`RunConfig.from_balance`). Tests use an in-memory database.
 
@@ -247,6 +253,8 @@ Notes:
 | `events/` | `Event` / `EventDispatcher` |
 | `app/` | `GameController` state machine (betting → chaos → player turn → dealer → round over → run over), `GameView`, `Notice` stream, `RunConfig` |
 | `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader, saves, preferences |
+| `meta/` | Meta progression: players, meta shop, upgrade effects, run tracking and rewards |
+| `modes/` | Game mode registry (`normal`, `chaos`) |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |
 | `ui/`, `cli/` | Text CLI |

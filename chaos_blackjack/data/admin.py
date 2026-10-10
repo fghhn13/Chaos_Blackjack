@@ -4,6 +4,7 @@ Keys address one value of a profile:
   <setting key>              run.start_money, bet.max_fraction, shop.slots, ...
   item.<item_id>.<field>     price, enabled, weight, params (JSON), price_mode
   rule.<rule_id>.<field>     enabled, params (JSON), stub_weight, stub_params (JSON)
+  upgrade.<upgrade_id>.<field>  cost, cost_step, max_level, enabled, params (JSON), requires
 
 Every edit is validated by loading the profile inside the same transaction;
 an invalid value is rolled back. Locked (seeded) profiles cannot be edited:
@@ -20,6 +21,13 @@ from chaos_blackjack.data.balance import BalanceError, load_balance
 
 ITEM_FIELDS = ("price", "enabled", "weight", "params", "price_mode")
 RULE_FIELDS = ("enabled", "params", "stub_weight", "stub_params")
+UPGRADE_FIELDS = ("cost", "cost_step", "max_level", "enabled", "params", "requires")
+# key prefix -> (table, id column, editable fields)
+_TABLES = {
+    "item": ("shop_item", "item_id", ITEM_FIELDS),
+    "rule": ("chaos_rule", "rule_id", RULE_FIELDS),
+    "upgrade": ("meta_upgrade", "upgrade_id", UPGRADE_FIELDS),
+}
 _JSON_FIELDS = {"params", "stub_params"}
 
 
@@ -59,6 +67,9 @@ def profile_values(conn: sqlite3.Connection, name: str) -> dict[str, str]:
     for row in conn.execute("SELECT * FROM chaos_rule WHERE profile_id = ?", (pid,)):
         for f in RULE_FIELDS:
             out[f"rule.{row['rule_id']}.{f}"] = _text(row[f], f)
+    for row in conn.execute("SELECT * FROM meta_upgrade WHERE profile_id = ?", (pid,)):
+        for f in UPGRADE_FIELDS:
+            out[f"upgrade.{row['upgrade_id']}.{f}"] = _text(row[f], f)
     return dict(sorted(out.items()))
 
 
@@ -93,8 +104,11 @@ def _value(field: str, raw: str) -> object:
         return int(low in ("1", "true", "on"))
     if field == "price_mode":
         return raw.strip()
+    if field == "requires":
+        return raw.strip() or None
     try:
-        return float(raw)
+        number = float(raw)
+        return int(number) if number.is_integer() else number
     except ValueError:
         raise BalanceError(f"{field}: {raw!r} is not a number") from None
 
@@ -108,9 +122,8 @@ def set_value(conn: sqlite3.Connection, profile: str, key: str, raw: str) -> Non
     parts = key.split(".")
     try:
         with conn:
-            if parts[0] in ("item", "rule") and len(parts) == 3:
-                table, id_col, fields = (("shop_item", "item_id", ITEM_FIELDS) if parts[0] == "item"
-                                         else ("chaos_rule", "rule_id", RULE_FIELDS))
+            if parts[0] in _TABLES and len(parts) == 3:
+                table, id_col, fields = _TABLES[parts[0]]
                 if parts[2] not in fields:
                     raise BalanceError(f"{key}: field must be one of {', '.join(fields)}")
                 cur = conn.execute(f"UPDATE {table} SET {parts[2]} = ? WHERE profile_id = ? AND {id_col} = ?",
@@ -174,4 +187,12 @@ def export_seed(conn: sqlite3.Connection, name: str) -> str:
         out.append(",\n".join(
             f"    (:profile, {_sql(r['rule_id'])}, {_sql(r['enabled'])}, {_sql(r['params'])}, "
             f"{_sql(r['stub_weight'])}, {_sql(r['stub_params'])})" for r in rows) + ";")
+    rows = conn.execute("SELECT * FROM meta_upgrade WHERE profile_id = ? ORDER BY upgrade_id", (pid,)).fetchall()
+    if rows:
+        out += ["", "INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, "
+                    "max_level, enabled, requires) VALUES"]
+        out.append(",\n".join(
+            f"    (:profile, {_sql(r['upgrade_id'])}, {_sql(r['kind'])}, {_sql(r['effect'])}, {_sql(r['params'])}, "
+            f"{_sql(r['cost'])}, {_sql(r['cost_step'])}, {_sql(r['max_level'])}, {_sql(r['enabled'])}, "
+            f"{_sql(r['requires'])})" for r in rows) + ";")
     return "\n".join(out) + "\n"

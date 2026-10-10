@@ -125,6 +125,7 @@ class GameController:
                 raise ValueError(f"Unknown configured item id: {item_id}")
         self._translator = EventTranslator()
         self._notices: list[Notice] = []
+        self._listeners: list[Callable[[Notice], None]] = []
         self._dispatcher = EventDispatcher()
         self._dispatcher.set_default(self._on_core_event)
 
@@ -402,6 +403,16 @@ class GameController:
         m = self.run.money if money is None else money
         return can_bet(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
 
+    def add_listener(self, fn: Callable[[Notice], None]) -> None:
+        """Call `fn` with every notice as it happens, without consuming it
+        (front-ends keep draining notices). Listeners run on whatever thread
+        drives the controller, e.g. the chaos worker; keep them small."""
+        self._listeners.append(fn)
+
+    def remove_listener(self, fn: Callable[[Notice], None]) -> None:
+        if fn in self._listeners:
+            self._listeners.remove(fn)
+
     def drain_notices(self) -> list[Notice]:
         out = self._notices
         self._notices = []
@@ -491,7 +502,7 @@ class GameController:
         self._notify(NoticeKind.PHASE_CHANGED, data={"from": prev.value, "to": phase.value})
 
     def _notify(self, kind: str, text: str = "", data: dict | None = None) -> None:
-        self._notices.append(Notice(kind=kind, text=text, data=data or {}))
+        self._publish(Notice(kind=kind, text=text, data=data or {}))
         if kind in {
             NoticeKind.ROUND_STARTED, NoticeKind.ITEM_BOUGHT, NoticeKind.ITEM_RESULT,
             NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY, NoticeKind.ROUND_SETTLED,
@@ -500,9 +511,14 @@ class GameController:
 
     def _on_core_event(self, event: Event) -> None:
         notice = self._translator.translate(event)
-        self._notices.append(notice)
+        self._publish(notice)
         if notice.kind == NoticeKind.DRAW_CARD:
             self.chaos_memory.record(self.run.round, notice.kind, dict(notice.data))
+
+    def _publish(self, notice: Notice) -> None:
+        self._notices.append(notice)
+        for fn in list(self._listeners):
+            fn(notice)
 
     def _is_natural(self, hand) -> bool:
         if len(hand) != 2:

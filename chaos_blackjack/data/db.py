@@ -108,7 +108,7 @@ def sync_seeds(conn: sqlite3.Connection) -> None:
                 ).lastrowid
             else:
                 pid = row["id"]
-                for table in ("setting", "shop_item", "chaos_rule"):
+                for table in ("setting", "shop_item", "chaos_rule", "meta_upgrade"):
                     conn.execute(f"DELETE FROM {table} WHERE profile_id = ?", (pid,))
                 conn.execute("UPDATE balance_profile SET source_hash = ?, locked = 1 WHERE id = ?", (digest, pid))
             for statement in _statements(sql):
