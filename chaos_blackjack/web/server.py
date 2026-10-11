@@ -268,6 +268,10 @@ class Application:
         try:
             path = env.get("PATH_INFO", "/")
             method = env.get("REQUEST_METHOD", "GET")
+            head_only = method == "HEAD"
+            if head_only:
+                env = {**env, "REQUEST_METHOD": "GET"}
+                method = "GET"
             if method not in ("GET", "POST"):
                 raise APIError(405, "Method not allowed.")
             if path in ("/", "/static/app.js", "/static/style.css") and method == "GET":
@@ -309,7 +313,7 @@ class Application:
         from http import HTTPStatus
         headers.append(("Content-Length", str(len(body))))
         start_response(f"{status} {HTTPStatus(status).phrase}", headers)
-        return [body]
+        return [] if head_only else [body]
 
 
 def create_app():
