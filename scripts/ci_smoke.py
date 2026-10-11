@@ -102,21 +102,20 @@ def gui_smoke(player_id: int, config) -> None:
 
     app = App(run_config=config)
     try:
-        for name, params in (("menu", {}), ("player_select", {}),
+        for name, params in (("player_select", {}), ("run_setup", {"player_id": player_id}),
                              ("meta_shop", {"player_id": player_id}),
                              ("history", {"player_id": player_id}),
-                             ("hub", {"player_id": player_id})):
+                             ("home", {})):
             app.scenes.reset(name, **params)
             app.scenes.apply_pending()
             app.scenes.draw(app.canvas)
-        hub = app.scenes.top
-        assert hub.nav["codex"].enabled
-        hub.navigate("codex", player_id=player_id, config=config)
+        home = app.scenes.top
+        home.open_collection()
         app.scenes.apply_pending()
-        gallery = app.scenes.top
-        assert gallery.config == config and gallery.entries
+        collection = app.scenes.top
+        assert collection.config == config and collection.entries
         app.scenes.draw(app.canvas)
-        app.scenes.push("codex_detail", entry=gallery.entries[0], config=config)
+        app.scenes.push("codex_detail", entry=collection.entries[0], config=config)
         app.scenes.apply_pending()
         app.scenes.update(0.1)
         app.scenes.draw(app.canvas)
@@ -124,7 +123,7 @@ def gui_smoke(player_id: int, config) -> None:
         app.scenes.apply_pending()
         app.scenes.pop()
         app.scenes.apply_pending()
-        assert app.scenes.top is hub
+        assert app.scenes.top is home
         app.scenes.draw(app.canvas)
     finally:
         app.audio.close()

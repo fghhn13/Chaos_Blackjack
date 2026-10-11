@@ -1,10 +1,10 @@
 """Scenes and the scene stack.
 
-A scene is one screen (menu, table, gallery, a modal dialog...). Scenes are
+A scene is one screen (player select, table, codex, a modal dialog...). Scenes are
 registered by name with `@register_scene("name")` and opened by name, so
 scenes never import each other:
 
-    self.app.scenes.push("gallery")
+    self.app.scenes.push("codex")
     self.app.scenes.replace("table", enable_chaos=True)
 
 Stack changes are queued and applied between frames, so it is safe to call
@@ -82,7 +82,7 @@ class SceneManager:
         self._pending.append(("pop", None, result))
 
     def reset(self, name: str, **params: Any) -> None:
-        """Clear the whole stack and open `name` (e.g. back to main menu)."""
+        """Clear the whole stack and open `name` (e.g. back to player select)."""
         self._pending.append(("reset", name, params))
 
     def apply_pending(self) -> None:

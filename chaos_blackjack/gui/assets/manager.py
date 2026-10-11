@@ -69,7 +69,7 @@ class AssetManager:
         return asset_id in self._files
 
     def source(self, asset_id: str) -> str:
-        """'file' | 'placeholder' | 'missing' — shown in the asset gallery."""
+        """'file' | 'placeholder' | 'missing' — reported by validation and previews."""
         if asset_id in self._files:
             return "file"
         return "placeholder" if asset_id in self.manifest else "missing"

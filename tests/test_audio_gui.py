@@ -58,15 +58,15 @@ def test_missing_audio_device_does_not_prevent_gui(monkeypatch, tmp_path):
         pygame.quit()
 
 
-def test_menu_mouse_and_global_audio_keys_keep_saved_volume(tmp_path):
+def test_settings_mouse_and_global_audio_keys_keep_saved_volume(tmp_path):
     app = App(GuiSettings(asset_dirs=(tmp_path,)))
     import chaos_blackjack.gui.scenes
     try:
-        app.scenes.reset("menu")
+        app.scenes.reset("meta_settings")
         app.scenes.apply_pending()
-        menu = app.scenes.top
+        settings = app.scenes.top
         for kind in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
-            app._dispatch(pygame.event.Event(kind, {"pos": menu.sound_button.rect.center, "button": 1}))
+            app._dispatch(pygame.event.Event(kind, {"pos": settings.mute.rect.center, "button": 1}))
         assert app.audio.muted and app.audio.volume == 0.4
         def key(code):
             app._dispatch(pygame.event.Event(pygame.KEYDOWN, {"key": code}))
@@ -81,7 +81,7 @@ def test_menu_mouse_and_global_audio_keys_keep_saved_volume(tmp_path):
             key(pygame.K_KP_PLUS)
         assert app.audio.volume == 1
         app._render()
-        assert "100%" in menu.sound_button.text
+        assert "100%" in settings.mute.text
     finally:
         app.audio.close()
         pygame.quit()
@@ -113,9 +113,9 @@ def test_table_fans_notices_to_audio_once_without_consuming_feed(tmp_path):
         played = list(cues)
         table.fx.update(2)
         assert cues == played
-        app.scenes.reset("menu")
+        app.scenes.reset("home")
         app.scenes.apply_pending()
-        assert type(app.scenes.top).__name__ == "MainMenuScene"
+        assert type(app.scenes.top).__name__ == "HomeScene"
     finally:
         app.audio.close()
         pygame.quit()

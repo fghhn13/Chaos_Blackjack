@@ -67,13 +67,15 @@ class App:
         self.audio = SoundManager(self.settings.asset_dirs, preferences=self.prefs)
         self.assets.audio = self.audio
         self.scenes = SceneManager(self)
+        # In-process choices shared by screens (current player, run setup picks).
+        self.session: dict = {}
         self.running = False
         self._viewport = pygame.Rect((0, 0), LOGICAL_SIZE)
         self._update_viewport()
 
     # ------------------------------------------------------------- lifecycle
 
-    def run(self, first_scene: str = "menu", *, max_frames: int | None = None, **params) -> None:
+    def run(self, first_scene: str = "home", *, max_frames: int | None = None, **params) -> None:
         import chaos_blackjack.gui.scenes  # noqa: F401  (registers scenes)
 
         self.scenes.reset(first_scene, **params)

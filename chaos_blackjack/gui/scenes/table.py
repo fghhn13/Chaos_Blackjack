@@ -56,7 +56,7 @@ FEED_LINE = 22  # px per event-feed line
 DEALER_STEP_DELAY = 0.7  # seconds between dealer decisions
 CHAOS_DELAY = 0.4        # pause before the chaos AI acts
 RUN_END_DELAY = 1.5      # let the last result sink in before the ending
-CHAOS_ERROR = "Chaos AI failed. Press Esc to return to the menu."
+CHAOS_ERROR = "Chaos AI failed. Press Esc to leave the table."
 
 # (action id, label, hotkey, style, controller method)
 ACTION_BUTTONS: tuple[tuple[str, str, int, str, str], ...] = (
@@ -237,7 +237,7 @@ class TableScene(Scene):
             self.app.scenes.push(
                 "confirm",
                 message="Return to the main menu? This run will be lost.",
-                on_confirm=lambda: self.app.scenes.reset("menu"),
+                on_confirm=lambda: self.app.scenes.reset("home"),
             )
             return
         if self.item_panel.handle_event(event):
@@ -266,7 +266,7 @@ class TableScene(Scene):
                     result.result()
                 except Exception:
                     # Do not retry a potentially billed call or expose backend
-                    # errors. Keep the cached table and allow returning to menu.
+                    # errors. Keep the cached table and allow leaving it.
                     self._chaos_failed = True
                     self.feed.push(CHAOS_ERROR, BAD)
                 else:

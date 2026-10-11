@@ -68,6 +68,17 @@ class RunStart:
 
 
 @dataclass(frozen=True)
+class PendingRun:
+    """An unfinished run's save, summarised without loading it."""
+
+    run_id: int
+    mode: str
+    round: int
+    money: int
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class RunReward:
     tokens: int
     breakdown: tuple[tuple[str, int], ...]   # (label, tokens)

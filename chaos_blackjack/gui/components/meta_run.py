@@ -51,7 +51,7 @@ class MetaTableScene(TableScene):
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.exit_pending = True
-            self.app.scenes.push("confirm", message="Abandon this run and return to your hub?",
+            self.app.scenes.push("confirm", message="Abandon this run and return to the main menu?",
                                  on_confirm=self.abandon, confirm_text="Abandon")
             return
         super().handle_event(event)
@@ -63,7 +63,7 @@ class MetaTableScene(TableScene):
             self.feed.push(str(exc), BAD)
             return
         self.abandoned = True
-        self.app.scenes.reset("hub", player_id=self.player_id)
+        self.app.scenes.reset("home")
 
     def on_resume(self, result=None):
         self.exit_pending = False

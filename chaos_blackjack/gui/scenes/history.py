@@ -4,6 +4,7 @@ import pygame
 
 from chaos_blackjack import meta
 from chaos_blackjack.gui import theme
+from chaos_blackjack.gui.components.lobby import back_button, mode_name
 from chaos_blackjack.gui.components.meta_screen import MetaScreen, panel, text, paragraph
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, wrap_text
@@ -16,6 +17,7 @@ class HistoryScene(MetaScreen):
     def on_enter(self, player_id, **params):
         self.setup()
         self.player_id = player_id
+        self.player = self.action(lambda: meta.get_player(player_id))
         self.records = self.action(lambda: meta.history(player_id)) or []
         self.page = 0
         self.detail_scroll = 0
@@ -24,22 +26,20 @@ class HistoryScene(MetaScreen):
         self.build_widgets()
 
     def build_widgets(self):
-        self.ui = WidgetGroup(
-            Button(self.app.assets, (64, 640, 240, 52), "Back to hub", self.app.scenes.pop,
-                   style="ghost", hotkey=pygame.K_ESCAPE),
-            Button(self.app.assets, (328, 640, 152, 52), "Previous", lambda: self.turn_page(-1),
-                   enabled=self.page > 0, style="ghost", font_size=20),
-            Button(self.app.assets, (496, 640, 152, 52), "Next", lambda: self.turn_page(1),
-                   enabled=(self.page + 1) * 7 < len(self.records), style="ghost", font_size=20),
-        )
+        self.ui = WidgetGroup(keyboard=True)
         self.record_buttons = {}
         for i, record in enumerate(self.records[self.page * 7:self.page * 7 + 7]):
-            label = f"#{record.id}  {record.mode.title()}  /  {(record.result or 'In progress').title()}"
+            label = f"#{record.id}  {mode_name(record.mode)}  ·  {(record.result or 'In progress').title()}"
             b = Button(self.app.assets, (64, 155 + i * 56, 488, 46), label,
-                       lambda r=record: self.select(r), font_size=18,
-                       style="primary" if self.selected and record.id == self.selected.id else "ghost")
+                       lambda r=record: self.select(r), font_size=18, style="ghost", key_hint="")
+            b.selected = bool(self.selected and record.id == self.selected.id)
             self.record_buttons[record.id] = b
             self.ui.add(b)
+        self.ui.add(back_button(self.app.assets, self.app.scenes.pop))
+        self.ui.add(Button(self.app.assets, (288, 642, 130, 50), "Previous", lambda: self.turn_page(-1),
+                           enabled=self.page > 0, style="ghost", font_size=20))
+        self.ui.add(Button(self.app.assets, (422, 642, 130, 50), "Next", lambda: self.turn_page(1),
+                           enabled=(self.page + 1) * 7 < len(self.records), style="ghost", font_size=20))
 
     def select(self, record):
         self.selected = record
@@ -71,8 +71,8 @@ class HistoryScene(MetaScreen):
         delta = 0
         if event.type == pygame.MOUSEWHEEL:
             delta = -event.y * 3
-        elif event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN):
-            delta = -1 if event.key == pygame.K_UP else 1
+        elif event.type == pygame.KEYDOWN and event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            delta = -3 if event.key == pygame.K_PAGEUP else 3
         if delta:
             capacity = 222 // self.app.assets.font(16).get_linesize()
             self.detail_scroll = max(0, min(self.detail_scroll + delta, max(0, len(self.detail_lines()) - capacity)))
@@ -85,13 +85,13 @@ class HistoryScene(MetaScreen):
         panel(surface, (584, 145, 632, 425))
         r = self.selected
         if r is None:
-            paragraph(surface, a, "No runs yet. Start a run from your hub; its story will appear here.",
+            paragraph(surface, a, "No runs yet. Start a new run from the main menu; its story will appear here.",
                       (616, 182, 560, 150))
         else:
             text(surface, a, f"Run #{r.id}  /  {(r.result or 'In progress').title()}", (612, 169), size=28,
                  color=theme.GOLD, width=570)
             text(surface, a, r.started_at, (614, 213), size=16, width=566)
-            text(surface, a, f"{r.mode.title()}  /  {r.rounds or 0} rounds  /  {r.tokens_earned or 0} tokens", (614, 246), width=566)
+            text(surface, a, f"{mode_name(r.mode)}  /  {r.rounds or 0} rounds  /  {r.tokens_earned or 0} tokens", (614, 246), width=566)
             text(surface, a, f"Final bankroll: {r.final_money if r.final_money is not None else '-'}  /  Peak: {r.peak_money if r.peak_money is not None else '-'}",
                  (614, 280), width=566)
             lines = self.detail_lines()
@@ -100,5 +100,5 @@ class HistoryScene(MetaScreen):
             for i, line in enumerate(lines[self.detail_scroll:self.detail_scroll + capacity]):
                 text(surface, a, line, (614, 315 + i * line_height), size=16, color=theme.TEXT_MUTED)
             if len(lines) > capacity:
-                text(surface, a, "Wheel / Up / Down to scroll details", (614, 547), size=14, color=theme.GOLD)
+                text(surface, a, "Wheel / Page Up / Page Down to scroll details", (614, 547), size=14, color=theme.GOLD)
         self.ui.draw(surface)

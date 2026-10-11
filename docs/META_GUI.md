@@ -1,74 +1,121 @@
 # Player progression GUI
 
-The main menu separates **Quick play** (the existing **New Game** button) from
-**Players**. Quick play uses the ordinary table and ending screen without changing
-player tokens or history. The developer Asset Gallery remains available.
+Every run belongs to a player. The game opens on **Home**: the title, the
+current player and the next step, over the Chaos dealer's table. There is no
+quick play and no in-game asset gallery.
 
-## Player screens
+## Screen map
 
-- **Player select:** three named slots. Create an empty slot, continue to its hub,
-  rename an occupied slot, or delete it after confirmation. Name errors are shown
-  in the dialog; Enter saves and Esc cancels.
-- **Hub:** tokens and run statistics, Classic/Chaos mode selection, consumables to
-  bring, Meta shop, History, Codex, Settings and player selection. Each selected
-  consumable contributes one copy to the next run. Changing a selection consumes
-  nothing; `start_run` performs the actual consumption. Replacing a saved run
-  requires confirmation. Continuing that run consumes no additional items.
-- **Meta shop:** permanent upgrades display level pips and the next price;
-  consumables display the owned count. Every price, limit, description and purchase
-  restriction comes from `meta_shop`; the GUI does not calculate upgrade effects.
-  Purchases refresh the offers and token balance. Sections and pages accommodate
-  additional catalog entries.
-- **Run result:** victory/defeat, final bankroll, rounds, token breakdown and the
-  updated token balance. Settlement is performed once; repeated input cannot award
-  tokens twice. API errors retain the screen and offer a retry.
-- **History:** recent runs and their results, with mode, dates, bankroll, tokens,
-  upgrades and the run summary. Long details scroll with the wheel or Up/Down.
-- **Settings:** mute, master volume and fullscreen. Global GUI shortcuts continue
-  to work as before.
+```text
+Home ──┬─ Continue run ─────────────────────────────► table (restores the saved run)
+       ├─ New run ─► Run setup ─► Start run ────────► table ─► Run result ─► Home
+       ├─ Upgrades        (Permanent / Consumables / any new kind)
+       ├─ Collection      (rules, modes, items, Chaos AI)
+       ├─ Run history
+       ├─ player badge ─► Players (play / create / rename / delete)
+       └─ Settings · Quit
+```
 
-Player runs checkpoint at the start and after commands whenever the controller
-permits saving. Closing the application leaves the latest checkpoint available
-through **Continue saved run**. Esc at the table confirms abandonment and returns
-to the player's hub; an abandoned run earns no tokens. Background Chaos calls and
-portrait banners retain the existing responsive table behaviour.
+## Screens
 
-## API and agent handoff
+- **Home** (`home`, the start scene): title and a vertical menu on the left, the
+  dealer, felt, cards and chips on the right. The menu follows the player's state:
+  - no player saves: **Start game** (primary) asks for a name, creates the player
+    in the first free slot and opens Run setup. Tokens and upgrades need a player:
+    Upgrades and Run history carry a "Needs a player" tag and the badge reads "No
+    player yet". Choosing any of them explains this, highlights Start game with a
+    pulsing outline and a "Start here" tag, and gives it keyboard focus. Collection
+    works without a player;
+  - an unfinished run: **Continue run** is primary and shows mode, round and
+    chips; **New run** is secondary;
+  - otherwise **New run** is primary and Continue is not shown.
 
-Implementation uses the public `chaos_blackjack.meta` functions in section 5.1 of
-`docs/design/META_PROGRESSION.md`, including A's added `resume_run`. The GUI
-receives `RunStart.controller` and never constructs upgrade effects or writes
-player data itself. The GUI validates its backend choice before `start_run` so a
-missing real-model configuration cannot spend consumables or create a run.
+  Upgrades, Collection and Run history follow; Settings and Quit are small text
+  actions at the bottom (Esc asks before quitting). The badge at the top right shows
+  the current player's name and tokens and opens Players. If a saved run cannot be
+  restored, Home says so, hides Continue for that run and promotes New run.
+- **Players** (`player_select`): three compact slot rows. **Play** makes a slot the
+  current player and returns home; empty slots offer **Create player**. Rename and
+  Delete live only here; Delete names the player and asks for confirmation.
+  Deleting the current player falls back to another save.
+- **Run setup** (`run_setup`): a scrolling mode list (each with icon and summary;
+  locked modes say how to unlock them), a showcase with the selected mode's full
+  rules using live numbers (Chaos shows the dealer in grey violet), a summary of
+  the permanent upgrades in effect with the numbers they change, and a scrolling
+  list of owned consumables with check boxes. Each checked kind brings one copy.
+  Browsing and checking spend nothing; `start_run` performs the consumption. With
+  an unfinished run, only the final **Start run** asks before abandoning it. The
+  mode and checked items are remembered per player for the session.
+- **Upgrades** (`meta_shop`): one tab per offer kind present in the catalog and a
+  scrolling list. Each row is its buy button and states the price, `Max level` or
+  the reason it cannot be bought. Permanent rows show level pips; consumables show
+  the owned count. Everything comes from `meta_shop`.
+- **Collection** (`codex`): tabs per kind, a grid of entries and animated detail
+  pages with live tuning (see `docs/design/CODEX.md`).
+- **Run history** (`history`): recent runs on the left, the selected run's
+  details on the right. Long details scroll with the wheel or Page Up/Page Down.
+- **Run result** (`run_result`): victory/defeat, final bankroll, rounds, token
+  breakdown and the updated balance. Settlement happens once; API errors keep the
+  screen and offer a retry. **Continue** returns home.
+- **Settings** (`meta_settings`): mute, master volume and fullscreen.
 
-`gui/components/meta_run.py` registers `meta_table` as a subclass of the existing
-table scene. It supplies checkpoints, abandonment and the transition to
-`run_result` without changing the shared table file. The normal table still opens
-the ordinary ending. `meta_screen.py` supplies common drawing, name entry and a
-settings overlay; the five main screens retain their own modules.
+## Current player
 
-C's Codex handoff is `app.scenes.push("codex", player_id=..., config=...)`.
-The integrated build registers both codex scenes. `CodexScene.on_enter(config=None,
-**params)` accepts this handoff and opens the real gallery with the selected
-balance configuration. CI exercises the hub-to-codex-to-detail return path.
+`gui/components/lobby.py` chooses the current player: the last choice (kept in
+`app.session` and the `gui.player_id` preference) while that player exists,
+otherwise the most recently played save, otherwise the lowest slot. Switching
+players refreshes Home's run summary, tokens and every screen opened from it.
 
-Implementation changes are confined to the B-owned scenes, new components,
-`tests/test_gui_meta_*`, append-only scene imports and documentation. A's core
-dependency is a separate merge commit; step 0 integration fixes are also separate
-commits already fast-forwarded into local `main`.
+## Interaction
+
+- Buttons have default, hover, selected (gold or violet edge) and disabled states.
+  Screens built with `WidgetGroup(keyboard=True)` add a visible keyboard focus:
+  Up/Down/Tab move it (including into scrolling lists), Enter/Space activate it,
+  and Esc goes back. Without a focus, Enter still triggers the screen's primary
+  hotkey (for example Start run).
+- `ScrollColumn` holds any number of rows, scrolls with the wheel and follows
+  keyboard focus, so new modes, upgrades and consumables need no layout change.
+- Motion is light and never blocks input: a short fade into Home, cards sliding
+  onto the felt, a slow dealer bob and an occasional smirk, and menu entries that
+  lean toward the pointer or focus.
+- Long names are trimmed with an ellipsis; the 1280×720 canvas scales to any
+  window size with letterboxing.
+
+## Extension points
+
+- New modes and challenges: `register_mode` → they appear in Run setup's mode list
+  and in Collection.
+- New permanent upgrades and consumables: `meta_upgrade` rows → they appear in
+  Upgrades (a new `kind` gets its own tab) and, when owned, in Run setup.
+- New rules, items and Chaos AI: registries / content packs → Collection.
+- A future dealer choice belongs in Run setup, beside the mode.
+
+## API
+
+The GUI uses the public `chaos_blackjack.meta` functions in section 5.1 of
+`docs/design/META_PROGRESSION.md`. `pending_run(player_id)` summarises the
+unfinished run for Home and Players without loading it; `resume_run` restores
+it. The GUI validates its backend choice before `start_run`, so a missing
+real-model configuration cannot spend consumables or create a run.
+
+`gui/components/meta_run.py` registers `meta_table`, a subclass of the table
+scene that adds checkpoints, abandonment (Esc, confirmed, back to Home) and the
+transition to `run_result`. `gui/components/lobby.py` holds the shared backdrop,
+header, player badge, menu items and list rows; `meta_screen.py` the screen base,
+name entry and settings.
 
 ## Preview and verification
 
 For development without touching player saves on disk:
 
 ```bash
-python -c "from chaos_blackjack.meta.fake import install_fake; install_fake(); from chaos_blackjack.gui.app import App; from chaos_blackjack.app.config import RunConfig; App(run_config=RunConfig(use_llm=False)).run('player_select')"
+python -c "from chaos_blackjack.meta.fake import install_fake; install_fake(); from chaos_blackjack.gui.app import App; from chaos_blackjack.app.config import RunConfig; App(run_config=RunConfig(use_llm=False)).run('home')"
 ```
 
-The fake uses A's real service on an in-memory database: Ace in slot 1 has tokens,
-upgrades and history, Rookie occupies slot 2, and slot 3 is empty. Normal launch
-uses the SQLite-backed service. Tests always disable billed calls and install a
-throwaway service.
+The fake uses the real service on an in-memory database: Ace in slot 1 has tokens,
+upgrades and history, Rookie occupies slot 2, and slot 3 is empty. Pass
+`install_fake(demo=False)` to see the first-launch Home. Tests always disable
+billed calls and install a throwaway service.
 
 ```bash
 python -m pytest tests/test_gui_meta_screens.py

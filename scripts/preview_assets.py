@@ -1,13 +1,12 @@
 """Render game screens and asset check sheets headlessly (needs only pygame).
 
 Writes PNGs into --out (default output/asset_previews/):
-  scene_menu.png, scene_menu_chaos.png      main menu (chaos off / on portrait)
+  scene_title.png                            home screen (title, menu and the dealer's table)
   scene_table_betting.png                    table while betting (chips)
   scene_table_play.png                       table mid-round (card faces + backs)
   scene_table_chaos.png                      chaos on: active rule, narration, items
   scene_table_tooltip.png                    same, hovering an item
   scene_ending_victory.png, scene_ending_bankrupt.png
-  gallery_<category>.png                     asset gallery, one per tab
   matte_<id>.png                             asset large on dark / felt / white
   zoom_cards.png, zoom_chips.png             in-game sizes magnified x3
   motion_*.png (with --motion)               animation filmstrips: deal, settle, chaos glitch
@@ -38,7 +37,7 @@ from chaos_blackjack.app.controller import GameController  # noqa: E402
 from chaos_blackjack.app.view import CardView, TablePhase  # noqa: E402
 from chaos_blackjack.gui import theme  # noqa: E402
 from chaos_blackjack.gui.app import App  # noqa: E402
-from chaos_blackjack.gui.assets.manifest import MANIFEST, by_category  # noqa: E402
+from chaos_blackjack.gui.assets.manifest import MANIFEST  # noqa: E402
 from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer  # noqa: E402
 from chaos_blackjack.gui.settings import GuiSettings, default_asset_dirs  # noqa: E402
 
@@ -235,10 +234,7 @@ def main(argv: list[str] | None = None) -> int:
 
     shots: dict[str, pygame.Surface] = {}
     app.prefs.enable_chaos = False
-    shots["scene_menu"] = render_scene(app, "menu")
-    app.prefs.enable_chaos = True
-    shots["scene_menu_chaos"] = render_scene(app, "menu")
-    app.prefs.enable_chaos = False
+    shots["scene_title"] = render_scene(app, "home")
     shots["scene_table_betting"] = render_scene(
         app, "table", controller=GameController(RunConfig(seed=1, enable_chaos=False)))
     shots["scene_table_play"] = render_scene(app, "table", controller=in_play_controller())
@@ -247,8 +243,6 @@ def main(argv: list[str] | None = None) -> int:
                                                 controller=chaos_controller())
     shots["scene_ending_victory"] = render_scene(app, "ending", kind="victory", money=400, rounds=12)
     shots["scene_ending_bankrupt"] = render_scene(app, "ending", kind="defeat", money=0, rounds=9)
-    for category in by_category():
-        shots[f"gallery_{category}"] = render_scene(app, "gallery", setup=lambda s, c=category: s._select(c))
     for asset_id in args.matte:
         if asset_id not in MANIFEST:
             print(f"skip unknown id {asset_id!r}", file=sys.stderr)

@@ -24,7 +24,7 @@ from chaos_blackjack.data.db import connect
 from chaos_blackjack.data.saves import SaveNotFound, load_run, save_run
 from chaos_blackjack.meta.effects import get_effect
 from chaos_blackjack.meta.models import (
-    MAX_NAME_LENGTH, SLOTS, MetaError, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart,
+    MAX_NAME_LENGTH, SLOTS, MetaError, PendingRun, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart,
     UpgradeOffer,
 )
 from chaos_blackjack.meta.tracker import RunTracker
@@ -262,6 +262,20 @@ class MetaService:
         if old is not None:
             old.detach()
         self._trackers[run_id] = RunTracker(controller)
+
+    def pending_run(self, player_id: int) -> PendingRun | None:
+        """Summary of the run `resume_run` would load, without loading or tracking it."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT h.id, h.mode, json_extract(s.data, '$.round') AS round, "
+                "json_extract(s.data, '$.money') AS money, s.updated_at FROM run_history h "
+                "JOIN run_save s ON s.run_id = h.id WHERE h.player_id = ? AND h.result IS NULL "
+                "ORDER BY s.updated_at DESC LIMIT 1", (player_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return PendingRun(int(row["id"]), row["mode"], int(row["round"] or 0), int(row["money"] or 0),
+                          row["updated_at"])
 
     def resume_run(self, player_id: int, *, loop_factory: LoopFactory | None = None) -> RunStart | None:
         """The player's unfinished run that has a save, loaded and tracked; None if there is none."""

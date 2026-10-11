@@ -1,4 +1,4 @@
-"""Minimal widget kit: Label, Button, Toggle and a WidgetGroup container.
+"""Minimal widget kit: Label, Button, Toggle, ScrollColumn and a WidgetGroup container.
 
 Widgets work in logical (canvas) coordinates; App already converts mouse
 positions, so widgets never think about window scaling.
@@ -59,6 +59,10 @@ class Label(Widget):
 
 
 class Button(Widget):
+    """Clickable box. States: default, hovered, `selected` (a chosen option),
+    `focused` (keyboard focus, drawn as an outer ring) and disabled."""
+
+    focusable = True
     STYLES = {
         # style: (fill, fill_hover, border, text)
         "primary": ((0x2A, 0x27, 0x1E), (0x3E, 0x38, 0x29), theme.GOLD, theme.IVORY),
@@ -94,6 +98,8 @@ class Button(Widget):
         self.font_size = font_size
         self.tooltip = tooltip
         self.hovered = False
+        self.selected = False
+        self.focused = False
         self._pressed = False
 
     def handle_event(self, event: pygame.event.Event) -> bool:
@@ -131,11 +137,15 @@ class Button(Widget):
         fill, fill_hover, border, text_color = self.STYLES[self.style]
         if not self.enabled:
             fill, border, text_color = (0x1A, 0x1F, 0x1E), (0x3A, 0x40, 0x3E), (0x62, 0x68, 0x65)
-        elif self.hovered:
+        elif self.hovered or self.selected:
             fill = fill_hover
+        if self.selected and self.enabled:
+            border = theme.GOLD if self.style != "chaos" else theme.CHAOS_MAGENTA
         rect = self.rect.move(0, 2) if self._pressed else self.rect
         pygame.draw.rect(surface, fill, rect, border_radius=10)
-        pygame.draw.rect(surface, border, rect, 2, border_radius=10)
+        pygame.draw.rect(surface, border, rect, 3 if self.selected and self.enabled else 2, border_radius=10)
+        if self.focused and self.enabled:
+            draw_focus_ring(surface, rect)
         img = self.assets.font(self.font_size).render(self.text, True, text_color)
         if self.key_hint:
             cap = self.assets.font(theme.FONT_TINY, bold=True).render(self.key_hint, True, text_color)
@@ -192,15 +202,84 @@ class Toggle(Button):
             self.on_change(self.value)
 
 
+def draw_focus_ring(surface: pygame.Surface, rect: pygame.Rect, radius: int = 13) -> None:
+    """Keyboard-focus outline, outside the widget so it never hides content."""
+    pygame.draw.rect(surface, theme.IVORY, rect.inflate(10, 10), 2, border_radius=radius)
+
+
+_FOCUS_NEXT = (pygame.K_DOWN, pygame.K_TAB)
+_FOCUS_PREV = (pygame.K_UP,)
+_ACTIVATE = (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE)
+
+
 class WidgetGroup(Widget):
-    def __init__(self, *widgets: Widget) -> None:
+    """Container. With `keyboard=True`, Up/Down/Tab move a visible focus over
+    the enabled buttons (including those inside a ScrollColumn) and
+    Enter/Space activates it; without focus, keys fall through to hotkeys."""
+
+    def __init__(self, *widgets: Widget, keyboard: bool = False) -> None:
         self.widgets: list[Widget] = list(widgets)
+        self.keyboard = keyboard
+        self.focus: Button | None = None
 
     def add(self, widget: Widget) -> Widget:
         self.widgets.append(widget)
         return widget
 
+    def focusables(self) -> list[Button]:
+        out: list[Button] = []
+        for w in self.widgets:
+            if not w.visible and not hasattr(w, "focusables"):
+                continue
+            if hasattr(w, "focusables"):
+                out.extend(w.focusables())
+            elif isinstance(w, Button) and w.enabled and w.focusable:
+                out.append(w)
+        return out
+
+    def set_focus(self, button: Button | None) -> None:
+        if self.focus is not None:
+            self.focus.focused = False
+        self.focus = button
+        if button is not None:
+            button.focused = True
+            parent = getattr(button, "scroll_parent", None)
+            if parent is not None:
+                parent.scroll_into_view(button)
+
+    def move_focus(self, delta: int) -> None:
+        items = self.focusables()
+        if not items:
+            self.set_focus(None)
+            return
+        if self.focus in items:
+            index = (items.index(self.focus) + delta) % len(items)
+        else:
+            index = 0 if delta > 0 else len(items) - 1
+        self.set_focus(items[index])
+
+    def _keyboard_event(self, event: pygame.event.Event) -> bool:
+        if event.type == pygame.MOUSEMOTION:
+            if self.focus is not None:
+                self.set_focus(None)  # the pointer takes over; hover shows the target
+            return False
+        if event.type != pygame.KEYDOWN:
+            return False
+        if event.key in _FOCUS_NEXT or event.key in _FOCUS_PREV:
+            shift = getattr(event, "mod", 0) & pygame.KMOD_SHIFT
+            back = event.key in _FOCUS_PREV or (event.key == pygame.K_TAB and shift)
+            self.move_focus(-1 if back else 1)
+            return True
+        if event.key in _ACTIVATE and self.focus is not None:
+            if self.focus in self.focusables():
+                self.focus.click()
+                return True
+            self.set_focus(None)
+        return False
+
     def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.keyboard and self._keyboard_event(event):
+            return True
         consumed = False
         for w in reversed(self.widgets):
             # Mouse motion goes to everyone so hover states stay correct.
@@ -217,6 +296,100 @@ class WidgetGroup(Widget):
         for w in self.widgets:
             if w.visible:
                 w.draw(surface)
+
+
+class ScrollColumn(Widget):
+    """A clipped vertical list of buttons that scrolls with the wheel and
+    follows keyboard focus, so a list can grow without a new layout.
+
+    Children keep their own heights; they are stacked top to bottom."""
+
+    def __init__(self, rect, children=None, *, gap: int = 8) -> None:
+        self.rect = pygame.Rect(rect)
+        self.gap = gap
+        self.scroll = 0
+        self._mouse = (-1, -1)
+        self.children: list[Button] = []
+        for child in children or ():
+            self.add(child)
+
+    def add(self, child: Button) -> Button:
+        child.scroll_parent = self
+        self.children.append(child)
+        self._layout()
+        return child
+
+    @property
+    def content_height(self) -> int:
+        return sum(c.rect.h for c in self.children) + self.gap * max(0, len(self.children) - 1)
+
+    @property
+    def max_scroll(self) -> int:
+        return max(0, self.content_height - self.rect.h)
+
+    def _layout(self) -> None:
+        self.scroll = max(0, min(self.scroll, self.max_scroll))
+        y = self.rect.y - self.scroll
+        for child in self.children:
+            child.rect.x, child.rect.y, child.rect.w = self.rect.x, y, self.rect.w
+            child.visible = child.rect.bottom > self.rect.y and child.rect.y < self.rect.bottom
+            y += child.rect.h + self.gap
+
+    def scroll_by(self, pixels: int) -> None:
+        self.scroll += pixels
+        self._layout()
+
+    def scroll_into_view(self, child: Button) -> None:
+        if child.rect.y < self.rect.y:
+            self.scroll -= self.rect.y - child.rect.y
+        elif child.rect.bottom > self.rect.bottom:
+            self.scroll += child.rect.bottom - self.rect.bottom
+        self._layout()
+
+    def focusables(self) -> list[Button]:
+        return [c for c in self.children if c.enabled and c.focusable]
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if event.type == pygame.MOUSEMOTION:
+            self._mouse = event.pos
+            inside = self.rect.collidepoint(event.pos)
+            for child in self.children:
+                child.hovered = inside and child.visible and child.rect.collidepoint(event.pos)
+            return False
+        if event.type == pygame.MOUSEWHEEL:
+            if self.max_scroll and self.rect.collidepoint(self._mouse):
+                self.scroll_by(-event.y * 40)
+                return True
+            return False
+        pos = getattr(event, "pos", None)
+        if pos is not None and not self.rect.collidepoint(pos):
+            for child in self.children:
+                child._pressed = False
+            return False
+        for child in self.children:
+            if child.visible and child.handle_event(event):
+                return True
+        return False
+
+    def update(self, dt: float) -> None:
+        for child in self.children:
+            child.update(dt)
+
+    def draw(self, surface: pygame.Surface) -> None:
+        clip = surface.get_clip()
+        # Leave room for the focus ring of a row at the edge.
+        area = self.rect.inflate(16, 12).clip(clip)
+        surface.set_clip(area)
+        for child in self.children:
+            if child.visible:
+                child.draw(surface)
+        surface.set_clip(clip)
+        if self.max_scroll:
+            track = pygame.Rect(self.rect.right + 8, self.rect.y, 3, self.rect.h)
+            pygame.draw.rect(surface, theme.PANEL, track, border_radius=2)
+            h = max(24, int(track.h * self.rect.h / self.content_height))
+            y = track.y + int((track.h - h) * self.scroll / self.max_scroll)
+            pygame.draw.rect(surface, theme.GOLD_DIM, (track.x, y, track.w, h), border_radius=2)
 
 
 # ------------------------------------------------------------ draw helpers

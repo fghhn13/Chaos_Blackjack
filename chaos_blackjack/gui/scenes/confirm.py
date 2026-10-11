@@ -12,7 +12,7 @@ import pygame
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
-from chaos_blackjack.gui.widgets import Button, WidgetGroup
+from chaos_blackjack.gui.widgets import Button, WidgetGroup, wrap_text
 
 W, H = LOGICAL_SIZE
 
@@ -39,6 +39,7 @@ class ConfirmScene(Scene):
             Button(a, (bx - 190, by, 170, 52), confirm_text, self._confirm, hotkey=pygame.K_RETURN),
             Button(a, (bx + 20, by, 170, 52), cancel_text, self.app.scenes.pop, style="ghost",
                    hotkey=pygame.K_ESCAPE),
+            keyboard=True,
         )
 
     def _confirm(self) -> None:
@@ -55,6 +56,10 @@ class ConfirmScene(Scene):
         surface.blit(shade, (0, 0))
         pygame.draw.rect(surface, theme.PANEL, self.box, border_radius=12)
         pygame.draw.rect(surface, theme.GOLD_DIM, self.box, 2, border_radius=12)
-        img = self.app.assets.font(theme.FONT_BODY).render(self.message, True, theme.TEXT)
-        surface.blit(img, img.get_rect(center=(self.box.centerx, self.box.top + 70)))
+        font = self.app.assets.font(theme.FONT_BODY)
+        lines = wrap_text(font, self.message, self.box.w - 60, max_lines=3)
+        top = self.box.top + 70 - (len(lines) - 1) * font.get_linesize() // 2
+        for i, line in enumerate(lines):
+            img = font.render(line, True, theme.TEXT)
+            surface.blit(img, img.get_rect(center=(self.box.centerx, top + i * font.get_linesize())))
         self.ui.draw(surface)

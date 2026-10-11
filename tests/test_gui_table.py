@@ -218,7 +218,7 @@ def test_poke_exit_discards_late_reply_and_cancel_preserves_request(app, monkeyp
     assert app.scenes.top is banner and slow_llm.calls == 1
     _key(app, pygame.K_ESCAPE)
     _key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "MainMenuScene"
+    assert type(app.scenes.top).__name__ == "HomeScene"
     assert t._closed and banner._closed and not result.done()
     fresh = _open_table(app, enable_chaos=True)
     slow_llm.release.set()
@@ -401,7 +401,7 @@ def test_chaos_worker_failure_is_shown_once_without_retry(app, monkeypatch, slow
     assert sum(line.text == CHAOS_ERROR for line in t.feed.lines) == 1
     _key(app, pygame.K_ESCAPE)
     _key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "MainMenuScene"
+    assert type(app.scenes.top).__name__ == "HomeScene"
 
 
 def test_llm_network_failure_preserves_noop_fallback(app, monkeypatch, slow_llm):
@@ -513,7 +513,7 @@ def test_exit_during_chaos_ignores_late_result_and_new_table_still_works(app, mo
     old.subscribe("*", delivered.append)
     _key(app, pygame.K_ESCAPE)
     _key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "MainMenuScene"
+    assert type(app.scenes.top).__name__ == "HomeScene"
     assert old._closed and old._chaos_future is None
     new = _open_table(app)
     slow_llm.release.set()
@@ -561,7 +561,7 @@ def test_run_end_opens_ending(app: App) -> None:
     assert type(app.scenes.top).__name__ == "TableScene"
 
 
-def test_escape_confirm_returns_to_menu(app: App) -> None:
+def test_escape_confirm_returns_to_home(app: App) -> None:
     _open_table(app)
     _key(app, pygame.K_ESCAPE)
     assert type(app.scenes.top).__name__ == "ConfirmScene"
@@ -570,7 +570,7 @@ def test_escape_confirm_returns_to_menu(app: App) -> None:
     assert type(app.scenes.top).__name__ == "TableScene"
     _key(app, pygame.K_ESCAPE)
     _key(app, pygame.K_RETURN)  # confirm
-    assert [type(s).__name__ for s in app.scenes.stack] == ["MainMenuScene"]
+    assert [type(s).__name__ for s in app.scenes.stack] == ["HomeScene"]
 
 
 def test_bet_panel_chips_and_limits(app: App) -> None:
@@ -613,3 +613,18 @@ def test_shop_button_disabled_during_a_round(app) -> None:
     table._deal(10)
     _key(app, pygame.K_b)
     assert app.scenes.top is table
+
+
+def test_clicking_hovered_item_keeps_drawing(app: App) -> None:
+    t = _open_table(app, deal=([_c("10"), _c("2")], [_c("10"), _c("7")], [_c("5"), _c("K")]))
+    t.controller.run.items = ("peek", "peek")
+    _key(app, pygame.K_RETURN)
+    _tick(app, 0.5, times=4)
+    rect, _ = t.item_panel.item_rects[0]
+    app.scenes.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {"pos": rect.center, "rel": (0, 0), "buttons": (0, 0, 0)}))
+    app.scenes.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": rect.center, "button": 1}))
+    _tick(app, 0.01)  # the tooltip follows the refreshed item instead of crashing
+    assert t.view.items[0].count == 1 and t.item_panel.hovered is t.item_panel.items[0]
+    app.scenes.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": rect.center, "button": 1}))
+    _tick(app, 0.01)  # last copy used: the hover clears with the row
+    assert not t.view.items and t.item_panel.hovered is None
