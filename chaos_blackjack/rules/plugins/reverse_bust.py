@@ -1,4 +1,4 @@
-"""Registered chaos rule: player bust no longer auto-loses (flag on modifiers)."""
+"""Registered chaos rule: a player bust is a push instead of a loss (flag on modifiers)."""
 
 from __future__ import annotations
 

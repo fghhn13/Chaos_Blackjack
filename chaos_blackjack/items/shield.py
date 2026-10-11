@@ -9,7 +9,7 @@ from chaos_blackjack.registry import register_item
 
 class Shield:
     name = "shield"
-    description = "Primes a shield against chaos (currently has no game effect)."
+    description = "Dispel every active chaos rule for the rest of this round."
 
     def use(self, ctx: ItemContext) -> ItemResult:
         rules = ctx.active_rule_ids

@@ -83,8 +83,8 @@ class DefaultBlackjackRules:
         pv = self.hand_value(state.player_hand, ctx)
         dv = self.hand_value(state.dealer_hand, ctx)
         pb = self.is_bust(pv, ctx)
-        if "reverse_bust" in ctx.modifiers.chaos_flags():
-            pb = False
+        if pb and "reverse_bust" in ctx.modifiers.chaos_flags():
+            return "push"  # Reverse Bust: a player bust is a draw instead of a loss
         db = self.is_bust(dv, ctx)
         if pb and db:
             return "push"

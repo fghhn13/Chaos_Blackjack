@@ -36,6 +36,7 @@ class NoticeKind:
     ROUND_SETTLED = "round_settled"
     ITEM_BOUGHT = "item_bought"
     SHOP_RESTOCKED = "shop_restocked"
+    SHOP_REROLLED = "shop_rerolled"
     CHAOS_DISPELLED = "chaos_dispelled"
     RUN_ENDED = "run_ended"
     GAME_SAVED = "game_saved"

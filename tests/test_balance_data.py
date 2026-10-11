@@ -35,11 +35,13 @@ def _set(conn, profile: str, key: str, value: str) -> None:
 
 def test_shipped_values_are_unchanged() -> None:
     b = default_balance()
-    assert (b.start_money, b.target_money, b.objective) == (100, 400, "double_money")
+    assert (b.start_money, b.target_money, b.objective) == (100, 300, "double_money")
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
-    assert b.shop_prices == {"peek": 10, "danger_radar": 10, "swap": 20, "hole_card_hacker": 25,
-                             "fate_oracle": 25, "shield": 30, "example_trim": 20}
+    assert b.shop_prices == {"peek": 6, "danger_radar": 6, "swap": 10, "hole_card_hacker": 12,
+                             "fate_oracle": 18, "shield": 15, "example_trim": 20}
+    assert set(b.shop_bankroll_pct) == {"peek", "danger_radar", "swap", "hole_card_hacker", "fate_oracle", "shield"}
+    assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (10, 15, 4, 2)
 
 
 def test_run_config_defaults_come_from_the_seed() -> None:
@@ -52,7 +54,7 @@ def test_run_config_defaults_come_from_the_seed() -> None:
 
 def test_database_is_created_migrated_and_seeded(db, tmp_path) -> None:
     assert (tmp_path / "game.db").is_file()
-    assert schema_version(db) == 4
+    assert schema_version(db) == 5
     row = db.execute("SELECT locked, source_hash FROM balance_profile WHERE name = 'default'").fetchone()
     assert row["locked"] == 1 and row["source_hash"]
     again = connect(tmp_path / "game.db")  # idempotent
@@ -124,14 +126,14 @@ def test_unknown_and_missing_settings_are_rejected(db) -> None:
         load_balance("typo", db)
 
 
-def test_unknown_profile_and_unsupported_price_mode(db) -> None:
+def test_unknown_profile_and_price_modes(db) -> None:
     with pytest.raises(BalanceError, match="Unknown balance profile"):
         load_balance("nope", db)
     clone_profile(db, "default", "pct")
     with db:
-        db.execute("UPDATE shop_item SET price_mode = 'bankroll_pct' WHERE item_id = 'peek'")
-    with pytest.raises(BalanceError, match="not supported yet"):
-        load_balance("pct", db)
+        db.execute("UPDATE shop_item SET price_mode = 'fixed' WHERE item_id = 'peek'")
+    b = load_balance("pct", db)
+    assert "peek" not in b.shop_bankroll_pct and "swap" in b.shop_bankroll_pct
 
 
 # --------------------------------------------------------------- wiring
@@ -177,6 +179,7 @@ def _rule(db, pid: int, rule_id: str, **cols) -> None:
 def _only_stub(db, pid: int, rule_id: str, stub_params: str | None = None) -> None:
     with db:
         db.execute("UPDATE chaos_rule SET stub_weight = 0 WHERE profile_id = ?", (pid,))
+        db.execute("UPDATE setting SET value = '0' WHERE profile_id = ? AND key = 'chaos.stub_calm_weight'", (pid,))
     _rule(db, pid, rule_id, stub_weight=1, stub_params=stub_params)
 
 
@@ -197,8 +200,8 @@ def test_old_databases_are_migrated(tmp_path) -> None:
     raw.commit()
     raw.close()
     conn = connect(path)
-    assert schema_version(conn) == 4
-    assert load_balance("default", conn).chaos_stub == (("modify_card_value", {"delta": -1}, 1.0),)
+    assert schema_version(conn) == 5
+    assert load_balance("default", conn).chaos_stub == default_balance().chaos_stub
     conn.close()
 
 
@@ -206,7 +209,7 @@ def test_shipped_phase_two_values() -> None:
     b = default_balance()
     assert (b.min_bet, b.max_bet_fraction) == (1, 0.5)
     assert b.chaos_rule_params == {
-        "fragile_bust": {"bust_limit": 18}, "great_crash": {"ten_value": 1},
+        "fragile_bust": {"bust_limit": 19}, "great_crash": {"ten_value": 8},
         "odd_even_chaos": {"even_delta": 2, "odd_delta": -1}, "suit_power": {"red_delta": 1, "black_delta": -1},
     }
     assert b.disabled_rules == () and b.item_params == {"fate_oracle": {"cards": 3}}
@@ -394,7 +397,7 @@ def test_existing_editable_profiles_receive_new_interaction_settings(db, tmp_pat
                    "('chaos.guidance_probability', 'chaos.memory_enabled', 'chaos.memory_limit')")
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 4
+        assert schema_version(conn) == 5
         b = load_balance("old-profile", conn)
         assert b.start_money == 150
         assert (b.chaos_guidance_probability, b.chaos_memory_enabled, b.chaos_memory_limit) == (.5, False, 32)
@@ -422,10 +425,14 @@ def test_existing_editable_profiles_receive_meta_settings_and_catalog(db, tmp_pa
     _rewind(db, 3)
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 4
+        assert schema_version(conn) == 5
         b = load_balance("old-profile", conn)
         assert b.start_money == 150 and (b.meta_win_tokens, b.meta_loss_cap) == (10, 5)
-        assert {u.upgrade_id for u in b.meta_upgrades} == {u.upgrade_id for u in default_balance().meta_upgrades}
-        assert b.meta_upgrades == default_balance().meta_upgrades
+        # The catalog snapshot of migration 0004; later seed changes do not touch editable profiles.
+        assert {u.upgrade_id for u in b.meta_upgrades} == {
+            "start_money", "shop_slot", "shop_discount", "start_peek", "start_danger_radar", "start_swap",
+            "start_hole_card_hacker", "start_fate_oracle", "start_shield"}
+        # Meta settings added by migration 0005 keep the old behaviour.
+        assert (b.meta_chaos_win_bonus, b.meta_bring_kinds) == (0, 99)
     finally:
         conn.close()

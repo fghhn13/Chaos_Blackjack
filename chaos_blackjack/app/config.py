@@ -35,6 +35,14 @@ class RunConfig:
     shop_prices: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_SHOP_PRICES))
     shop_slots: int = DEFAULT_SHOP_SLOTS
     shop_refresh_rounds: int = DEFAULT_SHOP_REFRESH_ROUNDS
+    # Items whose shop_prices entry is a percentage of the bankroll (see app/shop.py).
+    shop_bankroll_pct: tuple[str, ...] = _DEFAULTS.shop_bankroll_pct
+    # Bankroll that percentage prices never go below: the profile's start bankroll,
+    # unchanged by upgrades so a richer start does not raise opening prices.
+    shop_price_floor: int = DEFAULT_START_MONEY
+    shop_reroll_price: int = _DEFAULTS.shop_reroll_price
+    free_rerolls: int = 0          # rerolls per run that cost nothing (Reroll Pass)
+    bring_kinds: int = _DEFAULTS.meta_bring_kinds  # consumable kinds a player may bring
     dealer_stand_on: int = DEFAULT_DEALER_STAND_ON
     blackjack_pays: tuple[int, int] = DEFAULT_BLACKJACK_PAYS  # natural 21 payout ratio
     allow_double: bool = _DEFAULTS.allow_double
@@ -75,6 +83,10 @@ class RunConfig:
             "shop_prices": balance.shop_prices,
             "shop_slots": balance.shop_slots,
             "shop_refresh_rounds": balance.shop_refresh_rounds,
+            "shop_bankroll_pct": balance.shop_bankroll_pct,
+            "shop_price_floor": balance.start_money,
+            "shop_reroll_price": balance.shop_reroll_price,
+            "bring_kinds": balance.meta_bring_kinds,
             "dealer_stand_on": balance.dealer_stand_on,
             "blackjack_pays": balance.blackjack_pays,
             "allow_double": balance.allow_double,
@@ -111,7 +123,7 @@ class RunConfig:
             values["blackjack_pays"] = tuple(int(x) for x in values["blackjack_pays"])
         if "disabled_rules" in values:
             values["disabled_rules"] = tuple(values["disabled_rules"])
-        for key in ("content_packs", "starting_items"):
+        for key in ("content_packs", "starting_items", "shop_bankroll_pct"):
             if key in values:
                 values[key] = tuple(values[key])
         if "chaos_stub" in values:

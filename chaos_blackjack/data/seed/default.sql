@@ -8,7 +8,7 @@
 
 INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'run.start_money',         '100',          'int',  2,    NULL, 'Bankroll at the start of a run'),
-    (:profile, 'run.target_money',        '400',          'int',  3,    NULL, 'Bankroll that wins the run'),
+    (:profile, 'run.target_money',        '300',          'int',  3,    NULL, 'Bankroll that wins the run'),
     (:profile, 'run.objective',           'double_money', 'str',  NULL, NULL, 'Run objective id'),
     (:profile, 'table.dealer_stand_on',   '17',           'int',  2,    30,   'Dealer stands on this total or more'),
     (:profile, 'table.blackjack_pays_num','3',            'int',  1,    NULL, 'Natural blackjack payout numerator (3 in 3:2)'),
@@ -17,25 +17,31 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'table.allow_surrender',   '1',            'bool', NULL, NULL, 'Surrender allowed on the first decision'),
     (:profile, 'shop.slots',              '3',            'int',  1,    NULL, 'Different items on sale per restock'),
     (:profile, 'shop.refresh_rounds',     '2',            'int',  1,    NULL, 'Rounds between restocks'),
+    (:profile, 'shop.reroll_price',       '10',           'int',  0,    NULL, 'Chips for one reroll of the current stock (once per stock)'),
     (:profile, 'bet.min',                 '1',            'int',  1,    NULL, 'Smallest bet'),
     (:profile, 'bet.max_fraction',        '0.5',          'float',0.01, 1,    'Largest bet as a share of the bankroll (rounded down)'),
     (:profile, 'chaos.guidance_probability','0.5',        'float',0,    1,    'Probability of guiding rather than misleading portrait advice'),
     (:profile, 'chaos.memory_enabled',    '0',            'bool', NULL, NULL, 'Collect and persist run-local Chaos history'),
     (:profile, 'chaos.memory_limit',      '32',           'int',  1,    NULL, 'Maximum number of retained Chaos memory events'),
+    (:profile, 'chaos.stub_calm_weight',  '15',           'float',0,    NULL, 'Offline Chaos AI weight for a calm round (no rule), next to each rule stub_weight'),
     (:profile, 'meta.win_tokens',         '10',           'int',  0,    NULL, 'Tokens for winning a run'),
+    (:profile, 'meta.chaos_win_bonus',    '4',            'int',  0,    NULL, 'Extra tokens for winning a run with Chaos on'),
+    (:profile, 'meta.bring_kinds',        '2',            'int',  0,    NULL, 'Different consumables a player may bring to one run'),
     (:profile, 'meta.loss_per_round',     '0.2',          'float',0,    NULL, 'Consolation tokens per round survived in a lost run'),
     (:profile, 'meta.loss_per_peak_gain', '4',            'float',0,    NULL, 'Consolation tokens per 100% of the start bankroll gained at the peak'),
     (:profile, 'meta.loss_cap',           '5',            'int',  0,    NULL, 'Most consolation tokens for a lost run');
 
--- Placeholder prices (not balanced yet).
--- `params` is item tuning (JSON).
+-- Prices tuned with black-jack-sim (balance v1). `params` is item tuning (JSON).
+-- `bankroll_pct`: `price` is a percentage of the bankroll when the stock is
+-- rolled, never below that percentage of run.start_money (start-money upgrades
+-- do not raise it), so the numbers below are also the opening prices.
 INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
-    (:profile, 'peek',             'fixed', 10, NULL),
-    (:profile, 'danger_radar',     'fixed', 10, NULL),
-    (:profile, 'swap',             'fixed', 20, NULL),
-    (:profile, 'hole_card_hacker', 'fixed', 25, NULL),
-    (:profile, 'fate_oracle',      'fixed', 25, '{"cards": 3}'),
-    (:profile, 'shield',           'fixed', 30, NULL);
+    (:profile, 'peek',             'bankroll_pct',  6, NULL),
+    (:profile, 'danger_radar',     'bankroll_pct',  6, NULL),
+    (:profile, 'swap',             'bankroll_pct', 10, NULL),
+    (:profile, 'hole_card_hacker', 'bankroll_pct', 12, NULL),
+    (:profile, 'fate_oracle',      'bankroll_pct', 18, '{"cards": 3}'),
+    (:profile, 'shield',           'bankroll_pct', 15, NULL);
 
 -- Sold only when the example content pack is loaded; unused plugin ids are
 -- filtered by the run-scoped registry before the controller rolls stock.
@@ -44,27 +50,29 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price) VALUES
 
 -- Chaos rules. `params`: fixed tuning that wins over the AI's params.
 -- `stub_weight` / `stub_params`: how often the offline Chaos AI (no LLM) picks
--- the rule and what it sends. Today it always applies "values -1".
+-- the rule and what it sends; `chaos.stub_calm_weight` is the weight of a calm
+-- round. Player EV per round (black-jack-sim, basic strategy) is noted per rule;
+-- the weighted mix is about -2 %, a little harder than plain blackjack.
 INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_params) VALUES
-    (:profile, 'modify_card_value', 1, NULL,                                  1, '{"delta": -1}'),
-    (:profile, 'reverse_bust',      1, NULL,                                  0, NULL),
-    (:profile, 'great_crash',       1, '{"ten_value": 1}',                    0, NULL),
-    (:profile, 'odd_even_chaos',    1, '{"even_delta": 2, "odd_delta": -1}',  0, NULL),
-    (:profile, 'suit_power',        1, '{"red_delta": 1, "black_delta": -1}', 0, NULL),
-    (:profile, 'fragile_bust',      1, '{"bust_limit": 18}',                  0, NULL),
-    (:profile, 'tiebreaker_shift',  1, NULL,                                  0, '{"ties_to": "dealer"}');
+    (:profile, 'modify_card_value', 1, NULL,                                  15, '{"delta": -1}'),        -- -10 %
+    (:profile, 'reverse_bust',      1, NULL,                                   3, NULL),                   -- bust = push
+    (:profile, 'great_crash',       1, '{"ten_value": 8}',                    10, NULL),                   -- -14 %
+    (:profile, 'odd_even_chaos',    1, '{"even_delta": 2, "odd_delta": -1}',  22, NULL),                   --  +4 %
+    (:profile, 'suit_power',        1, '{"red_delta": 1, "black_delta": -1}', 20, NULL),                   --  -5 %
+    (:profile, 'fragile_bust',      1, '{"bust_limit": 19}',                  15, NULL),                   --  +8 %
+    (:profile, 'tiebreaker_shift',  1, NULL,                                  15, '{"ties_to": "dealer"}'); --  -9 %
 
--- Meta upgrades bought with tokens between runs (placeholder costs). Effects
+-- Meta upgrades bought with tokens between runs (tuned with black-jack-sim). Effects
 -- are code (chaos_blackjack/meta/effects.py); each row is one upgrade.
 -- Permanent: level n costs cost + (n - 1) * cost_step. Consumable: used up at
 -- the start of the run it is brought to; max_level caps the copies held.
 INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, max_level) VALUES
-    (:profile, 'start_money',            'permanent',  'run.start_money_add', '{"amount": 10}',               15, 10, 3),
-    (:profile, 'shop_slot',              'permanent',  'shop.slots_add',      '{"amount": 1}',                40,  0, 1),
-    (:profile, 'shop_discount',          'permanent',  'shop.discount_pct',   '{"pct": 10}',                  25, 15, 2),
-    (:profile, 'start_peek',             'consumable', 'run.starting_item',   '{"item": "peek"}',              5,  0, 9),
-    (:profile, 'start_danger_radar',     'consumable', 'run.starting_item',   '{"item": "danger_radar"}',      5,  0, 9),
-    (:profile, 'start_swap',             'consumable', 'run.starting_item',   '{"item": "swap"}',             10,  0, 9),
-    (:profile, 'start_hole_card_hacker', 'consumable', 'run.starting_item',   '{"item": "hole_card_hacker"}', 12,  0, 9),
-    (:profile, 'start_fate_oracle',      'consumable', 'run.starting_item',   '{"item": "fate_oracle"}',      12,  0, 9),
-    (:profile, 'start_shield',           'consumable', 'run.starting_item',   '{"item": "shield"}',           15,  0, 9);
+    (:profile, 'start_money',            'permanent',  'run.start_money_add', '{"amount": 10}',               20, 10, 3),
+    (:profile, 'bag_space',              'permanent',  'meta.bring_kinds_add', '{"amount": 1}',               25, 15, 2),
+    (:profile, 'reroll_pass',            'permanent',  'shop.free_rerolls_add', '{"amount": 1}',              30,  0, 1),
+    (:profile, 'start_peek',             'consumable', 'run.starting_item',   '{"item": "peek"}',              4,  0, 3),
+    (:profile, 'start_danger_radar',     'consumable', 'run.starting_item',   '{"item": "danger_radar"}',      3,  0, 3),
+    (:profile, 'start_swap',             'consumable', 'run.starting_item',   '{"item": "swap"}',              6,  0, 3),
+    (:profile, 'start_hole_card_hacker', 'consumable', 'run.starting_item',   '{"item": "hole_card_hacker"}',  8,  0, 3),
+    (:profile, 'start_fate_oracle',      'consumable', 'run.starting_item',   '{"item": "fate_oracle"}',      15,  0, 3),
+    (:profile, 'start_shield',           'consumable', 'run.starting_item',   '{"item": "shield"}',            8,  0, 3);

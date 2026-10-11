@@ -19,6 +19,7 @@ OBS_SCHEMA = 2
 ACTION_HELP: dict[str, str] = {
     Action.BET: "start the round: bet <amount>",
     Action.BUY: "buy a shop item before betting: buy <item_id>",
+    Action.REROLL: "roll the shop's stock again (once per stock; obs.shop.reroll_price chips)",
     Action.HIT: "take one more card",
     Action.STAND: "end your turn; the dealer plays",
     Action.DOUBLE: "double the bet, take exactly one card, then stand (first decision only)",
@@ -53,7 +54,12 @@ def event_texts(notices: list[Notice]) -> list[str]:
 
 def legal_actions(v: GameView) -> list[str]:
     if v.phase == TablePhase.BETTING:
-        return [Action.BET, Action.BUY] if any(o.affordable for o in v.shop_offers) else [Action.BET]
+        acts = [Action.BET]
+        if any(o.affordable for o in v.shop_offers):
+            acts.append(Action.BUY)
+        if v.can(Action.REROLL):
+            acts.append(Action.REROLL)
+        return acts
     if v.phase != TablePhase.PLAYER_TURN:
         return []
     acts = [a for a in (Action.HIT, Action.STAND, Action.DOUBLE, Action.SURRENDER) if v.can(a)]
@@ -67,8 +73,13 @@ def next_step_hint(v: GameView, acts: list[str]) -> str:
         return "The run is over. Start a new one with `new`."
     if v.phase == TablePhase.BETTING:
         bet = f"Place a bet: bet <amount> with {v.bet_min} <= amount <= {v.bet_max}."
+        extra = []
         if Action.BUY in acts:
-            return bet + " Or buy first: buy <item_id> (see obs.shop)."
+            extra.append("buy <item_id>")
+        if Action.REROLL in acts:
+            extra.append("reroll")
+        if extra:
+            return bet + f" Or first: {' / '.join(extra)} (see obs.shop)."
         return bet
     parts = [a if a != Action.USE_ITEM else "use_item <item_id>" for a in acts]
     return "Your move: act " + " | ".join(parts)
@@ -89,7 +100,10 @@ def summary(v: GameView) -> str:
     if v.phase == TablePhase.BETTING:
         on_sale = [f"{o.item} {o.price}" for o in v.shop_offers if not o.sold]
         stock = ", ".join(on_sale) if on_sale else "sold out"
-        lines.append(f"Shop: {stock} (restocks in {v.shop_restock_in} round{'s' if v.shop_restock_in != 1 else ''}).")
+        reroll = ""
+        if v.shop_reroll_price is not None:
+            reroll = "; reroll free" if v.shop_reroll_price == 0 else f"; reroll {v.shop_reroll_price}"
+        lines.append(f"Shop: {stock} (restocks in {v.shop_restock_in} round{'s' if v.shop_restock_in != 1 else ''}{reroll}).")
     return " ".join(lines)
 
 
@@ -118,6 +132,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
                 for o in v.shop_offers
             ],
             "restock_in": v.shop_restock_in,
+            "reroll_price": v.shop_reroll_price,
         } if v.phase == TablePhase.BETTING else None,
         "chaos": {
             "enabled": v.chaos_enabled,

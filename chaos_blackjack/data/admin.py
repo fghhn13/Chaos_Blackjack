@@ -17,7 +17,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
-from chaos_blackjack.data.balance import BalanceError, load_balance
+from chaos_blackjack.data.balance import PRICE_MODES, BalanceError, load_balance
 
 ITEM_FIELDS = ("price", "enabled", "weight", "params", "price_mode")
 RULE_FIELDS = ("enabled", "params", "stub_weight", "stub_params")
@@ -103,7 +103,10 @@ def _value(field: str, raw: str) -> object:
             raise BalanceError("enabled: use 1/0, true/false or on/off")
         return int(low in ("1", "true", "on"))
     if field == "price_mode":
-        return raw.strip()
+        mode = raw.strip()
+        if mode not in PRICE_MODES:
+            raise BalanceError(f"price_mode: use one of {', '.join(PRICE_MODES)}")
+        return mode
     if field == "requires":
         return raw.strip() or None
     try:

@@ -38,7 +38,7 @@ def test_starts_in_betting_with_limits() -> None:
     v = c.view()
     assert v.phase == TablePhase.BETTING
     assert (v.bet_min, v.bet_max) == (1, 50)
-    assert v.available_actions == frozenset({Action.BET, Action.BUY, Action.SAVE})
+    assert v.available_actions == frozenset({Action.BET, Action.BUY, Action.REROLL, Action.SAVE})
     assert v.player_cards == ()
 
 

@@ -73,14 +73,14 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 
 ## Game rules
 
-- Bankroll starts at **100**; reach **400** to win, or go bankrupt.
+- Bankroll starts at **100**; reach **300** to win, or go bankrupt.
 - Bet each round: integer from 1 to `floor(bankroll / 2)`.
 - Win `+bet`, lose / bust `-bet`, push `0`.
 - **Natural blackjack** (first two cards = 21) pays **3:2**, rounded down. A dealer natural wins before the player acts; two naturals push.
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
-- **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
-- **Chaos mode**: before each player turn the Chaos AI may apply one rule — e.g. card values −1, ties go to the dealer, bust above 18. Totals shown always include active rules.
+- **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (never below the opening price), and you may **reroll** the stock once per restock for 10 chips. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
+- **Chaos mode**: before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos on earns 4 extra tokens.
 
 These are the default profile's values; a balance profile, game mode or player
 upgrade can change them. Natural blackjack, double down, surrender and the shop
@@ -329,7 +329,7 @@ Notes:
 | `meta/`, `modes/` | Player slots, upgrade effects, rewards, tracked runs/history, selectable game modes |
 | `codex/` | Registered reference providers and deterministic controller demonstrations; no GUI dependency |
 | `content/`, `audio/` | Scoped content packs and the licensed casino sound catalog |
-| `meta/` | Meta progression: players, meta shop, upgrade effects, run tracking and rewards |
+| `meta/` | Meta progression: players, upgrades, upgrade effects, run tracking and rewards |
 | `modes/` | Game mode registry (`normal`, `chaos`) |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |

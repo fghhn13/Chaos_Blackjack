@@ -40,7 +40,7 @@ def test_set_edits_every_kind_of_value(conn) -> None:
     ("item.peek.price", "cheap", "not a number"),
     ("rule.great_crash.params", "[1]", "JSON object"),
     ("rule.great_crash.enabled", "maybe", "on/off"),
-    ("item.peek.price_mode", "bankroll_pct", "not supported yet"),
+    ("item.peek.price_mode", "percent", "use one of fixed, bankroll_pct"),
 ])
 def test_invalid_edits_change_nothing(conn, key, value, message) -> None:
     before = admin.profile_values(conn, "tune")
@@ -106,8 +106,8 @@ def test_cli(conn, tmp_path, capsys) -> None:
     assert data_cli(["show", "tune2"]) == 0
     assert data_cli(["profiles"]) == 0
     out = tmp_path / "seed.sql"
-    assert data_cli(["export", "tune2", "-o", str(out)]) == 0 and "'peek', 1, 'fixed', 7" in out.read_text("utf-8")
+    assert data_cli(["export", "tune2", "-o", str(out)]) == 0 and "'peek', 1, 'bankroll_pct', 7" in out.read_text("utf-8")
     assert data_cli(["delete", "tune2"]) == 0
     text = capsys.readouterr()
-    assert "item.peek.price 10 -> 7" in text.out and "locked" in text.err
-    assert "item.peek.price  10  ->  7" in text.out and "valid; fingerprint" in text.out
+    assert "item.peek.price 6 -> 7" in text.out and "locked" in text.err
+    assert "item.peek.price  6  ->  7" in text.out and "valid; fingerprint" in text.out

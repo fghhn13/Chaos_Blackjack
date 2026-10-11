@@ -75,15 +75,15 @@ def test_three_slots(svc) -> None:
 def test_buying_permanent_levels_and_consumables(svc) -> None:
     p = meta.create_player(1, "A")
     offer = {o.upgrade_id: o for o in meta.meta_shop(p.id)}["start_money"]
-    assert (offer.next_cost, offer.can_buy, offer.reason) == (15, False, "Needs 15 tokens")
+    assert (offer.next_cost, offer.can_buy, offer.reason) == (20, False, "Needs 20 tokens")
     svc.grant_tokens(p.id, 100)
     p = meta.buy_upgrade(p.id, "start_money")
-    assert p.tokens == 85 and p.upgrades["start_money"] == 1
+    assert p.tokens == 80 and p.upgrades["start_money"] == 1
     offer = {o.upgrade_id: o for o in meta.meta_shop(p.id)}["start_money"]
-    assert offer.owned == 1 and offer.next_cost == 25  # cost + step
+    assert offer.owned == 1 and offer.next_cost == 30  # cost + step
     meta.buy_upgrade(p.id, "start_money")
     p = meta.buy_upgrade(p.id, "start_money")
-    assert p.tokens == 100 - 15 - 25 - 35 and p.upgrades["start_money"] == 3
+    assert p.tokens == 100 - 20 - 30 - 40 and p.upgrades["start_money"] == 3
     offer = {o.upgrade_id: o for o in meta.meta_shop(p.id)}["start_money"]
     assert offer.next_cost is None and offer.reason == "Maximum level"
     with pytest.raises(MetaError, match="Maximum level"):
@@ -107,13 +107,13 @@ def test_requirements(svc, tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CHAOS_DB", str(db))
     conn = connect(db)
     clone_profile(conn, "default", "req")
-    set_value(conn, "req", "upgrade.shop_discount.requires", "shop_slot")
+    set_value(conn, "req", "upgrade.reroll_pass.requires", "bag_space")
     real = MetaService(conn)
     p = real.grant_tokens(real.create_player(1, "R").id, 500).id
-    offer = {o.upgrade_id: o for o in real.meta_shop(p, "req")}["shop_discount"]
-    assert not offer.can_buy and offer.reason == "Requires shop_slot"
-    real.buy_upgrade(p, "shop_slot", "req")
-    assert real.buy_upgrade(p, "shop_discount", "req").upgrades["shop_discount"] == 1
+    offer = {o.upgrade_id: o for o in real.meta_shop(p, "req")}["reroll_pass"]
+    assert not offer.can_buy and offer.reason == "Requires bag_space"
+    real.buy_upgrade(p, "bag_space", "req")
+    assert real.buy_upgrade(p, "reroll_pass", "req").upgrades["reroll_pass"] == 1
 
 
 # ---------------------------------------------------------------- runs
@@ -121,18 +121,18 @@ def test_requirements(svc, tmp_path, monkeypatch) -> None:
 
 def test_upgrades_shape_the_run(svc) -> None:
     p = _rich(svc)
-    for u in ("start_money", "start_money", "shop_slot", "shop_discount", "start_peek", "start_peek",
+    for u in ("start_money", "start_money", "bag_space", "reroll_pass", "start_peek", "start_peek",
               "start_shield"):
         meta.buy_upgrade(p.id, u)
     run = meta.start_run(p.id, "normal", consumables=["start_peek", "start_shield"], seed=3)
     cfg = run.config
     base = RunConfig()
-    assert cfg.start_money == base.start_money + 20 and cfg.shop_slots == base.shop_slots + 1
-    assert cfg.shop_prices["peek"] == 9 and cfg.shop_prices["shield"] == 27   # 10% off
+    assert cfg.start_money == base.start_money + 20 and cfg.bring_kinds == base.bring_kinds + 1
+    assert cfg.free_rerolls == 1 and cfg.shop_prices == base.shop_prices
     assert cfg.starting_items == ("peek", "shield") and not cfg.enable_chaos
     assert sorted(i.id for i in run.controller.view().items) == ["peek", "shield"]
     assert run.controller.view().money == base.start_money + 20
-    assert run.applied == {"shop_discount": 1, "shop_slot": 1, "start_money": 2, "start_peek": 1, "start_shield": 1}
+    assert run.applied == {"bag_space": 1, "reroll_pass": 1, "start_money": 2, "start_peek": 1, "start_shield": 1}
     after = meta.get_player(p.id).upgrades
     assert after["start_peek"] == 1 and "start_shield" not in after  # consumables used up
     assert cfg.balance_hash != RunConfig(seed=3).balance_hash
@@ -264,4 +264,6 @@ def test_pure_helpers_match_the_service(svc) -> None:
     with pytest.raises(MetaError):
         meta.build_run_config(b, get_mode("normal"), {}, ["start_peek"])
     assert meta.reward_tokens(b, "victory", 3, 100, 400) == [("Victory", b.meta_win_tokens)]
+    assert meta.reward_tokens(b, "victory", 3, 100, 400, chaos=True) == [
+        ("Victory", b.meta_win_tokens), ("Chaos bonus", b.meta_chaos_win_bonus)]
     assert meta.reward_tokens(b, "defeat", 10, 100, 100) == meta.consolation_tokens(b, 10, 100, 100)

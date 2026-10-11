@@ -32,7 +32,8 @@ def test_new_run_starts_at_betting() -> None:
     r = AgentSession.new(seed=7).execute({"cmd": "observe"})
     obs = r["obs"]
     assert r["ok"] and obs["schema"] == 2
-    assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet", "buy"]
+    assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet", "buy", "reroll"]
+    assert obs["shop"]["reroll_price"] == 10
     assert len(obs["shop"]["offers"]) == 3 and obs["shop"]["restock_in"] == 2
     assert obs["bet_range"] == [1, 50] and obs["you"] is None
     assert "bet <amount>" in obs["hint"]
@@ -67,7 +68,7 @@ def test_illegal_action_is_structured_and_changes_nothing() -> None:
     s = AgentSession.new(seed=7)
     r = s.execute({"cmd": "act", "action": "hit"})
     assert not r["ok"]
-    assert r["error"]["code"] == "illegal_action" and r["error"]["legal_actions"] == ["bet", "buy"]
+    assert r["error"]["code"] == "illegal_action" and r["error"]["legal_actions"] == ["bet", "buy", "reroll"]
     assert s.steps == 0 and r["obs"]["phase"] == "betting"
 
 

@@ -2,12 +2,17 @@
 
 The shop is open while betting. Its stock is a few single-purchase offers
 rolled from `RunConfig.shop_prices`; it restocks every
-`RunConfig.shop_refresh_rounds` rounds. Rolls are seeded per round, so the
-same run seed always shows the same shelves.
+`RunConfig.shop_refresh_rounds` rounds and can be rerolled once per stock.
+Rolls are seeded per round, so the same run seed always shows the same shelves.
+
+Prices are fixed chips, or (`RunConfig.shop_bankroll_pct`) a percentage of
+the bankroll when the stock is rolled, never below that percentage of
+`RunConfig.shop_price_floor` (the profile's start bankroll).
 """
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass, replace
 from typing import Any, Mapping
@@ -31,6 +36,8 @@ class ShopOffer:
 class ShopState:
     stock_round: int  # round the current stock was rolled in
     offers: tuple[ShopOffer, ...]
+    rerolled: bool = False         # this stock was already rerolled
+    free_rerolls_used: int = 0     # per run; carried across restocks
 
     def offer(self, item_id: str) -> ShopOffer | None:
         return next((o for o in self.offers if o.item == item_id and not o.sold), None)
@@ -40,19 +47,32 @@ class ShopState:
         return replace(self, offers=offers)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"stock_round": self.stock_round, "offers": [o.to_dict() for o in self.offers]}
+        return {"stock_round": self.stock_round, "offers": [o.to_dict() for o in self.offers],
+                "rerolled": self.rerolled, "free_rerolls_used": self.free_rerolls_used}
 
     @staticmethod
     def from_dict(d: Mapping[str, Any]) -> "ShopState":
         return ShopState(
             stock_round=int(d.get("stock_round", 1)),
             offers=tuple(ShopOffer.from_dict(o) for o in d.get("offers", [])),
+            rerolled=bool(d.get("rerolled", False)),
+            free_rerolls_used=int(d.get("free_rerolls_used", 0)),
         )
 
 
-def roll_stock(shop_seed: int, round_no: int, prices: Mapping[str, int], slots: int) -> ShopState:
+def shop_prices(prices: Mapping[str, int], bankroll_pct: tuple[str, ...] | frozenset[str], money: int,
+                floor_money: int) -> dict[str, int]:
+    """Chip prices for a roll: fixed prices as they are, percentage prices
+    against max(bankroll, floor_money), rounded half up and at least 1."""
+    base = max(money, floor_money)
+    return {item: max(1, math.floor(price * base / 100 + 0.5)) if item in bankroll_pct else int(price)
+            for item, price in prices.items()}
+
+
+def roll_stock(shop_seed: int, round_no: int, prices: Mapping[str, int], slots: int, *,
+               reroll: bool = False) -> ShopState:
     """Pick `slots` different items (sorted by price) for this round's shelves."""
-    rng = random.Random(f"{shop_seed}:shop:{round_no}")
+    rng = random.Random(f"{shop_seed}:shop:{round_no}" + (":reroll" if reroll else ""))
     pool = sorted(prices)
     picked = rng.sample(pool, min(slots, len(pool)))
     offers = sorted((ShopOffer(i, int(prices[i])) for i in picked), key=lambda o: (o.price, o.item))

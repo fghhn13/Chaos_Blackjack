@@ -44,6 +44,7 @@ def execute_item(
     peek_next_card_rank: Callable[[], str | None],
     active_rule_ids: tuple[str, ...] = (),
     params: dict[str, Any] | None = None,
+    next_hit_busts: Callable[[], bool | None] | None = None,
 ) -> tuple[GameState, ItemResult]:
     cls = registry.resolve_item(item_id)
     if cls is None:
@@ -52,7 +53,7 @@ def execute_item(
         return state, ItemResult(ok=False, message="You don't have that item.")
     # Publish item events only after the item and its effects succeed.
     pending: list[Event] = []
-    ctx = ItemContext(state, pending.append, peek_next_card_rank, active_rule_ids, params)
+    ctx = ItemContext(state, pending.append, peek_next_card_rank, active_rule_ids, params, next_hit_busts)
     result = cls().use(ctx)
     if not result.ok:
         return state, result

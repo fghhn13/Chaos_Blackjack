@@ -38,8 +38,11 @@ CONFIG_LABELS = {
     "dealer_stand_on": "Dealer stands on",
     "min_bet": "Minimum bet",
     "max_bet_fraction": "Maximum bet",
+    "bring_kinds": "Item kinds to bring",
+    "free_rerolls": "Free shop rerolls",
 }
-_HIDDEN = {"starting_items", "balance_profile", "balance_hash", "seed", "use_llm", "enable_chaos"}
+_HIDDEN = {"starting_items", "balance_profile", "balance_hash", "seed", "use_llm", "enable_chaos",
+           "shop_bankroll_pct", "shop_price_floor"}
 
 
 def _value(name: str, value) -> str:
@@ -144,9 +147,14 @@ class RunSetupScene(MetaScreen):
     def sync(self):
         for mode_id, row in self.mode_rows.items():
             row.selected = mode_id == self.mode_id
+        limit = self.bring_limit
+        while len(self.selected) > limit:
+            self.selected.discard(max(self.selected))  # e.g. Bag Space no longer owned
+        full = len(self.selected) >= limit
         for upgrade_id, row in self.item_rows.items():
             row.check = upgrade_id in self.selected
             row.note = "Bring 1" if row.check else ""
+            row.enabled = row.check or not full
         chaos = self.mode_id == "chaos"
         self.start_button.style = "chaos" if chaos else "primary"
         self.start_button.enabled = bool(self.mode_id) and not self.starting
@@ -162,7 +170,17 @@ class RunSetupScene(MetaScreen):
             self.memory["mode"] = mode_id
             self.sync()
 
+    @property
+    def bring_limit(self) -> int:
+        """Consumable kinds this player may bring (Bag Space raises it)."""
+        preview = self.preview_config()
+        return preview[1].bring_kinds if preview else RunConfig.from_balance(self.app.balance).bring_kinds
+
     def toggle_consumable(self, upgrade_id):
+        if upgrade_id not in self.selected and len(self.selected) >= self.bring_limit:
+            self.message = f"Your bag holds {self.bring_limit} kinds of items. Bag Space in Upgrades adds more."
+            return
+        self.message = ""
         self.selected.symmetric_difference_update({upgrade_id})
         self.sync()
 
@@ -232,7 +250,8 @@ class RunSetupScene(MetaScreen):
         self.draw_showcase(surface)
         y = draw_section(surface, a, "Upgrades in effect", (RIGHT_X, 136), RIGHT_W)
         self.draw_upgrades(surface, y)
-        y = draw_section(surface, a, "Bring items", (RIGHT_X, ITEMS_TOP - 30), RIGHT_W)
+        y = draw_section(surface, a, f"Bring items  ({len(self.selected)}/{self.bring_limit} kinds)",
+                         (RIGHT_X, ITEMS_TOP - 30), RIGHT_W)
         if not self.consumables:
             draw_paragraph(surface, a, "Your bag is empty. Consumables bought in Upgrades show up here.",
                            (RIGHT_X, ITEMS_TOP, RIGHT_W, 80))

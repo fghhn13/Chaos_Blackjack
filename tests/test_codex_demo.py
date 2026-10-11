@@ -37,10 +37,10 @@ def test_every_builtin_demo_is_deterministic_and_settles(entry):
 
 
 @pytest.mark.parametrize("rule_id,total,outcome", [
-    ("modify_card_value", 16, "dealer"), ("great_crash", 2, "dealer"),
+    ("modify_card_value", 16, "dealer"), ("great_crash", 16, "dealer"),
     ("odd_even_chaos", 20, "player"), ("suit_power", 18, "player"),
-    ("fragile_bust", 20, "dealer"), ("reverse_bust", 24, "player"),
-    ("tiebreaker_shift", 18, "player"),
+    ("fragile_bust", 20, "dealer"), ("reverse_bust", 24, "push"),
+    ("tiebreaker_shift", 18, "dealer"),
 ])
 def test_rule_examples_show_real_valuation_and_settlement(rule_id, total, outcome):
     result = run_demo(RULE_DEMOS[rule_id], RunConfig())[-1].view.last_result
@@ -197,4 +197,4 @@ def test_disabled_rules_remain_visible_and_demonstrable():
     cfg = RunConfig(disabled_rules=("great_crash",))
     entry = next(e for e in codex_entries("rule", cfg) if e.id == "great_crash")
     assert "Disabled" in entry.detail(cfg)
-    assert run_demo(entry.demo, cfg)[1].view.player_total == 2
+    assert run_demo(entry.demo, cfg)[1].view.player_total == 16

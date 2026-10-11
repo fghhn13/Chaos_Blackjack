@@ -75,6 +75,9 @@ def build_run_config(
         applied[upgrade_id] = min(level, u.max_level)
         config = _apply_upgrade(u, config, applied[upgrade_id])
     bring = list(consumables)
+    kinds = len(set(bring))
+    if kinds > config.bring_kinds:
+        raise MetaError(f"You can bring up to {config.bring_kinds} kinds of items (Bag Space raises this)")
     for upgrade_id in bring:
         u = catalog.get(upgrade_id)
         if u is None or u.kind != "consumable":
@@ -86,10 +89,15 @@ def build_run_config(
     return config, applied
 
 
-def reward_tokens(balance: Balance, result: str, rounds: int, start: int, peak: int) -> list[tuple[str, int]]:
-    """Token breakdown for a finished run: the win reward, or the consolation."""
+def reward_tokens(balance: Balance, result: str, rounds: int, start: int, peak: int, *,
+                  chaos: bool = False) -> list[tuple[str, int]]:
+    """Token breakdown for a finished run: the win reward (plus the Chaos
+    bonus when Chaos was on), or the consolation."""
     if result == "victory":
-        return [("Victory", balance.meta_win_tokens)]
+        parts = [("Victory", balance.meta_win_tokens)]
+        if chaos and balance.meta_chaos_win_bonus:
+            parts.append(("Chaos bonus", balance.meta_chaos_win_bonus))
+        return parts
     return consolation_tokens(balance, rounds, start, peak)
 
 
@@ -314,7 +322,7 @@ class MetaService:
             balance = self._balance(db, run["balance_profile"], fallback=True)
             result = controller.run_end.kind
             breakdown = reward_tokens(balance, result, summary["rounds"], controller.run.start_money,
-                                      summary["peak_money"])
+                                      summary["peak_money"], chaos=controller.config.enable_chaos)
             tokens = max(0, sum(t for _, t in breakdown))
             player_id = run["player_id"]
             with db:

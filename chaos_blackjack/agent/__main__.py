@@ -5,6 +5,7 @@ One-shot commands (state kept in a file between calls):
   python -m chaos_blackjack.agent new [--seed N] [--chaos] [--llm]
   python -m chaos_blackjack.agent observe
   python -m chaos_blackjack.agent buy peek
+  python -m chaos_blackjack.agent reroll
   python -m chaos_blackjack.agent bet 20
   python -m chaos_blackjack.agent act hit|stand|double|surrender
   python -m chaos_blackjack.agent act use_item peek
@@ -139,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("help", help="list game commands")
     buy = sub.add_parser("buy", help="buy a shop item (betting phase)")
     buy.add_argument("item")
+    sub.add_parser("reroll", help="roll the shop's stock again (betting phase, once per stock)")
     bet = sub.add_parser("bet", help="place a bet")
     bet.add_argument("amount", type=int)
     act = sub.add_parser("act", help="act in your turn")

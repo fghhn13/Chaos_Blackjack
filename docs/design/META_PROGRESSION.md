@@ -85,14 +85,20 @@ New settings (placeholders):
 
 Consolation = `min(loss_cap, floor(rounds * loss_per_round + max(0, peak - start) / start * loss_per_peak_gain))`.
 
-Initial catalog (placeholders):
+Catalog (balance v1, tuned with black-jack-sim; `seed/default.sql` is authoritative):
 
 | upgrade_id | kind | effect | params | cost (+step) | max |
 |---|---|---|---|---|---|
-| `start_money` | permanent | `run.start_money_add` | `{"amount": 10}` | 15 (+10) | 3 |
-| `shop_slot` | permanent | `shop.slots_add` | `{"amount": 1}` | 40 | 1 |
-| `shop_discount` | permanent | `shop.discount_pct` | `{"pct": 10}` | 25 (+15) | 2 |
-| `start_<item>` (one per shop item) | consumable | `run.starting_item` | `{"item": "<item>"}` | ≈ half the shop price | — |
+| `start_money` | permanent | `run.start_money_add` | `{"amount": 10}` | 20 (+10) | 3 |
+| `bag_space` | permanent | `meta.bring_kinds_add` | `{"amount": 1}` | 25 (+15) | 2 |
+| `reroll_pass` | permanent | `shop.free_rerolls_add` | `{"amount": 1}` | 30 | 1 |
+| `start_<item>` (one per shop item) | consumable | `run.starting_item` | `{"item": "<item>"}` | ≈ half the opening shop price | 3 |
+
+`meta.bring_kinds` (2) caps the different consumables brought to one run;
+`meta.chaos_win_bonus` (4) is added to the victory reward when Chaos was on.
+The `shop.slots_add` and `shop.discount_pct` effects remain available to
+profiles but are not sold by default (the simulator found them worth almost
+nothing).
 
 ## 4. Extension points (code registries)
 

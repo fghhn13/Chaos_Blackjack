@@ -84,6 +84,20 @@ register_effect(Effect(
 ))
 
 register_effect(Effect(
+    "meta.bring_kinds_add",
+    apply=lambda c, n, p: replace(c, bring_kinds=c.bring_kinds + n * int(p.get("amount", 0))),
+    title=lambda p: "Bag Space",
+    describe=lambda p, n: f"Bring {int(p.get('amount', 0)) * max(n, 1)} more kind(s) of consumable to each run.",
+))
+
+register_effect(Effect(
+    "shop.free_rerolls_add",
+    apply=lambda c, n, p: replace(c, free_rerolls=c.free_rerolls + n * int(p.get("amount", 0))),
+    title=lambda p: "Reroll Pass",
+    describe=lambda p, n: f"Reroll the table shop {int(p.get('amount', 0)) * max(n, 1)} time(s) per run for free.",
+))
+
+register_effect(Effect(
     "run.starting_item",
     apply=lambda c, n, p: replace(c, starting_items=c.starting_items + (str(p["item"]),) * n),
     title=lambda p: f"Starter: {_item_name(str(p.get('item', '?')))}",
