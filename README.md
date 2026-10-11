@@ -48,8 +48,9 @@ python -m chaos_blackjack.gui --scene codex
 
 Other ways to play:
 
-The authenticated browser edition supports Classic/Chaos runs, the shop,
-items and saved games. Registration requires a 16-digit invitation token.
+The authenticated browser edition runs the original Pygame GUI in WebAssembly,
+including progression, upgrades and account saves. Registration requires a
+16-digit invitation token. See [browser compatibility and builds](browser/README.md).
 See [browser deployment and continuous delivery](deploy/README.md) for local
 setup, HTTPS hosting, account administration and the production branch.
 

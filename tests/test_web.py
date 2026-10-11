@@ -10,6 +10,45 @@ from chaos_blackjack.web.server import Application
 TOKEN = "1234567890123456"
 
 
+def test_browser_cloud_saves_are_opaque_isolated_and_versioned(app):
+    alice, bob = Client(app), Client(app)
+    alice.register("alice"); bob.register("bobby")
+    assert alice.request("/api/browser-save")[1]["snapshot"] == ""
+    snapshot = "DROP TABLE account; -- opaque data must never execute"
+    assert alice.request("/api/browser-save", {"snapshot": snapshot, "revision": 0}, csrf=False)[0] == 403
+    status, reply, _ = alice.request("/api/browser-save", {"snapshot": snapshot, "revision": 0})
+    assert status == 200 and reply["revision"] == 1
+    assert alice.request("/api/browser-save")[1]["snapshot"] == snapshot
+    assert bob.request("/api/browser-save")[1]["snapshot"] == ""
+    assert alice.request("/api/browser-save", {"snapshot": "stale", "revision": 0})[0] == 409
+    assert alice.request("/api/browser-save", {"snapshot": "bad", "revision": True})[0] == 409
+    assert alice.request("/api/browser-save", {"snapshot": {}, "revision": 1})[0] == 400
+    assert alice.request("/api/browser-save", {"snapshot": "x" * 2_000_001, "revision": 1})[0] == 400
+    assert alice.request("/api/me")[0] == 200
+    alice.app = Application(app.db_path, invitation=TOKEN)
+    assert alice.request("/api/browser-save")[1]["revision"] == 1
+
+
+def test_wasm_assets_require_session_and_confine_paths(app, tmp_path, monkeypatch):
+    root = tmp_path / "bundle"
+    root.mkdir()
+    (root / "index.html").write_text("<html>game</html>")
+    monkeypatch.setenv("BLACKJACK_BROWSER_BUILD", str(root))
+    c = Client(app)
+    assert c.request("/play/")[0] == 401
+    c.register()
+    assert c.request("/play/../../accounts.db")[0] == 404
+    env = {"PATH_INFO": "/play/", "REQUEST_METHOD": "GET", "HTTP_COOKIE": c.cookie}
+    headers = {}
+    def start(status, values):
+        headers.update(dict(values))
+        assert status.startswith("200")
+    assert b"game" in b"".join(app(env, start))
+    assert headers["X-Frame-Options"] == "SAMEORIGIN"
+    c.request("/api/logout", {})
+    assert c.request("/play/")[0] == 401
+
+
 class Client:
     def __init__(self, app):
         self.app, self.cookie, self.csrf = app, "", ""

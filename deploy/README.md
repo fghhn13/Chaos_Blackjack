@@ -1,12 +1,14 @@
 # Browser deployment
 
-The public browser client wraps `AgentSession`; it does not change game rules.
-Each account has its own saved run and completed-run history. Desktop meta
-progression is separate. All web games explicitly use the offline Chaos AI.
+The public client runs the original Pygame GUI in WebAssembly. Accounts have
+separate cloud snapshots containing players, upgrades, saved runs and history.
+All web games explicitly use the offline Chaos AI. See [browser build and save
+details](../browser/README.md).
 
 ## Local development
 
 Set `BLACKJACK_REGISTRATION_TOKEN` to a random 16-digit string,
+install `.[browser,gui,dev]`, run `python scripts/build_browser.py`,
 then run `python -m chaos_blackjack.web`. Local HTTP uses a non-Secure cookie.
 Production requires `pip install '.[web]'`, Gunicorn behind an HTTPS proxy, and
 `BLACKJACK_SECURE_COOKIE=1`. Never commit credentials. Passwords use salted
@@ -14,17 +16,18 @@ scrypt hashes; sessions use hashed random tokens and CSRF protection.
 
 ## Production on 43.153.209.136
 
-The deployed branch is **`codex/web-deploy`**. The root-owned
+The deployed branch is **`codex/pygame-wasm`**. The root-owned
 `/usr/local/sbin/chaos-blackjack-deploy` fetches that public branch every minute
 using `chaos-blackjack-cd.timer`. No GitHub Actions SSH secret is required.
 Only push reviewed production code to this branch:
 
 ```sh
-git push origin codex/web-deploy
+git push origin codex/pygame-wasm
 ```
 
 Every new commit installs its own environment, runs the full offline pytest
-suite, integrated GUI smoke test and sound validation, then atomically switches
+suite, integrated GUI smoke test and sound validation, builds the self-hosted
+WASM bundle, then atomically switches
 `/opt/chaos-blackjack/current` and restarts the service. The health check must
 report the exact commit; otherwise the prior release is restored. Failed commits
 are marked in `/opt/chaos-blackjack/failed/` to avoid continuous retries. Review
@@ -40,7 +43,7 @@ sudo systemctl start chaos-blackjack-cd.service  # immediate check
 ```
 
 Runtime data lives in `/var/lib/chaos-blackjack/`: `web.db` stores accounts,
-sessions, invitations and per-account runs; `game.db` stores balance data.
+sessions, invitations and per-account browser snapshots; `game.db` stores balance data.
 Deploys preserve both. Back up SQLite with its `.backup` command or Python's
 `sqlite3.Connection.backup()` API rather than copying an active WAL database.
 

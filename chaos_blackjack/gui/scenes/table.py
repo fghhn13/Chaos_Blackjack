@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import Future
-from threading import Thread
 from dataclasses import replace
 
 import pygame
@@ -35,6 +34,7 @@ from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD, notice_line, outcome_banner
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
+from chaos_blackjack.gui.worker import start_worker
 
 W, H = LOGICAL_SIZE
 
@@ -277,8 +277,7 @@ class TableScene(Scene):
             result = Future()
             self._chaos_future = result
             # A daemon avoids waiting for a slow network request at app shutdown.
-            Thread(target=_resolve_chaos, args=(self.controller, result),
-                   name="chaos-ai", daemon=True).start()
+            start_worker(_resolve_chaos, (self.controller, result), name="chaos-ai")
         elif phase == TablePhase.DEALER_TURN and self._timer >= DEALER_STEP_DELAY:
             self._command("dealer_step")()
         elif phase == TablePhase.RUN_OVER and not self._ending_opened and self._timer >= RUN_END_DELAY:

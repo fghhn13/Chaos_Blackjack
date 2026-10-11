@@ -10,6 +10,7 @@ Global keys: F11 fullscreen, F5 rescan assets/sounds, M mute, +/- volume.
 from __future__ import annotations
 
 import sqlite3
+import asyncio
 
 from dataclasses import dataclass
 
@@ -99,6 +100,34 @@ class App:
 
     def quit(self) -> None:
         self.running = False
+
+    async def run_async(self, first_scene: str = "home", *, on_frame=None,
+                        max_frames: int | None = None, **params) -> None:
+        """Run the same scenes while yielding to the browser once per frame."""
+        import chaos_blackjack.gui.scenes  # noqa: F401
+
+        self.scenes.reset(first_scene, **params)
+        self.scenes.apply_pending()
+        self.running = True
+        frames = 0
+        try:
+            while self.running and self.scenes.top is not None:
+                # Browser animation frames pace execution; tick(60) would block JS.
+                dt = min(self.clock.tick(0) / 1000.0, 0.1)
+                for event in pygame.event.get():
+                    self._dispatch(event)
+                self.scenes.update(dt)
+                self.scenes.apply_pending()
+                self._render()
+                if on_frame is not None:
+                    on_frame(self)
+                frames += 1
+                if max_frames is not None and frames >= max_frames:
+                    break
+                await asyncio.sleep(0)
+        finally:
+            self.audio.close()
+            pygame.quit()
 
     # ---------------------------------------------------------------- events
 

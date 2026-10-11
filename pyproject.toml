@@ -14,6 +14,7 @@ dependencies = []
 dev = ["pytest>=7.0"]
 gui = ["pygame>=2.5"]
 web = ["gunicorn>=23.0,<24"]
+browser = ["pygbag==0.9.3"]
 # Art pipeline (scripts/asset_tools.py); validation and previews need only pygame.
 art = ["pygame>=2.5", "pillow>=10", "numpy>=1.24"]
 

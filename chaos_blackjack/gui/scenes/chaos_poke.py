@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from concurrent.futures import Future
-from threading import Thread
 
 import pygame
 
@@ -13,6 +12,7 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, wrap_text
+from chaos_blackjack.gui.worker import start_worker
 
 
 def _reply_worker(llm: LLMBackend, request: PokeRequest, future: Future[PokeReply]) -> None:
@@ -42,8 +42,7 @@ class ChaosPokeScene(Scene):
             "Continue", self._dismiss, enabled=False, hotkey=pygame.K_RETURN,
         )
         self._future: Future[PokeReply] | None = Future()
-        Thread(target=_reply_worker, args=(llm, request, self._future),
-               name="chaos-poke", daemon=True).start()
+        start_worker(_reply_worker, (llm, request, self._future), name="chaos-poke")
 
     def on_exit(self) -> None:
         self._closed = True

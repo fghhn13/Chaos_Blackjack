@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import mimetypes
 import json
 import logging
 import os
@@ -73,6 +74,9 @@ class Application:
                 CREATE TABLE IF NOT EXISTS setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS attempt (key TEXT PRIMARY KEY, count INTEGER NOT NULL,
                     until INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS browser_save (
+                    account_id INTEGER PRIMARY KEY REFERENCES account(id),
+                    snapshot TEXT NOT NULL, revision INTEGER NOT NULL);
             """)
             db.execute("INSERT OR IGNORE INTO setting VALUES ('invitation', ?)", (digest(invitation),))
             # A bootstrap administrator is explicit; registrants never acquire admin rights.
@@ -187,6 +191,22 @@ class Application:
             if method == "POST" and not hmac.compare_digest(env.get("HTTP_X_CSRF_TOKEN", ""), user["csrf"]):
                 raise APIError(403, "Invalid security token. Reload the page.")
             uid = user["id"]
+            if path == "/api/browser-save":
+                row = db.execute("SELECT snapshot,revision FROM browser_save WHERE account_id=?", (uid,)).fetchone()
+                revision = row["revision"] if row else 0
+                if method == "GET":
+                    return {"ok": True, "snapshot": row["snapshot"] if row else "", "revision": revision}, []
+                if method == "POST":
+                    snapshot = data.get("snapshot")
+                    if not isinstance(snapshot, str) or len(snapshot.encode()) > 2_000_000:
+                        raise APIError(400, "Save exceeds the 2 MB limit.")
+                    if type(data.get("revision")) is not int or data["revision"] != revision:
+                        raise APIError(409, "Save changed in another tab. Reload to use the latest save.")
+                    # Opaque client data: never execute SQL or deserialize it on the server.
+                    revision += 1
+                    db.execute("INSERT INTO browser_save VALUES (?,?,?) ON CONFLICT(account_id) DO UPDATE SET snapshot=excluded.snapshot,revision=excluded.revision",
+                               (uid, snapshot, revision))
+                    return {"ok": True, "revision": revision}, []
             if path == "/api/me" and method == "GET":
                 return {"ok": True, "user": self.account_dict(user), "csrf": user["csrf"]}, []
             if path == "/api/logout" and method == "POST":
@@ -274,7 +294,24 @@ class Application:
                 method = "GET"
             if method not in ("GET", "POST"):
                 raise APIError(405, "Method not allowed.")
-            if path in ("/", "/static/app.js", "/static/style.css") and method == "GET":
+            if path.startswith("/play/") and method == "GET":
+                with self.connect() as db:
+                    self.authenticate(db, env)
+                root = Path(os.environ.get("BLACKJACK_BROWSER_BUILD", "build/pygame/build/web")).resolve()
+                target = (root / (path[6:] or "index.html")).resolve()
+                if not target.is_relative_to(root) or not target.is_file():
+                    raise APIError(404, "Game asset not found.")
+                body = target.read_bytes()
+                mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+                if target.suffix == ".wasm":
+                    mime = "application/wasm"
+                headers.append(("Content-Type", mime))
+                # Pygbag's generated loader needs inline scripts and WASM compilation.
+                # This policy is restricted to the authenticated game frame.
+                headers = [(k, v) for k, v in headers if k not in ("Content-Security-Policy", "X-Frame-Options")]
+                headers += [("X-Frame-Options", "SAMEORIGIN"), ("Content-Security-Policy",
+                             "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'")]
+            elif path in ("/", "/static/app.js", "/static/style.css") and method == "GET":
                 name, mime = {"/": ("index.html", "text/html"), "/static/app.js": ("app.js", "text/javascript"),
                               "/static/style.css": ("style.css", "text/css")}[path]
                 body = (STATIC / name).read_bytes()
@@ -290,7 +327,8 @@ class Application:
                         raise APIError(415, "JSON requests are required.")
                     try:
                         size = int(env.get("CONTENT_LENGTH") or 0)
-                        if not 0 < size <= 8192:
+                        limit = 2_100_000 if path == "/api/browser-save" else 8192
+                        if not 0 < size <= limit:
                             raise APIError(413, "Request is too large or empty.")
                         data = json.loads(env["wsgi.input"].read(size))
                         if not isinstance(data, dict):

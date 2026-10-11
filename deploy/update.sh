@@ -24,9 +24,14 @@ trap failure ERR
 runuser -u chaos-deploy -- bash -e -o pipefail -c 'git -C "$1" archive "$2" | tar -x -C "$3"' _ "$repo" "$sha" "$release"
 echo "Testing $sha"
 runuser -u chaos-deploy -- python3 -m venv "$release/.venv"
-runuser -u chaos-deploy -- "$release/.venv/bin/pip" -q install "$release[web,dev,gui,art]"
+runuser -u chaos-deploy -- "$release/.venv/bin/pip" -q install "$release[web,dev,gui,art,browser]"
 runuser -u chaos-deploy -- env CHAOS_USE_LLM=0 CHAOS_DB=:memory: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy PYTHONUTF8=1 \
     bash -ec 'cd "$1"; .venv/bin/python -m pytest; .venv/bin/python scripts/ci_smoke.py --gui; .venv/bin/python scripts/export_sounds.py --verify' _ "$release"
+mkdir -p "$base/runtime-cache"
+chown chaos-deploy:chaos-deploy "$base/runtime-cache"
+runuser -u chaos-deploy -- env BLACKJACK_RUNTIME_CACHE="$base/runtime-cache" \
+    bash -ec 'cd "$1"; .venv/bin/python scripts/build_browser.py' _ "$release"
+test -s "$release/build/pygame/build/web/runtime/0.9.3/cpython312/main.wasm"
 printf 'BLACKJACK_REVISION=%s\n' "$sha" > "$release/revision.env"
 # Runtime user can read a release but cannot alter the deployment source.
 chown -R root:root "$release"
