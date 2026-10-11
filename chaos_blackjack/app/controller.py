@@ -10,8 +10,8 @@ Flow:  BETTING [-buy*] -place_bet-> [CHAOS -resolve_chaos->] PLAYER_TURN
        -hit/stand/double_down/use_item-> DEALER_TURN -dealer_step*-> ROUND_OVER
        -next_round-> BETTING ... until RUN_OVER.
 
-Naturals are checked when the player turn opens (after chaos, so active
-rules count): a player natural pays `blackjack_pays` (3:2), a dealer natural
+Naturals are checked against the original two cards before chaos:
+a player natural pays `blackjack_pays` (3:2), a dealer natural
 wins at once, both is a push. Double and surrender are first-decision only.
 
 The shop is open while betting: `buy(item_id)` spends bankroll on one of a
@@ -237,6 +237,8 @@ class GameController:
         self._dealer_blackjack = False
         self.hole_revealed = False
         self._notify(NoticeKind.ROUND_STARTED, data={"round": self.run.round, "bet": amount})
+        if self._settle_naturals():
+            return
         if self.config.enable_chaos:
             self._set_phase(TablePhase.CHAOS)
         else:
@@ -370,12 +372,15 @@ class GameController:
 
     def reroll_shop(self) -> None:
         """Roll the current stock again (once per stock); keep enough bankroll to bet."""
-        self._require(Action.REROLL)
+        if self.phase != TablePhase.BETTING:
+            self._require(Action.REROLL)
         price = self.reroll_price()
         if price is None:
             raise ActionError("This stock was already rerolled; wait for the next restock")
         if not self.can_bet(self.run.money - price):
-            raise ActionError(f"Not enough chips: a reroll costs {price} and you must keep enough to bet")
+            import math
+            required = price + math.ceil(self.config.min_bet / self.config.max_bet_fraction)
+            raise ActionError(f"Not enough chips: a reroll costs {price}; you need at least {required} chips to keep betting")
         self.run.money -= price
         free_used = self.shop.free_rerolls_used + (1 if price == 0 else 0)
         stock = self._roll_shop(reroll=True)
@@ -390,6 +395,9 @@ class GameController:
         self._require(Action.NEXT_ROUND)
         self.state = None
         self._set_phase(TablePhase.BETTING)
+        self._check_can_bet()
+        if self.phase == TablePhase.RUN_OVER:
+            return
         if needs_restock(self.shop, self.run.round, self.config.shop_refresh_rounds):
             used = self.shop.free_rerolls_used
             self.shop = self._roll_shop()
@@ -552,16 +560,19 @@ class GameController:
     def _is_natural(self, hand) -> bool:
         if len(hand) != 2:
             return False
-        v = self._value(hand)
-        return v == 21 and not self.loop.rules.is_bust(v, self.loop.context())
+        ranks = {str(card.rank).upper() for card in hand}
+        return 'A' in ranks and bool(ranks & {'10', 'J', 'Q', 'K'})
 
     def _enter_player_turn(self) -> None:
         self._set_phase(TablePhase.PLAYER_TURN)
+        self._settle_if_player_bust()
+
+    def _settle_naturals(self) -> bool:
         st = self._st
         player_nat = self._is_natural(st.player_hand)
         dealer_nat = self._is_natural(st.dealer_hand)
         if not (player_nat or dealer_nat):
-            return
+            return False
         if player_nat:
             self._notify(NoticeKind.PLAYER_BLACKJACK, "♠ BLACKJACK!")
         if dealer_nat:
@@ -569,6 +580,7 @@ class GameController:
             self._notify(NoticeKind.DEALER_BLACKJACK, "Dealer has blackjack.")
         self.state = st.with_phase(GamePhase.RESOLVED)
         self._settle("push" if player_nat and dealer_nat else "blackjack" if player_nat else "dealer")
+        return True
 
     def _settle_if_player_bust(self) -> bool:
         pv = self._value(self._st.player_hand)
@@ -610,6 +622,8 @@ class GameController:
         self._notify(NoticeKind.ROUND_SETTLED, data={"result": self.last_result})
 
         self.run_end = self.run_end_policy.check(self.run)
+        if self.run_end is None and not self.can_bet(self.run.money):
+            self.run_end = RunEndResult(kind='defeat', message=NO_VALID_BET_MESSAGE)
         if self.run_end is not None:
             self._end_run()
             return
@@ -630,7 +644,8 @@ class GameController:
 
     def _roll_shop(self, *, reroll: bool = False) -> ShopState:
         listed = {item: price for item, price in self.config.shop_prices.items()
-                  if self.registry.resolve_item(item) is not None}
+                  if self.registry.resolve_item(item) is not None
+                  and (item != 'shield' or self.config.enable_chaos)}
         prices = shop_prices(listed, frozenset(self.config.shop_bankroll_pct), self.run.money,
                              self.config.shop_price_floor)
         return roll_stock(self.shop_seed, self.run.round, prices, self.config.shop_slots, reroll=reroll)

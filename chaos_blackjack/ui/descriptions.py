@@ -42,7 +42,7 @@ def _describe_one(tid: str, m: Any) -> str:
         return f"The Great Crash: all 10/J/Q/K become value {getattr(m, 'ten_value', 1)} (until cleared)."
     if tid == "odd_even_chaos":
         even, odd = getattr(m, "even_delta", 2), getattr(m, "odd_delta", -1)
-        return f"Odd-Even Chaos: even ranks {even:+}, odd ranks {odd:+} (until cleared)."
+        return f"Odd-Even Chaos: 2/4/6/8 {even:+}, 3/5/7/9 {odd:+}; A/10/J/Q/K unchanged (until cleared)."
     if tid == "suit_power":
         red, black = getattr(m, "red_delta", 1), getattr(m, "black_delta", -1)
         return f"Suit Power: red suits {red:+}, black suits {black:+} (until cleared)."

@@ -38,10 +38,10 @@ def test_shipped_values_are_unchanged() -> None:
     assert (b.start_money, b.target_money, b.objective) == (100, 300, "double_money")
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
-    assert b.shop_prices == {"peek": 6, "danger_radar": 6, "swap": 10, "hole_card_hacker": 12,
-                             "fate_oracle": 18, "shield": 15, "example_trim": 20}
+    assert b.shop_prices == {"peek": 4, "danger_radar": 6, "swap": 2, "hole_card_hacker": 3,
+                             "fate_oracle": 8, "shield": 5, "example_trim": 20}
     assert set(b.shop_bankroll_pct) == {"peek", "danger_radar", "swap", "hole_card_hacker", "fate_oracle", "shield"}
-    assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (10, 15, 4, 2)
+    assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (3, 15, 4, 2)
 
 
 def test_run_config_defaults_come_from_the_seed() -> None:
@@ -207,7 +207,7 @@ def test_old_databases_are_migrated(tmp_path) -> None:
 
 def test_shipped_phase_two_values() -> None:
     b = default_balance()
-    assert (b.min_bet, b.max_bet_fraction) == (1, 0.5)
+    assert (b.min_bet, b.max_bet_fraction) == (5, 0.5)
     assert b.chaos_rule_params == {
         "fragile_bust": {"bust_limit": 19}, "great_crash": {"ten_value": 8},
         "odd_even_chaos": {"even_delta": 2, "odd_delta": -1}, "suit_power": {"red_delta": 1, "black_delta": -1},
@@ -280,7 +280,7 @@ def test_offline_stub_draws_by_weight_and_replays(db) -> None:
         c = _chaos_ctrl(b, seed)
         out = []
         for _ in range(12):
-            c.place_bet(2)
+            c.place_bet(5)
             if c.phase.value == "chaos":
                 c.resolve_chaos()
             out.append(c.loop.modifiers.items[0].id if c.loop.modifiers.items else "-")
@@ -350,7 +350,7 @@ def test_rule_descriptions_show_tuned_numbers() -> None:
     reg = get_registry()
     assert "value 5" in describe_modifier(reg.build_chaos_rule("great_crash", {"ten_value": 5}))
     assert "reduced to 19" in describe_modifier(reg.build_chaos_rule("fragile_bust", {"bust_limit": 19}))
-    assert "+3, odd ranks -2" in describe_modifier(
+    assert "2/4/6/8 +3, 3/5/7/9 -2" in describe_modifier(
         reg.build_chaos_rule("odd_even_chaos", {"even_delta": 3, "odd_delta": -2}))
     assert "red suits +2, black suits +0" in describe_modifier(
         reg.build_chaos_rule("suit_power", {"red_delta": 2, "black_delta": 0}))

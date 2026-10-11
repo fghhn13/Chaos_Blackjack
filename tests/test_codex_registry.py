@@ -35,7 +35,7 @@ def test_rule_details_use_fixed_params_over_stub_proposals():
     assert "+4 per card" in entries["modify_card_value"].detail(cfg)
     assert "value 6" in entries["great_crash"].detail(cfg)
     assert "Disabled for AI selection" in entries["great_crash"].detail(cfg)
-    assert "even ranks +5, odd ranks -3" in entries["odd_even_chaos"].detail(cfg)
+    assert "2/4/6/8 +5, 3/5/7/9 -3" in entries["odd_even_chaos"].detail(cfg)
     assert "red suits +3, black suits -4" in entries["suit_power"].detail(cfg)
     assert "reduced to 16" in entries["fragile_bust"].detail(cfg)
     assert "ties go to Player" in entries["tiebreaker_shift"].detail(cfg)
@@ -47,7 +47,7 @@ def test_rule_details_use_fixed_params_over_stub_proposals():
 
 def test_item_details_are_live_even_on_an_existing_entry():
     oracle = next(e for e in codex_entries("item") if e.id == "fate_oracle")
-    cfg = replace(RunConfig(), shop_prices={"fate_oracle": 47}, shop_slots=4,
+    cfg = replace(RunConfig(), shop_prices={"fate_oracle": 47}, shop_bankroll_pct=(), shop_slots=4,
                   shop_refresh_rounds=5, item_params={"fate_oracle": {"cards": 6}})
     detail = oracle.detail(cfg)
     assert "next 6 cards" in detail and "47 chips" in detail

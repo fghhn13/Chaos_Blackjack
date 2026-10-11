@@ -37,9 +37,9 @@ class RunConfig:
     shop_refresh_rounds: int = DEFAULT_SHOP_REFRESH_ROUNDS
     # Items whose shop_prices entry is a percentage of the bankroll (see app/shop.py).
     shop_bankroll_pct: tuple[str, ...] = _DEFAULTS.shop_bankroll_pct
-    # Bankroll that percentage prices never go below: the profile's start bankroll,
-    # unchanged by upgrades so a richer start does not raise opening prices.
-    shop_price_floor: int = DEFAULT_START_MONEY
+    # Optional pricing floor retained for saved/custom configurations.
+    # New runs price against their current bankroll, with a one-chip minimum.
+    shop_price_floor: int = 0
     shop_reroll_price: int = _DEFAULTS.shop_reroll_price
     free_rerolls: int = 0          # rerolls per run that cost nothing (Reroll Pass)
     bring_kinds: int = _DEFAULTS.meta_bring_kinds  # consumable kinds a player may bring
@@ -84,7 +84,7 @@ class RunConfig:
             "shop_slots": balance.shop_slots,
             "shop_refresh_rounds": balance.shop_refresh_rounds,
             "shop_bankroll_pct": balance.shop_bankroll_pct,
-            "shop_price_floor": balance.start_money,
+            "shop_price_floor": 0,
             "shop_reroll_price": balance.shop_reroll_price,
             "bring_kinds": balance.meta_bring_kinds,
             "dealer_stand_on": balance.dealer_stand_on,

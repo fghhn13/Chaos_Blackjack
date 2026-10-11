@@ -33,7 +33,8 @@ class FakeLLM:
 
 def controller(**kwargs):
     return GameController(RunConfig(seed=3, enable_chaos=True,
-                                   shop_prices={"peek": 10, "shield": 30}, **kwargs),
+                                   shop_prices={"peek": 10, "shield": 30},
+                                   shop_bankroll_pct=(), **kwargs),
                           save_fn=lambda data, name: name)
 
 

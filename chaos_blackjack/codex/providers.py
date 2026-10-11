@@ -188,7 +188,10 @@ def _ai_detail(config: RunConfig) -> str:
 
 
 def ai_entries(config: RunConfig) -> list[CodexEntry]:
-    entries = [CodexEntry("ai", "default", "Chaos AI", "chaos_calm",
+    from chaos_blackjack.content.builtin_persona import default_persona
+
+    persona = default_persona()
+    entries = [CodexEntry("ai", "default", persona.name, persona.asset_id(persona.default),
                        "A sandboxed opponent that bends rules and offers unreliable advice.",
                        _ai_detail, None)]
     registry = _registry(config)

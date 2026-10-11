@@ -133,6 +133,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             ],
             "restock_in": v.shop_restock_in,
             "reroll_price": v.shop_reroll_price,
+            "reroll_affordable": v.can(Action.REROLL),
         } if v.phase == TablePhase.BETTING else None,
         "chaos": {
             "enabled": v.chaos_enabled,

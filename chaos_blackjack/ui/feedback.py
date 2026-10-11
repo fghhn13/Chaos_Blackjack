@@ -46,9 +46,9 @@ class FeedbackLog:
         params = pl.get("params") or {}
         if rid == "modify_card_value" and isinstance(params, dict) and "delta" in params:
             d = params["delta"]
-            self.add(f"⚡ Chaos Effect Triggered: rank adjustment {d:+} per card")
+            self.add(f"⚡ Chaos effect applied: rank adjustment {d:+} per card")
         else:
-            self.add(f"⚡ Chaos effect applied: {rid}")
+            self.add(f"⚡ Chaos effect applied: {str(rid).replace('_', ' ').title()}")
 
     def _on_reject(self, e: Event) -> None:
         pl = e.payload

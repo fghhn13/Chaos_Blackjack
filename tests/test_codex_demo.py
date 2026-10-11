@@ -113,8 +113,9 @@ def test_profile_can_end_a_rule_demo_early():
     frames = run_demo(RULE_DEMOS["odd_even_chaos"], RunConfig(chaos_rule_params={
         "odd_even_chaos": {"even_delta": 6, "odd_delta": 0},
     }))
-    assert frames[-1].view.last_result.outcome == "blackjack"
-    assert len(frames) == 2
+    assert frames[-1].view.last_result.outcome == "dealer"
+    assert frames[-1].view.last_result.player_bust
+    assert len(frames) == 3
 
 
 @pytest.mark.parametrize("action,expected", [("double", "player"), ("surrender", "surrender")])

@@ -266,3 +266,14 @@ chaos_blackjack/ui/descriptions.py
 chaos_blackjack/ui/feedback.py
 chaos_blackjack/ui/formatting.py
 chaos_blackjack/ui/session.py
+
+chaos_blackjack/data/migrations/0005_balance_v1_settings.sql
+chaos_blackjack/ai/personas/poker_head.json
+chaos_blackjack/ai/assets/poker_head/neutral.png
+chaos_blackjack/ai/assets/poker_head/puzzled.png
+chaos_blackjack/ai/assets/poker_head/suspicious.png
+chaos_blackjack/ai/assets/poker_head/startled.png
+chaos_blackjack/ai/assets/poker_head/displeased.png
+chaos_blackjack/ai/assets/poker_head/welcome.png
+chaos_blackjack/ai/assets/poker_head/present_card.png
+chaos_blackjack/ai/assets/poker_head/hidden_card.png

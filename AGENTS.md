@@ -79,19 +79,19 @@ drawing, moving to the next round) happens automatically inside your command:
 - Cards are `<rank><suit>` (`A`, `2`–`10`, `J`, `Q`, `K`; `♠ ♥ ♦ ♣`). `??` is the dealer's face-down card; its total is `null` until revealed.
 - `obs.you.total` already includes active chaos rules — trust it over your own arithmetic.
 - After a round settles, the next `obs` is `betting` and `obs.last_round` holds the result: `outcome` (`player` / `dealer` / `push` / `blackjack` / `surrender`), `delta` (bankroll change), both final hands, `doubled`.
-- While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n, "reroll_price": n | null}`; `null` in other phases.
+- While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n, "reroll_price": n | null, "reroll_affordable": bool}`; `null` in other phases.
 - On failure `ok` is `false` and `error` is `{code, message, legal_actions}`; the state is unchanged, so fix the command and retry. Codes: `illegal_action`, `invalid_argument`, `unknown_command`, `run_over`, `step_limit`, `usage`.
 - Exit code: `0` ok, `1` command rejected, `2` usage or missing/invalid run file.
 
 ### Rules
 
-- Bankroll starts at 100; reach the target (300) to win, or go bankrupt. You need at least 2 chips to bet.
-- Bet each round: integer from 1 to half your bankroll (rounded down).
-- Win `+bet`, lose `-bet`, push `0`. Natural blackjack (first two cards = 21) pays 3:2, rounded down. If the dealer has a natural, the round ends before you act.
+- Bankroll starts at 100; reach the target (300) to win, or go bankrupt. You need at least 10 chips to bet.
+- Bet each round: integer from 5 to half your bankroll (rounded down).
+- Win `+bet`, lose `-bet`, push `0`. Original-card natural blackjack (A plus 10/J/Q/K) pays 3:2, rounded down. Both sides' naturals settle before Chaos or player actions.
 - `double`: first decision only — bet doubles, you get exactly one card, then stand.
 - `surrender`: first decision only — lose half the bet (rounded in the house's favour).
 - Dealer draws to 17 and stands on 17+.
-- Shop (betting phase only): 3 different items, each buyable once; restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (never below the price at 100 chips). `reroll` rolls the current stock again once per stock for 10 chips. A purchase or reroll must leave at least 2 chips. `buy` / `reroll` are in `legal_actions` only when allowed.
+- Shop (betting phase only): 3 different items, each buyable once; restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, with a one-chip minimum). `reroll` rolls the current stock again once per stock for 3 chips. A purchase or reroll must leave at least 10 chips. `buy` / `reroll` are in `legal_actions` only when allowed.
 - With `--chaos`, the Chaos AI may apply one rule per round, or leave the round calm (e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push). Active rules are listed in `obs.chaos.active_rules` with a plain-English `help`.
 
 ### Fair play

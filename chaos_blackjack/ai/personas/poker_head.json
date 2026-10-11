@@ -1,0 +1,84 @@
+{
+  "name": "Poker Head",
+  "description": "A dealer in an immaculate dinner jacket with a fan of aces for a head. Unfailingly courteous, never in a hurry, and never quite on your side.",
+  "default": "neutral",
+  "portraits": {
+    "neutral": "assets/poker_head/neutral.png",
+    "puzzled": "assets/poker_head/puzzled.png",
+    "suspicious": "assets/poker_head/suspicious.png",
+    "startled": "assets/poker_head/startled.png",
+    "displeased": "assets/poker_head/displeased.png",
+    "welcome": "assets/poker_head/welcome.png",
+    "present_card": "assets/poker_head/present_card.png",
+    "hidden_card": "assets/poker_head/hidden_card.png"
+  },
+  "moods": {
+    "off": "neutral",
+    "round_started": "welcome",
+    "rule_applied": "present_card",
+    "poke": "hidden_card",
+    "item_used": "suspicious",
+    "player_bust": "neutral",
+    "player_blackjack": "startled",
+    "dealer_blackjack": "present_card",
+    "dealer_busts": "displeased",
+    "outcome_dealer": "neutral",
+    "outcome_player": "displeased",
+    "outcome_blackjack": "startled",
+    "outcome_push": "puzzled",
+    "outcome_surrender": "suspicious"
+  },
+  "lines": {
+    "idle": [
+      "Take your time. The cards are patient, and so am I.",
+      "Whenever you're ready. I'll be right here. I always am."
+    ],
+    "off": [
+      "No tricks this evening. Merely cards and good manners."
+    ],
+    "round_started": [
+      "The cards are on the table. Most of them.",
+      "After you. I insist.",
+      "Your move. Do make it a considered one."
+    ],
+    "rule_applied": [
+      "A small amendment to the house rules: {rule}. Do keep up.",
+      "{rule}, effective immediately. I trust you don't mind.",
+      "Allow me to adjust the table. {rule}."
+    ],
+    "item_used": [
+      "Resourceful. I'll pretend I didn't notice.",
+      "A little help from your pocket? How charming."
+    ],
+    "player_bust": [
+      "Ah. A touch too ambitious, I'm afraid.",
+      "Over the line. Gracefully done, at least."
+    ],
+    "player_blackjack": [
+      "Twenty-one. How very... inconvenient."
+    ],
+    "dealer_blackjack": [
+      "Twenty-one. Do forgive me."
+    ],
+    "dealer_busts": [
+      "Hm. Even I overreach now and then."
+    ],
+    "outcome_dealer": [
+      "A pity. Do stay for another hand.",
+      "The house thanks you for your generosity."
+    ],
+    "outcome_player": [
+      "Well played. Savour it; such things rarely last.",
+      "Yours, this time. I'll remember it."
+    ],
+    "outcome_blackjack": [
+      "A natural. Luck must be allowed its evening, I suppose."
+    ],
+    "outcome_push": [
+      "A draw. Let us call it a courtesy."
+    ],
+    "outcome_surrender": [
+      "A graceful retreat. I do admire prudence. Mostly."
+    ]
+  }
+}

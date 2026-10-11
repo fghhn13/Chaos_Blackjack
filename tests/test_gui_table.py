@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from threading import Event, current_thread
 from types import SimpleNamespace
 
@@ -529,24 +530,28 @@ def test_exit_during_chaos_ignores_late_result_and_new_table_still_works(app, mo
 
 
 def test_chaos_natural_settles_and_next_round_starts_another_worker(app, monkeypatch, slow_llm):
-    t = _start_chaos(app, monkeypatch, slow_llm, natural=True)
-    slow_llm.release.set()
-    t._chaos_future.result(timeout=3)
-    _tick(app, 0.01)
+    t = _open_table(app, enable_chaos=True,
+                    deal=([_c("A"), _c("K")], [_c("10"), _c("7")], []))
+    monkeypatch.setattr(t.controller.loop.pipeline, "llm", slow_llm)
+    monkeypatch.setattr(t.controller.loop.pipeline.scheduler, "should_attempt", lambda obs: True)
+    t._deal(10)
+    _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     assert t.view.phase == TablePhase.ROUND_OVER
     assert t.view.last_result.outcome == "blackjack"
+    assert slow_llm.calls == 0 and not slow_llm.started.is_set()
     _key(app, pygame.K_RETURN)
     assert t.view.phase == TablePhase.BETTING
-    slow_llm.release.clear()
-    slow_llm.started.clear()
+    natural_round = t.controller.loop.new_round
+    monkeypatch.setattr(t.controller.loop, "new_round", lambda **kwargs: replace(
+        natural_round(**kwargs), player_hand=(_c("10"), _c("8"))))
     t._deal(10)
     _tick(app, DEAL_TIME + 3 * DEAL_GAP + CHAOS_DELAY)
     assert slow_llm.started.wait(timeout=1)
-    assert slow_llm.calls == 2
+    assert slow_llm.calls == 1
     slow_llm.release.set()
     t._chaos_future.result(timeout=3)
     _tick(app, 0.01)
-    assert t.view.phase == TablePhase.ROUND_OVER
+    assert t.view.phase == TablePhase.PLAYER_TURN
 
 
 def test_run_end_opens_ending(app: App) -> None:

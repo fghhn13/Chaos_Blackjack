@@ -72,8 +72,8 @@ inside the command you sent, and its events are returned in `events`:
 
 ```text
 bet <n> ──► deal 2+2 cards
-           └► [chaos mode] Chaos AI acts once (may add one rule or use one of your items)
-           └► naturals check: player and/or dealer two-card 21 ends the round at once
+           └► original-card naturals check: A + 10/J/Q/K settles immediately
+           └► [chaos mode, no natural] Chaos AI acts once; an opening bust settles immediately
            └► phase = player_turn  (or straight to settlement)
 
 act hit      ──► one card; if you bust the round settles immediately
@@ -152,8 +152,8 @@ descriptions. For example, a 40-chip run with `bet.min=5` and
 
 Economy
 
-- Start with 100, win at 300 (bankroll `>=` target), lose at 0 or when you cannot place a legal bet (you need at least 2 to bet 1).
-- Bet: integer from 1 to `floor(bankroll / 2)`. You can never bet everything.
+- Start with 100, win at 300 (bankroll `>=` target), lose at 0 or when you cannot place a legal bet (you need at least 10 to bet 5).
+- Bet: integer from 5 to `floor(bankroll / 2)`. You can never bet everything.
 
 Card values
 
@@ -163,7 +163,7 @@ Card values
 Round
 
 - You and the dealer get two cards; the dealer's second card is face down.
-- Natural blackjack = exactly two cards totalling 21 (after chaos rules, and not a bust under them). Player natural pays **3:2**, rounded down (bet 5 → +7). Dealer natural ends the round before you act: you lose the bet, unless you also have a natural (push).
+- Natural blackjack = an original A plus 10/J/Q/K, settled before chaos rules. Player natural pays **3:2**, rounded down (bet 5 → +7). Dealer natural ends the round before you act: you lose the bet, unless you also have a natural (push).
 - `double` and `surrender` are only legal on your first decision (exactly two cards). Using an item does not count as a decision.
 - Double: bet ×2, one card, then stand. If that card busts you, you lose the doubled bet.
 - Surrender: you get `floor(bet / 2)` back, i.e. lose `bet - floor(bet/2)` (bet 15 → −8).
@@ -176,9 +176,9 @@ Shop
 
 - Open only in `betting`. It offers 3 different items from the catalog below; each offer can be bought once (`sold` afterwards).
 - The stock is rolled in round 1 and again every 2 rounds (rounds 3, 5, …); `shop.restock_in` counts down. Unbought offers are lost on restock.
-- A purchase must leave you at least 2 chips (enough for a minimum bet); `affordable` says whether it does.
-- Prices are a percentage of your bankroll when the stock rolls, never below the price at 100 chips: `peek` 6 %, `danger_radar` 6 %, `swap` 10 %, `hole_card_hacker` 12 %, `fate_oracle` 18 %, `shield` 15 % (rounded, at least 1). With 100 chips that is 6 / 6 / 10 / 12 / 18 / 15.
-- `reroll` rolls the current stock again, once per stock, for `shop.reroll_price` (10) chips; it must leave you 2 chips. `obs.shop.reroll_price` is the cost (0 = free, from the Reroll Pass upgrade) or `null` once this stock was rerolled.
+- A purchase must leave you at least 10 chips (enough for a minimum bet); `affordable` says whether it does.
+- Prices are a percentage of your bankroll when the stock rolls, rounded half up, with a one-chip minimum: `peek` 4 %, `danger_radar` 6 %, `swap` 2 %, `hole_card_hacker` 3 %, `fate_oracle` 8 %, `shield` 5 % (rounded, at least 1). With 100 chips that is 4 / 6 / 2 / 3 / 8 / 5.
+- `reroll` rolls the current stock again, once per stock, for `shop.reroll_price` (3) chips; it must leave you 10 chips. `obs.shop.reroll_price` is the cost (0 = free, from the Reroll Pass upgrade) or `null` once this stock was rerolled.
 - The same seed always shows the same shelves; buying never changes the cards dealt.
 
 ## 7. Chaos AI and chaos rules
@@ -205,7 +205,7 @@ with the rest of the run configuration. Model context uses profile-aware bet
 limits and affordable offers, excludes disabled rule choices, and includes
 fixed rule parameters and descriptions of their tuned effects.
 
-With `--chaos`, after every deal the Chaos AI gets **one** chance to act, before the naturals check and before your first decision. It can:
+With `--chaos`, after every deal the Chaos AI gets **one** chance to act, after original-card naturals are settled and before your first decision. It can:
 
 - **apply one rule** for the rest of the round (listed in `obs.chaos.active_rules`, announced in `events`), or
 - **use one of your items** (it is consumed — yes, it can burn your items), or
@@ -216,10 +216,10 @@ At most one rule is active at a time; rules are cleared when the next round is d
 | Rule id | Effect | Implications |
 | ------- | ------ | ------------ |
 | `modify_card_value` | every card's value shifts by `delta` (stub: −1) | totals drop (an Ace is 10 or 0); more room before busting |
-| `great_crash` | 10, J, Q, K are worth 8 | high cards shrink; naturals become impossible |
+| `great_crash` | 10, J, Q, K are worth 8 | high cards shrink; already-dealt naturals settle before this rule applies |
 | `odd_even_chaos` | 2/4/6/8 +2 each, 3/5/7/9 −1 each | even cards push you toward bust |
 | `suit_power` | red cards (♥ ♦) +1, black (♠ ♣) −1 | read suits, not just ranks |
-| `fragile_bust` | bust threshold is 19 for both sides | stand earlier; the dealer, who must reach 17, busts much more often; no naturals |
+| `fragile_bust` | bust threshold is 19 for both sides | stand earlier; the dealer, who must reach 17, busts more often; original naturals have already settled |
 | `reverse_bust` | a player bust is a push instead of a loss | hitting is free of risk this round: a bust returns your bet |
 | `tiebreaker_shift` | ties go to the dealer or to the player instead of a push (see the rule's `help`) | a tie is no longer safe (or becomes a win) |
 
@@ -247,7 +247,7 @@ Real transcripts (`--brief --compact`, `run` field omitted).
 
 ```text
 $ python -m chaos_blackjack.agent new --seed 7
-{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/300. Shop: danger_radar 6, swap 10, hole_card_hacker 12 (restocks in 2 rounds; reroll 10).","hint":"Place a bet: bet <amount> with 1 <= amount <= 50. Or first: buy <item_id> / reroll (see obs.shop).","legal_actions":["bet","buy","reroll"],"bet_range":[1,50],"shop":{...}}}
+{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/300. Shop: danger_radar 6, swap 2, hole_card_hacker 3 (restocks in 2 rounds; reroll 3).","hint":"Place a bet: bet <amount> with 5 <= amount <= 50. Or first: buy <item_id> / reroll (see obs.shop).","legal_actions":["bet","buy","reroll"],"bet_range":[5,50],"shop":{...}}}
 
 $ python -m chaos_blackjack.agent --brief --compact bet 20
 {"ok":true,"events":["Round 1 started, bet 20"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/300. Bet 20. You: 8♣ 3♥ = 11. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand | double | surrender","legal_actions":["hit","stand","double","surrender"]}}
@@ -256,7 +256,7 @@ $ python -m chaos_blackjack.agent --brief --compact act hit
 {"ok":true,"events":["You draw: Q"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/300. Bet 20. You: 8♣ 3♥ Q♥ = 21. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand","legal_actions":["hit","stand"]}}
 
 $ python -m chaos_blackjack.agent --brief --compact act stand
-{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/300. Shop: ...","hint":"...","legal_actions":["bet","buy"],"bet_range":[1,60],"shop":{...},
+{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/300. Shop: ...","hint":"...","legal_actions":["bet","buy","reroll"],"bet_range":[5,60],"shop":{...},
  "last_round":{"round":1,"outcome":"player","player_total":21,"dealer_total":23,"player_bust":false,"bet":20,"delta":20,"money_after":120,"doubled":false,"dealer_blackjack":false,"your_cards":["8♣","3♥","Q♥"],"dealer_cards":["K♣","5♥","8♦"]}}}
 ```
 
@@ -280,7 +280,7 @@ J♠ 7♠ is 15, not 17, because of the −1 rule. Doubling on 15 was a bad idea
 
 ```text
 $ python -m chaos_blackjack.agent --brief --compact bet 30        # bankroll 50 -> max 25
-{"ok":false,"events":[],"error":{"code":"illegal_action","message":"Invalid bet. Allowed range: 1~25","legal_actions":["bet","buy"]},"obs":{"phase":"betting", ...,"bet_range":[1,25]}}
+{"ok":false,"events":[],"error":{"code":"illegal_action","message":"Invalid bet. Allowed range: 5~25","legal_actions":["bet","buy"]},"obs":{"phase":"betting", ...,"bet_range":[5,25]}}
 ```
 
 ## 10. Strategy notes
@@ -371,3 +371,11 @@ so its seeded runs remain fair and reproducible. See [GUI guide](META_GUI.md).
 The home screen's Collection (codex) opens rule, item, mode and AI reference pages with live tuning
 and offline controller demonstrations. Space pauses, R replays and Left/Right
 steps through snapshots. These previews never change player progress or bill a model.
+
+## Balance update and default dealer
+
+New runs start with 100 chips and target 300. The minimum bet is 5 and the maximum is half the bankroll. A bankroll below 10 ends the run; purchases and rerolls must leave a valid bet. Original-card naturals (A plus 10/J/Q/K) settle before Chaos, for both sides. Other player busts settle immediately as losses, except Reverse Bust, which settles a push. A rule-modified two-card 21 is not a natural.
+
+Shop prices are peek 4%, danger_radar 6%, swap 2%, hole_card_hacker 3%, fate_oracle 8%, shield 5% of the bankroll at stocking, rounded half up with a one-chip minimum. Classic excludes shield. Reroll costs 3 chips once per stock and does not reset the restock timer; new prices use the bankroll after the fee. `obs.shop.reroll_affordable` reports whether reroll is available. Existing saved configurations retain their recorded values.
+
+Poker Head is the bundled default table persona (eight portraits and event lines), including in the browser and installed package. This presentation keeps the default balance profile's rule weights. The optional `poker_head` pack remains available with its own AI behaviour.

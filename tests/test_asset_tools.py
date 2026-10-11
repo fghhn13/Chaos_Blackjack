@@ -63,7 +63,9 @@ def test_validator_flags_size_alpha_and_names(validate, tmp_path, capsys) -> Non
     assert status["chip_1"] == "FAIL"
     assert status["table_background"] == "FAIL"
     assert status["card_back"] == "MISSING"
-    assert data["unrecognized"] == [{"file": "card-back.png", "suggested_id": "card_back"}]
+    assert len(data["unrecognized"]) == 1
+    assert Path(data["unrecognized"][0]["file"]).name == "card-back.png"
+    assert data["unrecognized"][0]["suggested_id"] == "card_back"
 
 
 def test_validator_require_all(validate, tmp_path, capsys) -> None:

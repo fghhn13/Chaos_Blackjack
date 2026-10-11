@@ -88,7 +88,9 @@ class TableScene(Scene):
         )
         self.cards = CardRenderer(a)
         profile = self.controller.registry.resolve_ai(self.controller.config.ai_id)
-        self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke, persona=getattr(profile, "persona", None))
+        from chaos_blackjack.content.builtin_persona import default_persona
+        persona = default_persona() if self.controller.config.ai_id == "default" else getattr(profile, "persona", None)
+        self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke, persona=persona)
         self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
         log = self.chaos_panel.log_area
         self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
@@ -416,7 +418,7 @@ class TableScene(Scene):
     def _draw_chaos_thinking(self, surface: pygame.Surface) -> None:
         """Procedural placeholder animation; no additional art is required."""
         img = self.app.assets.font(theme.FONT_BODY).render(
-            "The Chaos AI is thinking...", True, theme.CHAOS_MAGENTA,
+            f"{self.chaos_panel.persona.name if self.chaos_panel.persona else 'Chaos AI'} is thinking...", True, theme.CHAOS_MAGENTA,
         )
         surface.blit(img, img.get_rect(center=(W // 2, ACTION_Y + 14)))
         active = int(self._timer / 0.25) % 3

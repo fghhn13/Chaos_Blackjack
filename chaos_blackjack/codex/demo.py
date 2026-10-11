@@ -145,7 +145,7 @@ def run_demo(script: DemoScript, config: RunConfig) -> list[DemoFrame]:
             controller.loop.modifiers = controller.loop.modifiers.with_added(modifier)
             controller.loop.emit_event(Event(EventType.RULE_MODIFIER_APPLIED, {"rule_id": rid, "params": params}))
             if controller.phase == TablePhase.CHAOS:
-                # The real controller checks naturals after the explicit rule.
+                # Enter the player turn and settle any rule-induced opening bust.
                 controller.resolve_chaos()
             else:
                 controller._settle_if_player_bust()

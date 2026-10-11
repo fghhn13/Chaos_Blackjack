@@ -6,8 +6,8 @@ rolled from `RunConfig.shop_prices`; it restocks every
 Rolls are seeded per round, so the same run seed always shows the same shelves.
 
 Prices are fixed chips, or (`RunConfig.shop_bankroll_pct`) a percentage of
-the bankroll when the stock is rolled, never below that percentage of
-`RunConfig.shop_price_floor` (the profile's start bankroll).
+the bankroll when the stock is rolled, rounded half up and at least one chip.
+Custom configurations and saved runs may retain an optional price floor.
 """
 
 from __future__ import annotations

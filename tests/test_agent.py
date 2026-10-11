@@ -33,9 +33,9 @@ def test_new_run_starts_at_betting() -> None:
     obs = r["obs"]
     assert r["ok"] and obs["schema"] == 2
     assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet", "buy", "reroll"]
-    assert obs["shop"]["reroll_price"] == 10
+    assert obs["shop"]["reroll_price"] == 3
     assert len(obs["shop"]["offers"]) == 3 and obs["shop"]["restock_in"] == 2
-    assert obs["bet_range"] == [1, 50] and obs["you"] is None
+    assert obs["bet_range"] == [5, 50] and obs["you"] is None
     assert "bet <amount>" in obs["hint"]
 
 
@@ -140,7 +140,7 @@ def test_run_over_and_step_limit() -> None:
     assert restored.observe()["phase"] == "run_over"
 
     limited = AgentSession.new(seed=1, max_steps=1)
-    limited.execute({"cmd": "bet", "amount": 1})
+    limited.execute({"cmd": "bet", "amount": 5})
     assert limited.execute({"cmd": "act", "action": "stand"})["error"]["code"] == "step_limit"
 
 

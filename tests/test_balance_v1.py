@@ -47,9 +47,9 @@ def test_restock_prices_use_the_bankroll_at_restock() -> None:
 
 def test_reroll_once_per_stock_costs_chips_and_survives_saves() -> None:
     c = GameController(RunConfig(seed=4))
-    assert c.view().shop_reroll_price == 10 and c.view().can(Action.REROLL)
+    assert c.view().shop_reroll_price == 3 and c.view().can(Action.REROLL)
     c.reroll_shop()
-    assert c.run.money == 90 and c.shop.rerolled and c.view().shop_reroll_price is None
+    assert c.run.money == 97 and c.shop.rerolled and c.view().shop_reroll_price is None
     assert not c.view().can(Action.REROLL) and c.shop.stock_round == 1
     with pytest.raises(ActionError):
         c.reroll_shop()
@@ -70,7 +70,7 @@ def test_free_rerolls_are_counted_per_run_across_restocks() -> None:
     c.reroll_shop()
     assert c.run.money == 100 and c.shop.free_rerolls_used == 1
     c.shop = ShopState(c.shop.stock_round, c.shop.offers, free_rerolls_used=1)  # new stock keeps the count
-    assert c.reroll_price() == 10
+    assert c.reroll_price() == 3
 
 
 def test_calm_rounds_and_rule_weights_in_the_offline_ai() -> None:

@@ -17,8 +17,8 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'table.allow_surrender',   '1',            'bool', NULL, NULL, 'Surrender allowed on the first decision'),
     (:profile, 'shop.slots',              '3',            'int',  1,    NULL, 'Different items on sale per restock'),
     (:profile, 'shop.refresh_rounds',     '2',            'int',  1,    NULL, 'Rounds between restocks'),
-    (:profile, 'shop.reroll_price',       '10',           'int',  0,    NULL, 'Chips for one reroll of the current stock (once per stock)'),
-    (:profile, 'bet.min',                 '1',            'int',  1,    NULL, 'Smallest bet'),
+    (:profile, 'shop.reroll_price',       '3',           'int',  0,    NULL, 'Chips for one reroll of the current stock (once per stock)'),
+    (:profile, 'bet.min',                 '5',            'int',  1,    NULL, 'Smallest bet'),
     (:profile, 'bet.max_fraction',        '0.5',          'float',0.01, 1,    'Largest bet as a share of the bankroll (rounded down)'),
     (:profile, 'chaos.guidance_probability','0.5',        'float',0,    1,    'Probability of guiding rather than misleading portrait advice'),
     (:profile, 'chaos.memory_enabled',    '0',            'bool', NULL, NULL, 'Collect and persist run-local Chaos history'),
@@ -31,17 +31,16 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'meta.loss_per_peak_gain', '4',            'float',0,    NULL, 'Consolation tokens per 100% of the start bankroll gained at the peak'),
     (:profile, 'meta.loss_cap',           '5',            'int',  0,    NULL, 'Most consolation tokens for a lost run');
 
--- Prices tuned with black-jack-sim (balance v1). `params` is item tuning (JSON).
+-- Prices revised from agent playtest feedback. `params` is item tuning (JSON).
 -- `bankroll_pct`: `price` is a percentage of the bankroll when the stock is
--- rolled, never below that percentage of run.start_money (start-money upgrades
--- do not raise it), so the numbers below are also the opening prices.
+-- rolled, rounded half up with a minimum price of one chip.
 INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
-    (:profile, 'peek',             'bankroll_pct',  6, NULL),
+    (:profile, 'peek',             'bankroll_pct',  4, NULL),
     (:profile, 'danger_radar',     'bankroll_pct',  6, NULL),
-    (:profile, 'swap',             'bankroll_pct', 10, NULL),
-    (:profile, 'hole_card_hacker', 'bankroll_pct', 12, NULL),
-    (:profile, 'fate_oracle',      'bankroll_pct', 18, '{"cards": 3}'),
-    (:profile, 'shield',           'bankroll_pct', 15, NULL);
+    (:profile, 'swap',             'bankroll_pct', 2, NULL),
+    (:profile, 'hole_card_hacker', 'bankroll_pct', 3, NULL),
+    (:profile, 'fate_oracle',      'bankroll_pct', 8, '{"cards": 3}'),
+    (:profile, 'shield',           'bankroll_pct', 5, NULL);
 
 -- Sold only when the example content pack is loaded; unused plugin ids are
 -- filtered by the run-scoped registry before the controller rolls stock.

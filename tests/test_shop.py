@@ -15,7 +15,7 @@ from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
 from chaos_blackjack.core.run_state import RunSaveData
 from chaos_blackjack.registry import get_registry
 
-PRICES = {"peek": 10, "swap": 20, "shield": 30}
+PRICES = {"peek": 10, "swap": 20, "hole_card_hacker": 30}
 
 
 def _c(r: str, s: str = "♠") -> Card:
@@ -23,7 +23,7 @@ def _c(r: str, s: str = "♠") -> Card:
 
 
 def _ctrl(**cfg) -> GameController:
-    return GameController(RunConfig(seed=1, shop_prices=dict(PRICES), **cfg), save_fn=lambda d, n: n)
+    return GameController(RunConfig(seed=1, shop_prices=dict(PRICES), shop_bankroll_pct=(), min_bet=1, **cfg), save_fn=lambda d, n: n)
 
 
 def _play_round(c: GameController) -> None:
@@ -61,9 +61,9 @@ def test_buy_spends_bankroll_and_sells_out() -> None:
 
 def test_buy_must_leave_enough_to_bet() -> None:
     c = _ctrl(start_money=31)
-    assert not next(o for o in c.view().shop_offers if o.item == "shield").affordable
+    assert not next(o for o in c.view().shop_offers if o.item == "hole_card_hacker").affordable
     with pytest.raises(ActionError):
-        c.buy("shield")
+        c.buy("hole_card_hacker")
     c.buy("swap")
     assert c.view().money == 11
 
