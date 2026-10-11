@@ -10,6 +10,7 @@ import pygame
 from chaos_blackjack import meta
 from chaos_blackjack.meta.models import MAX_NAME_LENGTH
 from chaos_blackjack.gui import theme
+from chaos_blackjack.gui.components.lobby import PlayerBadge, back_button, draw_backdrop, draw_header
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, fit_text, wrap_text
 
@@ -65,12 +66,16 @@ class MetaScreen(Scene):
         self.leaving = False
 
     def draw(self, surface):
-        surface.fill(theme.DARK)
-        pygame.draw.line(surface, theme.GOLD_DIM, (64, 116), (1216, 116), 1)
-        text(surface, self.app.assets, self.title, (64, 38), size=40, color=theme.GOLD, width=1152)
-        text(surface, self.app.assets, self.subtitle, (66, 88), size=18, width=1150)
+        draw_backdrop(surface, self.app.assets, shade=205)
+        self.draw_header(surface)
+
+    def draw_header(self, surface):
+        draw_header(surface, self.app.assets, self.title, self.subtitle)
+        player = getattr(self, "player", None)
+        if player is not None:
+            PlayerBadge(self.app.assets, player, None).draw(surface)
         if self.message:
-            paragraph(surface, self.app.assets, self.message, (66, 582, 1148, 48), color=theme.CHAOS_MAGENTA)
+            paragraph(surface, self.app.assets, self.message, (66, 596, 1148, 40), color=theme.CHAOS_MAGENTA)
 
 
 @register_scene("meta_name")
@@ -146,16 +151,17 @@ class MetaSettings(MetaScreen):
         self.mute = Button(a, (340, 190, 600, 60), "", self.app.audio.toggle_mute)
         self.ui = WidgetGroup(
             self.mute,
-            Button(a, (340, 280, 285, 58), "Volume -", lambda: self.app.adjust_volume(-0.1)),
-            Button(a, (655, 280, 285, 58), "Volume +", lambda: self.app.adjust_volume(0.1)),
-            Button(a, (340, 380, 600, 58), "Toggle fullscreen", self.app.toggle_fullscreen),
-            Button(a, (64, 640, 240, 52), "Back", self.app.scenes.pop, style="ghost", hotkey=pygame.K_ESCAPE),
+            Button(a, (340, 280, 285, 58), "Volume -", lambda: self.app.adjust_volume(-0.1), key_hint="-"),
+            Button(a, (655, 280, 285, 58), "Volume +", lambda: self.app.adjust_volume(0.1), key_hint="+"),
+            Button(a, (340, 380, 600, 58), "Toggle fullscreen", self.app.toggle_fullscreen, key_hint="F11"),
+            back_button(a, self.app.scenes.pop),
+            keyboard=True,
         )
 
     def draw(self, surface):
         state = "muted" if self.app.audio.muted else f"{self.app.audio.volume:.0%}"
         self.mute.text = f"Sound: {state}"
         super().draw(surface)
-        paragraph(surface, self.app.assets, "M mute   +/- volume   F11 fullscreen   F5 reload assets",
+        paragraph(surface, self.app.assets, "M mute  ·  +/- volume  ·  F11 fullscreen  ·  F5 reload assets",
                   (340, 480, 600, 60))
         self.ui.draw(surface)

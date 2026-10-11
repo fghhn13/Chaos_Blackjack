@@ -1,4 +1,4 @@
-"""Codex gallery and detail scenes; providers own the content and demos."""
+"""Collection (codex) browser and detail scenes; providers own the content and demos."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from chaos_blackjack.codex import CodexEntry, codex_entries, codex_kinds, run_de
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.codex_demo import CodexDemo
 from chaos_blackjack.gui.components.codex_text import draw_text, wrap_text
+from chaos_blackjack.gui.components.lobby import MARGIN, back_button, draw_backdrop, draw_header
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
@@ -29,19 +30,18 @@ class CodexScene(Scene):
         self.page = 0
         self.tabs = []
         assets = self.app.assets
-        x = 40
+        x = MARGIN
         for k in self.kinds:
             width = max(140, assets.font(theme.FONT_BODY).size(k.label)[0] + 32)
-            self.tabs.append(Button(assets, (x, 84, width, 42), k.label,
+            self.tabs.append(Button(assets, (x, 134, width, 42), k.label,
                                     lambda key=k.id: self._select(key), style="ghost", font_size=20))
             x += width + 10
-        self.previous = Button(assets, (40, H - 68, 144, 40), "Previous", lambda: self._page(-1),
+        self.previous = Button(assets, (288, 642, 144, 50), "Previous", lambda: self._page(-1),
                                style="ghost", hotkey=pygame.K_LEFT, font_size=18)
-        self.next = Button(assets, (198, H - 68, 144, 40), "Next", lambda: self._page(1),
+        self.next = Button(assets, (442, 642, 144, 50), "Next", lambda: self._page(1),
                            style="ghost", hotkey=pygame.K_RIGHT, font_size=18)
         self.ui = WidgetGroup(*self.tabs, self.previous, self.next,
-            Button(assets, (W - 160, 24, 120, 42), "Back", self.app.scenes.pop,
-                   style="ghost", hotkey=pygame.K_ESCAPE, font_size=20))
+            back_button(assets, self.app.scenes.pop))
         self._select(self.current)
 
     def _select(self, kind):
@@ -60,7 +60,7 @@ class CodexScene(Scene):
         self.tiles = []
         for index, entry in enumerate(self.entries[self.page * PAGE_SIZE:(self.page + 1) * PAGE_SIZE]):
             row, column = divmod(index, 5)
-            self.tiles.append((pygame.Rect(40 + column * 242, 158 + row * 212, 224, 194), entry))
+            self.tiles.append((pygame.Rect(MARGIN + column * 234, 194 + row * 214, 216, 200), entry))
         self.previous.enabled = self.page > 0
         self.next.enabled = (self.page + 1) * PAGE_SIZE < len(self.entries)
 
@@ -81,10 +81,8 @@ class CodexScene(Scene):
 
     def draw(self, surface):
         assets = self.app.assets
-        surface.fill(theme.DARK)
-        draw_text(surface, "Codex", assets.font(theme.FONT_HEADING, role="display"), (40, 24, 800, 48), theme.GOLD)
-        draw_text(surface, "Explore the rules, items and opponents at your table.", assets.font(18),
-                  (238, 36, 800, 32), theme.TEXT_MUTED)
+        draw_backdrop(surface, assets, shade=215)
+        draw_header(surface, assets, "Collection", "Explore the rules, items and opponents at your table.")
         self.ui.draw(surface)
         mouse = self.app.mouse_pos()
         hovered = None
@@ -97,8 +95,8 @@ class CodexScene(Scene):
             draw_text(surface, entry.name, assets.font(20), (rect.x + 12, rect.y + 134, rect.w - 24, 56), centered=True)
             if selected:
                 hovered = entry
-        footer = hovered.summary if hovered else f"{len(self.entries)} entries    Tab: switch category    Click an entry to explore"
-        draw_text(surface, footer, assets.font(16), (370, H - 66, W - 410, 48), theme.TEXT_MUTED)
+        footer = hovered.summary if hovered else f"{len(self.entries)} entries  ·  Tab: switch category  ·  Click an entry to explore"
+        draw_text(surface, footer, assets.font(16), (606, 646, W - 670, 48), theme.TEXT_MUTED)
 
 
 @register_scene("codex_detail")
@@ -155,7 +153,7 @@ class CodexDetailScene(Scene):
 
     def draw(self, surface):
         a = self.app.assets
-        surface.fill(theme.DARK)
+        draw_backdrop(surface, a, shade=215)
         icon = a.image_fit(self.entry.icon, (52, 52))
         surface.blit(icon, icon.get_rect(center=(66, 50)))
         draw_text(surface, self.entry.name, a.font(theme.FONT_HEADING, role="display"), (110, 24, W - 310, 50), theme.GOLD)

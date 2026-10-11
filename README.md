@@ -16,7 +16,7 @@
 - **Plugins**: chaos rules (`rules/plugins/`) and items (`items/`) self-register; prompts (`ai/prompts/*.txt`) and permission profiles (`ai/permissions/*.json`) are data files.
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
 - **Player progression**: three named slots, Classic/Chaos modes, token rewards, permanent upgrades, starting consumables, checkpoints and run history.
-- **Codex**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
+- **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
 - **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
 - **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
 
@@ -29,12 +29,20 @@ pip install -e ".[gui]"            # Python 3.10+
 python -m chaos_blackjack.gui      # play in a window
 ```
 
-Choose **Players** to create or continue a player, then start a run from the hub.
-**New Game** starts quick play without tokens or player progression. Offline
-Chaos mode is available without an API key:
+On Windows, double-click `start_game.bat` to launch the GUI. It prefers a local
+`.venv` or `venv`, then the active Python or Windows Python launcher (Python
+3.10+). If Pygame is missing, it installs the GUI dependencies automatically
+(internet required). Launch errors keep the console open. You can also pass
+GUI options from a terminal: `start_game.bat --fullscreen` or
+`.\start_game.bat --mute` in PowerShell. The launcher uses the game's
+existing `.env` settings.
+
+The game opens on the home screen. The first time, **Start game** creates your
+player; after that, **Continue run** or **New run** (pick **Classic** or **Chaos**,
+check your upgrades, choose items to bring) takes you to the table. Offline
+Chaos mode needs no API key. To open the collection directly:
 
 ```bash
-python -m chaos_blackjack.gui --chaos
 python -m chaos_blackjack.gui --scene codex
 ```
 
@@ -142,7 +150,7 @@ Game logic never reads the database: front-ends load a `Balance` and build a
 ### Pygame GUI
 
 ```bash
-python -m chaos_blackjack.gui              # --fullscreen, --scene gallery, --profile NAME
+python -m chaos_blackjack.gui              # --fullscreen, --scene codex, --profile NAME
 ```
 
 | Phase | Mouse | Keyboard |
@@ -150,9 +158,9 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene gallery, --pr
 | Betting | left-click a chip to add, right-click to remove; Clear / Max; Shop | ↑ / ↓ ±1, Enter deals, B shop (1–3 buy) |
 | Your turn | Hit / Stand / Double / Surrender buttons | H / S / D / R |
 | Round over | Next Round | Enter |
-| Anywhere | — | Esc (menu, asks first), F11 fullscreen, F5 reload assets |
+| Anywhere | — | Esc (back to the main menu, asks first), F11 fullscreen, F5 reload assets |
 
-The window scales a fixed 1280×720 canvas with letterboxing. Toggle **Chaos Mode** on the main menu.
+The window scales a fixed 1280×720 canvas with letterboxing. Choose **Chaos** in New run's mode list.
 
 Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
 indicator appears while the table waits; gameplay controls stay disabled, and Esc,
@@ -193,14 +201,17 @@ current process. Missing clips, mixer failure and SDL dummy audio are silent.
 
 The standalone casino audio library and offline validator remain available: `python -m chaos_blackjack.audio validate`.
 
-#### Player progression and codex
+#### Player progression and collection
 
-**Players** opens three named slots with create, continue, rename and confirmed
-delete actions. The hub selects **Classic** or **Chaos**, lets you bring one
-copy of each selected consumable, and opens the meta shop, history, codex and
-settings. Tokens persist between runs; bankroll belongs to the current run.
+The home screen shows the current player (top right; click to switch) and the
+next step: **Continue run** with its mode, round and chips when a run is
+unfinished, otherwise **New run**, plus **Upgrades**, **Collection** and **Run
+history**. **Players** holds three named slots with play, create, rename and
+confirmed delete actions. **New run** selects **Classic** or **Chaos**, shows the
+permanent upgrades in effect and lets you bring one copy of each checked
+consumable; nothing is spent until the run starts. Tokens persist between runs; bankroll belongs to the current run.
 
-The **meta shop** uses tokens for permanent starting-bankroll, shop-slot and
+**Upgrades** uses tokens for permanent starting-bankroll, shop-slot and
 discount upgrades, plus consumable starting items. The table's between-round
 shop uses bankroll. Victory earns the profile's win reward; defeat earns capped
 consolation based on rounds and peak bankroll. Abandoning earns no tokens and
@@ -208,24 +219,24 @@ does not return consumed starting items. The result screen settles each run
 once and shows the token breakdown.
 
 Player runs checkpoint at safe table phases. Closing the window preserves the
-last checkpoint for **Continue saved run**; confirming a return to the hub
+last checkpoint for **Continue run**; confirming a return to the main menu
 abandons the run. Replacing an unfinished run also asks for confirmation.
 History shows outcomes, bankroll, tokens, applied upgrades and encounter counts.
 
-The **codex** is available from the hub or `--scene codex`. Its rule, item, mode
+The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. Its rule, item, mode
 and AI tabs show every entry. Detail pages use the selected profile's numbers;
 card demonstrations run on a real controller with fixed deals and an offline
 backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
 **Page Up/Page Down** scrolls descriptions. Selected content packs appear in
-the codex. Browsing and demonstrations never spend tokens or call a paid model.
+the collection. Browsing and demonstrations never spend tokens or call a paid model.
 
-The agent CLI and quick play stay independent of player upgrades. Development
+The agent CLI stays independent of player upgrades. Development
 tools include `python -m chaos_blackjack.data players`, `history SLOT` and
 `grant SLOT TOKENS`. See [Player GUI guide](docs/META_GUI.md),
 [Meta API contract](docs/design/META_PROGRESSION.md) and
 [Codex API and replay guide](docs/design/CODEX.md).
 
-**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; the in-game **Asset Gallery** shows which are still placeholders and previews each image on dark / felt / white backdrops (B) to check alpha edges. A font in `assets/fonts/` overrides the UI font.
+**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; `python scripts/validate_assets.py` reports which are still placeholders and `python scripts/preview_assets.py` renders matte sheets on dark / felt / white backdrops to check alpha edges. A font in `assets/fonts/` overrides the UI font.
 
 ### Text CLI
 
@@ -372,7 +383,7 @@ to `main` and manual dispatch: the full suite on Ubuntu (Python 3.10, 3.12) and
 Windows (3.12), application/GUI and CLI smoke checks, content-pack validation
 and sound verification. A separate job builds the source distribution and wheel,
 installs the wheel, then checks its migrations, seeded values, prompts, sounds,
-meta lifecycle and real hub-to-codex navigation from outside the checkout.
+meta lifecycle and real home-to-collection navigation from outside the checkout.
 Distribution files are uploaded as a workflow artifact. All runtime checks
 disable billed calls and need no API secrets.
 

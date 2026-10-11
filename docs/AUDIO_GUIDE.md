@@ -144,8 +144,8 @@ single drain and fan-out so sound, feed and future animations all receive the
 same stream. Do not create another audio drain, emit extra core events or play
 the same cue both in a button handler and its notice subscriber.
 
-The minimal GUI hooks already follow this recipe. The Sound button and `-` / `+`
-buttons live on the main menu; `M` and `+/-` work in all scenes. They adjust
+The minimal GUI hooks already follow this recipe. The Sound and Volume `-` / `+`
+buttons live on the Settings screen (opened from the home screen); `M` and `+/-` work in all scenes. They adjust
 remembered master volume by 10 percentage points, clamped to 0..100%. Changing
 volume while muted keeps mute active. The default is 40%, further reduced by
 each cue's gain. Startup flags are `--volume 0..1` and `--mute`.

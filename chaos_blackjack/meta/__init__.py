@@ -18,7 +18,7 @@ from collections.abc import Iterable
 
 from chaos_blackjack.meta.effects import Effect, effect_ids, get_effect, register_effect
 from chaos_blackjack.meta.models import (
-    SLOTS, MetaError, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart, UpgradeOffer,
+    SLOTS, MetaError, PendingRun, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart, UpgradeOffer,
 )
 from chaos_blackjack.meta.service import (
     LoopFactory, MetaService, ModeOption, build_run_config, consolation_tokens, reward_tokens,
@@ -78,6 +78,10 @@ def start_run(player_id: int, mode_id: str, *, consumables: Iterable[str] = (), 
                                loop_factory=loop_factory)
 
 
+def pending_run(player_id: int) -> PendingRun | None:
+    return service().pending_run(player_id)
+
+
 def resume_run(player_id: int, *, loop_factory: LoopFactory | None = None) -> RunStart | None:
     return service().resume_run(player_id, loop_factory=loop_factory)
 
@@ -99,10 +103,10 @@ def codex_seen(player_id: int) -> dict[tuple[str, str], int]:
 
 
 __all__ = [
-    "SLOTS", "Effect", "MetaError", "MetaService", "ModeOption", "Player", "PlayerSlot", "PlayerStats",
+    "SLOTS", "Effect", "MetaError", "MetaService", "ModeOption", "PendingRun", "Player", "PlayerSlot", "PlayerStats",
     "RunRecord", "RunReward", "RunStart", "UpgradeOffer", "abandon_run", "build_run_config", "buy_upgrade",
     "codex_seen", "reward_tokens",
     "consolation_tokens", "create_player", "delete_player", "effect_ids", "finish_run", "get_effect",
-    "get_player", "history", "list_slots", "meta_shop", "modes", "register_effect", "rename_player",
+    "get_player", "history", "list_slots", "meta_shop", "modes", "pending_run", "register_effect", "rename_player",
     "resume_run", "service", "start_run", "use_service",
 ]

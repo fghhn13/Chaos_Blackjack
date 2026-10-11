@@ -69,7 +69,7 @@ class ChaosPokeScene(Scene):
                 self._confirm_pending = True
                 self.app.scenes.push(
                     "confirm", message="Return to the main menu? This run will be lost.",
-                    on_confirm=lambda: self.app.scenes.reset("menu"),
+                    on_confirm=lambda: self.app.scenes.reset("home"),
                 )
             return
         # All events stop here; avatar clicks cannot reach the table/shop.
@@ -101,7 +101,7 @@ class ChaosPokeScene(Scene):
                 pygame.draw.circle(surface, theme.CHAOS_MAGENTA if i == active else theme.CHAOS_PURPLE,
                                    (self.box.centerx + (i - 1) * 18, self.box.centery + 20),
                                    5 if i == active else 3)
-            note = a.font(theme.FONT_SMALL).render("Esc: return to menu", True, theme.TEXT_MUTED)
+            note = a.font(theme.FONT_SMALL).render("Esc: leave the table", True, theme.TEXT_MUTED)
             surface.blit(note, note.get_rect(midbottom=(self.box.centerx, self.box.bottom - 24)))
         else:
             font = a.font(theme.FONT_BODY)

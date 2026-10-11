@@ -12,7 +12,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--fullscreen", action="store_true")
     p.add_argument("--volume", type=checked_volume, default=DEFAULT_MASTER_VOLUME, help="master volume, 0..1 (default 0.4)")
     p.add_argument("--mute", action="store_true", help="start with sound muted")
-    p.add_argument("--scene", default="menu", help="scene to open first (e.g. gallery)")
+    p.add_argument("--scene", default="home", help="scene to open first (e.g. codex)")
     p.add_argument("--profile", default=None, help="balance profile in data/game.db (default: $CHAOS_PROFILE or 'default')")
     p.add_argument("--pack", action="append", default=[])
     p.add_argument("--ai", default="default")

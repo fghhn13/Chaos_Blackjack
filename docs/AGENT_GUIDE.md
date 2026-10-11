@@ -360,11 +360,11 @@ above; it does not block future Chaos actions.
 
 ## 15. GUI player progression
 
-The GUI now offers three named player slots, a hub, permanent/consumable upgrades,
-run rewards and history through the meta API. Quick play remains available through
-New Game. The agent interface continues without meta progression or token rewards,
+The GUI now offers three named player slots, a home screen with run setup, permanent/consumable upgrades,
+run rewards and history through the meta API; it opens on player select and has
+no quick play. The agent interface continues without meta progression or token rewards,
 so its seeded runs remain fair and reproducible. See [GUI guide](META_GUI.md).
 
-The hub's Codex opens rule, item, mode and AI reference pages with live tuning
+The home screen's Collection (codex) opens rule, item, mode and AI reference pages with live tuning
 and offline controller demonstrations. Space pauses, R replays and Left/Right
 steps through snapshots. These previews never change player progress or bill a model.

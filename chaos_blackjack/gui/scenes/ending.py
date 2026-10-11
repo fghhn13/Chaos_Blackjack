@@ -24,7 +24,7 @@ class EndingScene(Scene):
         self.ui = WidgetGroup(
             Button(a, (W // 2 - 230, H - 150, 210, 58), "Play Again", lambda: self.app.scenes.reset("table"),
                    hotkey=pygame.K_RETURN),
-            Button(a, (W // 2 + 20, H - 150, 210, 58), "Main Menu", lambda: self.app.scenes.reset("menu"),
+            Button(a, (W // 2 + 20, H - 150, 210, 58), "Main Menu", lambda: self.app.scenes.reset("home"),
                    style="ghost", hotkey=pygame.K_ESCAPE),
         )
 

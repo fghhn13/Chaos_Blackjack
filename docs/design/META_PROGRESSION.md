@@ -123,6 +123,7 @@ start_run(player_id, mode_id, *, consumables=(), profile=None, seed=None, loop_f
     # consumables (one entry per copy) are used up here; the controller is
     # tracked and saves into the player's run (controller.save(name))
 resume_run(player_id, *, loop_factory=None) -> RunStart | None   # unfinished run with a save
+pending_run(player_id) -> PendingRun | None   # PendingRun(run_id, mode, round, money, updated_at); reads the save without loading it
 finish_run(run_id, controller) -> RunReward
     # RunReward(tokens, breakdown: tuple[(label, tokens)], result, player); only once the run is over
 abandon_run(run_id) -> None                          # quitting mid-run: result "abandoned", no tokens
@@ -177,14 +178,15 @@ and the text. The GUI only plays frames.
 
 | Screen | Owner | Content |
 |---|---|---|
-| Player select | B | 3 slots: create / continue / rename / delete (confirm) |
-| Hub | B | tokens, Start run (mode picker + consumables to bring), Meta shop, History, Codex, Settings, back |
-| Meta shop | B | permanent upgrades (level pips, next cost) and consumables (owned count) |
-| Run result | B | victory / defeat, token breakdown, back to hub (replaces the ending scene when a player is active) |
+| Home | B | start scene: current player badge; Continue run (with summary) / New run / Start game; Upgrades, Collection, Run history; Settings, Quit |
+| Players | B | 3 slots: play / create / rename / delete (confirm) |
+| Run setup | B | mode list + rules showcase, permanent upgrades in effect, consumables to bring, Start run |
+| Upgrades | B | one tab per offer kind: permanent upgrades (level pips, next cost) and consumables (owned count) |
+| Run result | B | victory / defeat, token breakdown, back to home (replaces the ending scene when a player is active) |
 | History | B | list of runs, detail with summary |
-| Codex | C | tabs per kind, grid of icon + name; detail: animated demo + text with live numbers |
+| Collection (codex) | C | tabs per kind, grid of icon + name; detail: animated demo + text with live numbers |
 
-Main menu keeps "Quick play" (no player, as today) and the developer asset gallery.
+The game starts on Home (see `docs/META_GUI.md`). There is no quick play and no in-game asset gallery.
 
 ## 7. Work split
 
@@ -202,7 +204,7 @@ File ownership, to avoid conflicts:
 - A: `chaos_blackjack/meta/**`, `chaos_blackjack/modes/**`, `data/migrations/0003_*`, the meta rows in
   `data/seed/default.sql`, `app/config.py` and `app/controller.py` changes, `data/__main__.py`
   (player / history commands), `tests/test_meta_*`.
-- B: `gui/scenes/{player_select,hub,meta_shop,run_result,history}.py`, `gui/scenes/menu.py`,
+- B: `gui/scenes/{home,player_select,run_setup,meta_shop,run_result,history}.py`,
   new `gui/components/*` for those screens, `tests/test_gui_meta_*`.
 - C: `chaos_blackjack/codex/**`, `gui/scenes/codex*.py`, new codex components, codex icon specs in
   `gui/assets/manifest.py` (mode icons via `scripts/fetch_icons.py`), `tests/test_codex_*`.

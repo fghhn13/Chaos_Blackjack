@@ -125,7 +125,7 @@ controller's scoped registry so content-pack rules can be demonstrated too.
 
 Open the gallery with `app.scenes.push("codex", config=config)`; `config` is
 optional and defaults to `app.run_config`. An optional `kind` selects the
-initial tab. Agent B's hub can use this entry point without importing the
+initial tab. The home screen uses this entry point without importing the
 scene class. For development, launch `python -m chaos_blackjack.gui --scene
 codex`. The existing scene package imports register both `codex` and
 `codex_detail`.

@@ -25,7 +25,7 @@ class RunResultScene(MetaScreen):
         victory = self.reward is not None and self.reward.result == "victory"
         self.title = "Victory" if victory else "Run complete" if self.reward else "Could not settle this run"
         self.subtitle = f"Final bankroll: {self.controller.run.money}  /  Rounds: {self.controller.last_result.round if self.controller.last_result else max(0, self.controller.run.round - 1)}"
-        self.back = Button(self.app.assets, (470, 640, 340, 52), "Back to hub", self.back_to_hub,
+        self.back = Button(self.app.assets, (470, 640, 340, 52), "Continue", self.back_to_hub,
                            enabled=self.reward is not None, hotkey=pygame.K_RETURN)
         self.ui = WidgetGroup(self.back)
         if self.reward is None:
@@ -37,7 +37,7 @@ class RunResultScene(MetaScreen):
     def back_to_hub(self):
         if not self.leaving:
             self.leaving = True
-            self.app.scenes.reset("hub", player_id=self.player_id)
+            self.app.scenes.reset("home")
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.reward:

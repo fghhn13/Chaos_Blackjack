@@ -58,20 +58,26 @@ def player_id():
     return meta.list_slots()[0].player.id
 
 
-def test_slot_create_name_entry_and_continue(app):
-    select = open_screen(app, "player_select")
+def open_saves(app):
+    home = open_screen(app, "home")
+    click(app, home.badge)
+    return app.scenes.top
+
+
+def test_slot_create_name_entry_and_play(app):
+    select = open_saves(app)
     assert len(select.slots) == 3 and select.slots[2].player is None
     click(app, select.buttons[(3, "create")])
     dialog = app.scenes.top
     app.scenes.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="Jia"))
     assert dialog.value == "Jia"
     key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "HubScene"
+    home = app.scenes.top
+    assert type(home).__name__ == "HomeScene" and home.player.name == "Jia"
     assert meta.list_slots()[2].player.name == "Jia"
-    key(app, pygame.K_ESCAPE)
-    assert type(app.scenes.top).__name__ == "PlayerSelectScene"
-    click(app, app.scenes.top.buttons[(3, "continue")])
-    assert app.scenes.top.player.name == "Jia"
+    click(app, home.badge)
+    click(app, app.scenes.top.buttons[(1, "continue")])
+    assert app.scenes.top is home and home.player.name == "Ace"
 
 
 def test_invalid_name_stays_in_dialog_and_cancel_keeps_slot_empty(app):
@@ -104,7 +110,7 @@ def test_delete_requires_confirmation_and_refreshes_slots(app):
 
 
 def test_duplicate_name_submit_creates_only_one_player(app):
-    select = open_screen(app, "player_select")
+    select = open_saves(app)
     click(app, select.buttons[(3, "create")])
     dialog = app.scenes.top
     dialog.value = "Once"
@@ -112,7 +118,7 @@ def test_duplicate_name_submit_creates_only_one_player(app):
     dialog.submit()
     app.scenes.apply_pending()
     assert meta.list_slots()[2].player.name == "Once"
-    assert sum(type(s).__name__ == "HubScene" for s in app.scenes.stack) == 1
+    assert [type(s).__name__ for s in app.scenes.stack] == ["HomeScene"]
 
 
 def test_meta_shop_buy_refreshes_cost_tokens_and_levels(app):
@@ -140,25 +146,28 @@ def test_shop_tabs_consumables_and_rejected_stale_purchase(app):
     app._render()
 
 
-def test_hub_refreshes_after_shop_and_settings_keep_navigation(app):
-    hub = open_screen(app, "hub", player_id=player_id())
-    click(app, hub.nav["meta_shop"])
+def test_home_refreshes_after_upgrades_and_settings_keep_navigation(app):
+    home = open_screen(app, "home")
+    tokens = home.player.tokens
+    click(app, home.entries["upgrades"])
     app.scenes.top.tab("consumable")
     click(app, app.scenes.top.buy_buttons["start_peek"])
     key(app, pygame.K_ESCAPE)
-    assert app.scenes.top is hub
-    assert "start_peek" in hub.consume_buttons
-    click(app, hub.nav["meta_settings"])
+    assert app.scenes.top is home and home.player.tokens < tokens
+    click(app, home.entries["new"])
+    assert "start_peek" in app.scenes.top.item_rows
+    key(app, pygame.K_ESCAPE)
+    click(app, home.settings)
     settings = app.scenes.top
     settings.mute.click()
     assert app.audio.muted
     key(app, pygame.K_ESCAPE)
-    assert app.scenes.top is hub
+    assert app.scenes.top is home
 
 
 def test_mode_and_consumable_choices_only_spend_when_run_starts(app):
     pid = player_id()
-    hub = open_screen(app, "hub", player_id=pid)
+    hub = open_screen(app, "run_setup", player_id=pid)
     before = meta.get_player(pid)
     hub.choose_mode("chaos")
     hub.toggle_consumable("start_peek")
@@ -218,13 +227,13 @@ def test_long_history_summary_can_be_scrolled_to_the_last_item(app):
 
 
 def test_start_error_keeps_consumable_selection_and_reenables_controls(app, monkeypatch):
-    hub = open_screen(app, "hub", player_id=player_id())
+    hub = open_screen(app, "run_setup", player_id=player_id())
     hub.toggle_consumable("start_peek")
     def reject(*args, **kwargs):
         raise meta.MetaError("Cannot start this run")
     monkeypatch.setattr(meta, "start_run", reject)
     hub.begin_run()
-    assert not hub.starting and not hub.leaving
+    assert not hub.starting and not hub.leaving and hub.start_button.enabled
     assert "start_peek" in hub.selected and hub.message == "Cannot start this run"
     app._render()
 
@@ -234,7 +243,7 @@ def test_missing_real_backend_does_not_consume_items_or_create_a_run(app, monkey
 
     monkeypatch.setattr(relay, "try_create_gptsapi_llm", lambda: None)
     app.run_config = replace(app.run_config, use_llm=True)
-    hub = open_screen(app, "hub", player_id=player_id())
+    hub = open_screen(app, "run_setup", player_id=player_id())
     hub.toggle_consumable("start_peek")
     before_player, before_runs = meta.get_player(player_id()), meta.history(player_id())
     hub.begin_run()
@@ -244,11 +253,109 @@ def test_missing_real_backend_does_not_consume_items_or_create_a_run(app, monkey
     app._render()
 
 
-def test_main_menu_players_entry_and_asset_gallery_remain_available(app):
-    menu = open_screen(app, "menu")
-    assert any(getattr(b, "text", "") == "Asset Gallery" for b in menu.ui.widgets)
-    click(app, next(b for b in menu.ui.widgets if getattr(b, "text", "") == "Players"))
-    assert type(app.scenes.top).__name__ == "PlayerSelectScene"
+def test_home_without_unfinished_run_leads_with_new_run(app):
+    home = open_screen(app, "home")
+    assert home.player.name == "Ace" and "continue" not in home.entries
+    assert home.entries["new"].weight == "primary"
+    assert list(home.entries) == ["new", "upgrades", "codex", "history"]
+    app.running = True
+    key(app, pygame.K_ESCAPE)
+    assert type(app.scenes.top).__name__ == "ConfirmScene"
+    key(app, pygame.K_RETURN)
+    assert app.running is False
+
+
+def test_home_with_unfinished_run_leads_with_continue_and_summary(app):
+    pid = player_id()
+    started = meta.start_run(pid, "chaos")
+    started.controller.save("pending")
+    home = open_screen(app, "home")
+    assert list(home.entries)[:2] == ["continue", "new"]
+    assert home.entries["continue"].weight == "primary" and home.entries["new"].weight == "secondary"
+    run = started.controller.run
+    assert home.entries["continue"].detail == f"Chaos  ·  Round {max(1, run.round)}  ·  {run.money} chips"
+
+
+def test_first_launch_start_game_creates_player_and_opens_setup(app):
+    for slot in meta.list_slots():
+        if slot.player:
+            meta.delete_player(slot.player.id)
+    home = open_screen(app, "home")
+    assert home.player is None and type(home.badge).__name__ == "EmptyBadge"
+    assert list(home.entries) == ["start", "upgrades", "codex", "history"]
+    assert home.entries["upgrades"].note and home.entries["history"].note
+    click(app, home.entries["start"])
+    app.scenes.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="Nova"))
+    key(app, pygame.K_RETURN)
+    setup = app.scenes.top
+    assert type(setup).__name__ == "RunSetupScene" and setup.player.name == "Nova"
+    assert meta.list_slots()[0].player.name == "Nova"
+
+
+@pytest.mark.parametrize("target", ["upgrades", "history", "badge"])
+def test_player_only_entries_explain_and_point_at_start_game(app, target):
+    for slot in meta.list_slots():
+        if slot.player:
+            meta.delete_player(slot.player.id)
+    home = open_screen(app, "home")
+    click(app, home.badge if target == "badge" else home.entries[target])
+    assert app.scenes.top is home and "Create one with Start game" in home.message
+    assert home.point > 0 and home.ui.focus is home.entries["start"]
+    key(app, pygame.K_RETURN)  # the pointed-at button is focused, so Enter creates a player
+    assert type(app.scenes.top).__name__ == "NameDialog"
+
+
+def test_home_remembers_choice_and_switching_player_updates_run_info(app):
+    pid = player_id()
+    meta.start_run(pid, "normal").controller.save("ace")
+    rookie = meta.list_slots()[1].player.id
+    home = open_screen(app, "home")
+    assert "continue" in home.entries
+    click(app, home.badge)
+    click(app, app.scenes.top.buttons[(2, "continue")])
+    assert home.player.id == rookie and "continue" not in home.entries
+    assert app.session["player_id"] == rookie
+    assert open_screen(app, "home").player.id == rookie  # remembered on return
+
+
+def test_deleting_current_player_falls_back_to_another(app):
+    select = open_saves(app)
+    current = app.session["player_id"]
+    slot = next(s.slot for s in select.slots if s.player and s.player.id == current)
+    click(app, select.buttons[(slot, "delete")])
+    key(app, pygame.K_RETURN)
+    key(app, pygame.K_ESCAPE)
+    home = app.scenes.top
+    assert home.player is not None and home.player.id != current
+
+
+def test_setup_choices_survive_leaving_and_returning(app):
+    pid = player_id()
+    setup = open_screen(app, "run_setup", player_id=pid)
+    setup.choose_mode("chaos")
+    setup.toggle_consumable("start_peek")
+    again = open_screen(app, "run_setup", player_id=pid)
+    assert again.mode_id == "chaos" and again.selected == {"start_peek"}
+    assert again.item_rows["start_peek"].check and again.mode_rows["chaos"].selected
+
+
+def test_setup_keyboard_focus_moves_and_activates(app):
+    setup = open_screen(app, "run_setup", player_id=player_id())
+    key(app, pygame.K_DOWN)
+    assert setup.ui.focus is setup.mode_rows["normal"]
+    key(app, pygame.K_DOWN)
+    key(app, pygame.K_SPACE)
+    assert setup.mode_id == "chaos"
+
+
+def test_broken_save_hides_continue_with_message(app, monkeypatch):
+    pid = player_id()
+    meta.start_run(pid, "normal").controller.save("broken")
+    home = open_screen(app, "home")
+    monkeypatch.setattr(meta, "resume_run", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad save")))
+    click(app, home.entries["continue"])
+    assert app.scenes.top is home and "could not be restored" in home.message
+    assert "continue" not in home.entries and home.entries["new"].weight == "primary"
 
 
 def test_saved_run_continue_does_not_consume_again(app):
@@ -256,9 +363,8 @@ def test_saved_run_continue_does_not_consume_again(app):
     started = meta.start_run(pid, "normal", consumables=["start_peek"])
     started.controller.save("continued")
     before = meta.get_player(pid).upgrades
-    hub = open_screen(app, "hub", player_id=pid)
-    assert hub.continue_button.enabled
-    click(app, hub.continue_button)
+    home = open_screen(app, "home")
+    click(app, home.entries["continue"])
     assert app.scenes.top.run_id == started.run_id
     assert meta.get_player(pid).upgrades == before
 
@@ -267,7 +373,7 @@ def test_replacing_saved_run_requires_confirmation(app):
     pid = player_id()
     old = meta.start_run(pid, "normal")
     old.controller.save("old")
-    hub = open_screen(app, "hub", player_id=pid)
+    hub = open_screen(app, "run_setup", player_id=pid)
     click(app, hub.start_button)
     key(app, pygame.K_ESCAPE)
     assert meta.history(pid)[0].result is None
@@ -289,7 +395,7 @@ def test_table_exit_confirmation_abandons_without_reward(app):
     assert app.scenes.top is table
     key(app, pygame.K_ESCAPE)
     key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "HubScene"
+    assert type(app.scenes.top).__name__ == "HomeScene"
     assert meta.history(pid)[0].result == "abandoned"
     assert meta.get_player(pid).tokens == before
 
@@ -318,7 +424,7 @@ def test_finished_table_routes_to_reward_once_and_back_to_hub(app, kind):
     result.settle()
     assert meta.get_player(pid).tokens == before + result.reward.tokens
     key(app, pygame.K_RETURN)
-    assert type(app.scenes.top).__name__ == "HubScene"
+    assert type(app.scenes.top).__name__ == "HomeScene"
     assert meta.history(pid)[0].result == kind
 
 
@@ -362,23 +468,18 @@ def test_codex_handoff_is_available_when_c_registers_scene(app, monkeypatch):
         def on_enter(self, player_id, config):
             self.player_id, self.config = player_id, config
     monkeypatch.setitem(app.scenes.registry, "codex", Codex)
-    hub = open_screen(app, "hub", player_id=player_id())
-    click(app, hub.nav["codex"])
+    home = open_screen(app, "home")
+    click(app, home.entries["codex"])
     assert app.scenes.top.player_id == player_id()
     assert app.scenes.top.config == app.run_config
 
 
-def test_quick_play_keeps_regular_ending_and_no_meta_run(app):
-    menu = open_screen(app, "menu")
-    quick = next(b for b in menu.ui.widgets if getattr(b, "text", "") == "New Game")
-    before = meta.history(player_id())
-    click(app, quick)
-    assert type(app.scenes.top).__name__ == "TableScene"
-    assert meta.history(player_id()) == before
-
-
-def test_invalid_player_hub_shows_error_and_can_return(app):
-    hub = open_screen(app, "hub", player_id=99999)
-    assert hub.message
+def test_invalid_player_setup_shows_error_and_can_return(app):
+    home = open_screen(app, "home")
+    app.scenes.push("run_setup", player_id=99999)
+    app.scenes.apply_pending()
+    setup = app.scenes.top
+    assert setup.message
+    app._render()
     key(app, pygame.K_ESCAPE)
-    assert type(app.scenes.top).__name__ == "PlayerSelectScene"
+    assert app.scenes.top is home

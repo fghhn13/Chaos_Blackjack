@@ -98,34 +98,15 @@ def test_scene_manager_stack_ops() -> None:
         mgr.apply_pending()
 
 
-@pytest.mark.parametrize("scene", ["menu", "gallery", "table", "ending"])
+@pytest.mark.parametrize("scene", ["home", "player_select", "table", "ending"])
 def test_each_scene_runs_frames(app: App, scene: str) -> None:
     app.run(scene, max_frames=3)
 
 
-def test_menu_new_game_opens_table_with_chaos_pref(app: App) -> None:
-    app.scenes.reset("menu")
-    app.scenes.apply_pending()
-    menu = app.scenes.top
-    chaos_toggle = next(w for w in menu.ui.widgets if getattr(w, "label", None) and callable(w.label))
-    _click(app, chaos_toggle.rect.center)
-    assert app.prefs.enable_chaos is True
-    new_game = next(w for w in menu.ui.widgets if getattr(w, "text", "") == "New Game")
-    _click(app, new_game.rect.center)
-    table = app.scenes.top
-    assert type(table).__name__ == "TableScene"
-    assert table.controller.config.enable_chaos is True
-
-
-def test_gallery_preview_overlay_opens_and_closes(app: App) -> None:
-    app.scenes.reset("gallery")
-    app.scenes.apply_pending()
-    rect, asset_id = app.scenes.top.tiles[0]
-    _click(app, rect.center)
-    assert type(app.scenes.top).__name__ == "AssetPreviewScene"
-    assert app.scenes.top.asset_id == asset_id
-    _click(app, (10, 10))
-    assert type(app.scenes.top).__name__ == "GalleryScene"
+def test_app_starts_on_home(app: App) -> None:
+    app.run(max_frames=1)
+    assert type(app.scenes.top).__name__ == "HomeScene"
+    assert {"menu", "gallery", "asset_preview", "hub"}.isdisjoint(app.scenes.registry)
 
 
 def test_window_scaling_maps_mouse_to_canvas(app: App) -> None:

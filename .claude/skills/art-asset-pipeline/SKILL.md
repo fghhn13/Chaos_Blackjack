@@ -139,8 +139,8 @@ python scripts/preview_assets.py --matte card_back card_front_blank peek chip_1 
 python scripts/preview_assets.py --motion   # + filmstrips of dealing, settling and the chaos glitch
 ```
 
-This writes the menu (chaos off and on), table while betting and mid-round, both
-endings, one gallery page per category, matte sheets (asset on dark, felt and
+This writes the title screen, table while betting and mid-round, both
+endings, matte sheets (asset on dark, felt and
 white), and `zoom_cards.png` / `zoom_chips.png` (in-game 100×150 cards and 76×76
 chips at ×3). Look at every image yourself and show the key ones to the user.
 Check:
