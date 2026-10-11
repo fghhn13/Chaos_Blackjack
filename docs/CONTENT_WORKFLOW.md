@@ -227,6 +227,40 @@ backend. It makes billed calls during play; validation never constructs the rela
 Credentials stay in `.env`. The original built-in controller/GUI environment
 opt-in remains supported; pack AIs default to their offline backend.
 
+### Persona: portraits and table lines
+
+`AIProfile(persona=Persona(...))` gives an AI its own look and voice at the
+table. It is presentation only and never widens what the AI may do.
+
+```python
+from chaos_blackjack.content.ai_profile import Persona
+
+Persona(
+    id="lucky",                       # portrait asset ids become lucky_<expression>
+    name="Lucky",                     # shown on the Chaos panel and in the codex
+    portraits={"neutral": folder / "portraits/neutral.png", "grin": ...},
+    moods={"rule_applied": "grin", "outcome_player": "neutral"},     # event -> expression
+    lines={"rule_applied": ("{rule}, if you please.",), "idle": ("Well?",)},  # rotated
+    default="neutral",
+)
+```
+
+Events are listed in `PERSONA_EVENTS` (`idle`, `off`, `round_started`,
+`rule_applied`, `narration`, `poke`, `item_used`, `player_bust`,
+`player_blackjack`, `dealer_blackjack`, `dealer_busts` and `outcome_<result>`).
+An event without a mood keeps the current expression; one without lines keeps
+the current speech, and the backend's narration and advice always win. The
+portraits are found by the GUI's asset manager after its own asset folders; the
+codex uses the persona's name and default portrait. AIs without a persona keep
+the built-in Chaos AI look.
+
+Portrait advice: when the player pokes the portrait, a pack AI's offline backend
+receives the poke prompt with `{"intent": "guide" | "mislead", "context": {...}}`
+and must answer `{"reply": "one or two sentences"}`.
+
+The `poker_head` pack is a complete example: eight portraits, persona lines,
+weighted offline rules with narration, and in-character advice.
+
 These profiles control the **Chaos AI**, not an automated player or the normal
 dealer draw policy. The controller currently invokes chaos once before the
 player turn. Increasing permission limits alone does not add invocation points.

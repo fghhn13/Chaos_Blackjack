@@ -125,6 +125,21 @@ python -m chaos_blackjack.gui
 
 祝你赢到 400 块，然后头也不回地离开这张桌子。 🎲
 
+## 扑克头 Poker Head
+
+仓库里新增了一位混沌庄家 **扑克头**：西装领结、脑袋是一把扇形展开的 A。
+他永远彬彬有礼、不慌不忙，说话优雅得体，但从来不站在你这边。
+
+- **出手风格**：偏爱"体面"的小动作，比如花色之力、奇偶混沌、平局判庄家、全体点数 −1，
+  偶尔才会动用大崩盘和脆弱爆牌；也常常故意来一局平静局，让你放松警惕。
+  他从不碰你的道具。整体比默认混沌 AI 稍微狠一点点。
+- **表情**：8 种立绘会随局面切换，比如改规则时亮牌、你用道具时审视你、
+  你赢了他会不悦、平局时一脸疑惑、被你戳头像时把牌藏到身后。
+- **怎么和他玩**：`python -m chaos_blackjack.content play poker_head`
+  （直接开桌，混沌模式，离线不收费）。命令行玩法：
+  `python -m chaos_blackjack.agent new --pack poker_head --ai poker_head --chaos`。
+  目前主菜单的 New run 还不能选择庄家，会在开局准备页加入庄家选择后开放。
+
 ## 本地扩展道具和混沌 AI
 
 仓库自带示例内容包。运行 `python -m chaos_blackjack.content play example`

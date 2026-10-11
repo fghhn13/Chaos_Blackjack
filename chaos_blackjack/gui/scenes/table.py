@@ -87,7 +87,8 @@ class TableScene(Scene):
             replace(self.app.run_config, enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
-        self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke)
+        profile = self.controller.registry.resolve_ai(self.controller.config.ai_id)
+        self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke, persona=getattr(profile, "persona", None))
         self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
         log = self.chaos_panel.log_area
         self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)

@@ -3,8 +3,9 @@
 Lookup order for `image(id)`:
   1. a file named `<id>.png|.jpg|.jpeg|.webp` anywhere under the asset dirs
      (first dir wins; subfolders allowed),
-  2. the manifest placeholder,
-  3. a magenta checker so missing art is obvious.
+  2. a portrait contributed by a content pack's AI persona,
+  3. the manifest placeholder,
+  4. a magenta checker so missing art is obvious.
 
 Fonts come from a `fonts/` folder in an asset dir. Files named by role are
 used for that role: `ui`, `ui-bold`, `display`, `display-bold` (any font
@@ -19,6 +20,7 @@ from pathlib import Path
 
 import pygame
 
+from chaos_blackjack.content.ai_profile import persona_image
 from chaos_blackjack.gui.assets import placeholders
 from chaos_blackjack.gui.assets.manifest import MANIFEST, AssetSpec
 
@@ -66,16 +68,16 @@ class AssetManager:
         self._fonts.clear()
 
     def has_file(self, asset_id: str) -> bool:
-        return asset_id in self._files
+        return asset_id in self._files or persona_image(asset_id) is not None
 
     def source(self, asset_id: str) -> str:
         """'file' | 'placeholder' | 'missing' — reported by validation and previews."""
-        if asset_id in self._files:
+        if self.has_file(asset_id):
             return "file"
         return "placeholder" if asset_id in self.manifest else "missing"
 
     def path(self, asset_id: str) -> Path | None:
-        return self._files.get(asset_id)
+        return self._files.get(asset_id) or persona_image(asset_id)
 
     # ---------------------------------------------------------------- images
 
@@ -100,7 +102,7 @@ class AssetManager:
         return self.image(asset_id, (max(1, round(w * k)), max(1, round(h * k))))
 
     def _load_base(self, asset_id: str) -> pygame.Surface:
-        path = self._files.get(asset_id)
+        path = self.path(asset_id)
         if path is not None:
             try:
                 return self._optimize(pygame.image.load(str(path)))

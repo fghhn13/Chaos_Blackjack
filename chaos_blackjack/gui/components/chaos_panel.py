@@ -2,6 +2,8 @@
 
 The panel only reads `GameView` and notices. Mood is a presentation choice:
 the portrait reacts to what just happened (a rule landing, a bust, a win).
+An AI with a persona (content packs) brings its own name, portraits and lines;
+without one the built-in Chaos AI look and lines below apply.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from chaos_blackjack.gui.texts import asset_name
 from chaos_blackjack.gui.widgets import Widget, draw_heading, draw_panel, draw_tooltip, fit_text, wrap_text
 
 if TYPE_CHECKING:
+    from chaos_blackjack.content.ai_profile import Persona
     from chaos_blackjack.gui.assets import AssetManager
 
 PORTRAIT = 200
@@ -58,13 +61,29 @@ def mood_face(assets: "AssetManager", mood: str) -> str:
     return face
 OFF_LINE = "Chaos mode is off. Plain blackjack tonight."
 
+# Notice -> persona event (see content.ai_profile.PERSONA_EVENTS).
+PERSONA_NOTICE_EVENT = {
+    NoticeKind.ROUND_STARTED: "round_started",
+    NoticeKind.RULE_MODIFIER_APPLIED: "rule_applied",
+    NoticeKind.CHAOS_NARRATION: "narration",
+    NoticeKind.CHAOS_POKE_REPLY: "poke",
+    NoticeKind.ITEM_USED: "item_used",
+    NoticeKind.PLAYER_BUST: "player_bust",
+    NoticeKind.PLAYER_BLACKJACK: "player_blackjack",
+    NoticeKind.DEALER_BLACKJACK: "dealer_blackjack",
+    NoticeKind.DEALER_BUSTS: "dealer_busts",
+}
+
 
 class ChaosPanel(Widget):
     def __init__(self, assets: "AssetManager", rect: pygame.Rect | tuple[int, int, int, int],
-                 on_poke: Callable[[], object] | None = None) -> None:
+                 on_poke: Callable[[], object] | None = None, persona: "Persona | None" = None) -> None:
         self.assets = assets
         self.rect = pygame.Rect(rect)
-        self.mood = "calm"
+        self.persona = persona
+        self._turn = 0  # rotates persona lines
+        self._busted = False
+        self.mood = persona.default if persona else "calm"
         self.speech: str | None = None
         self.chaos_enabled = False
         self.rules: tuple[RuleView, ...] = ()
@@ -97,10 +116,13 @@ class ChaosPanel(Widget):
             TablePhase.BETTING, TablePhase.PLAYER_TURN, TablePhase.ROUND_OVER,
         ))
         if not v.chaos_enabled:
-            self.mood = "calm"
+            self.mood = self.persona.moods.get("off", self.persona.default) if self.persona else "calm"
 
     def react(self, n: Notice) -> None:
         if not self.chaos_enabled:
+            return
+        if self.persona is not None:
+            self._react_persona(n)
             return
         if n.kind in (NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY):
             self.speech = str(n.data.get("text") or n.text) or self.speech
@@ -120,6 +142,33 @@ class ChaosPanel(Widget):
         if mood and mood != self.mood:
             self.mood = mood
             self._pop = Tween(0.4, ease=out_back)
+
+    def _react_persona(self, n: Notice) -> None:
+        p = self.persona
+        assert p is not None
+        if n.kind == NoticeKind.ROUND_STARTED:
+            self._busted = False
+        if n.kind == NoticeKind.ROUND_SETTLED:
+            event = f"outcome_{getattr(n.data.get('result'), 'outcome', '')}"
+        else:
+            event = PERSONA_NOTICE_EVENT.get(n.kind, "")
+        if n.kind in (NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY):
+            self.speech = str(n.data.get("text") or n.text) or self.speech
+        elif not (n.kind == NoticeKind.ROUND_SETTLED and self._busted):  # keep the bust remark
+            line = p.line(event, self._turn)
+            if line is not None:
+                rule = asset_name(str(n.data.get("rule_id", ""))) if n.kind == NoticeKind.RULE_MODIFIER_APPLIED else ""
+                self.speech = line.replace("{rule}", rule)
+                self._turn += 1
+        if n.kind == NoticeKind.PLAYER_BUST:
+            self._busted = True
+        mood = p.moods.get(event)
+        if mood and mood != self.mood:
+            self.mood = mood
+            self._pop = Tween(0.4, ease=out_back)
+
+    def _face(self) -> str:
+        return self.persona.asset_id(self.mood) if self.persona else mood_face(self.assets, self.mood)
 
     def update(self, dt: float) -> None:
         if self._pop is not None:
@@ -153,7 +202,7 @@ class ChaosPanel(Widget):
         draw_panel(surface, r)
         inner_w = r.w - 28
 
-        portrait = a.image_fit(mood_face(a, self.mood), (PORTRAIT, PORTRAIT))
+        portrait = a.image_fit(self._face(), (PORTRAIT, PORTRAIT))
         if self._pop is not None:
             k = 0.86 + 0.14 * self._pop.value
             w, h = portrait.get_size()
@@ -167,8 +216,10 @@ class ChaosPanel(Widget):
             surface.blit(hint, hint.get_rect(center=label.center))
 
         y = r.y + 12 + PORTRAIT + 4
-        name = a.font(theme.FONT_BODY + 2, role="display").render("Chaos AI", True, theme.GOLD)
-        mood = a.font(theme.FONT_TINY).render(self.mood if self.chaos_enabled else "off duty", True, theme.TEXT_MUTED)
+        title = self.persona.name if self.persona else "Chaos AI"
+        name = a.font(theme.FONT_BODY + 2, role="display").render(title, True, theme.GOLD)
+        mood_text = self.mood.replace("_", " ") if self.chaos_enabled else "off duty"
+        mood = a.font(theme.FONT_TINY).render(mood_text, True, theme.TEXT_MUTED)
         surface.blit(name, (r.x + 14, y))
         surface.blit(mood, mood.get_rect(bottomright=(r.right - 14, y + name.get_height() - 2)))
 
@@ -201,10 +252,11 @@ class ChaosPanel(Widget):
             surface.blit(more, more.get_rect(topright=(r.right - 14, y + MAX_RULE_ROWS * RULE_ROW - 4)))
 
     def _draw_speech(self, surface: pygame.Surface, box: pygame.Rect) -> None:
+        p = self.persona
         if not self.chaos_enabled:
-            text, color = OFF_LINE, theme.TEXT_MUTED
+            text, color = (p and p.line("off")) or OFF_LINE, theme.TEXT_MUTED
         else:
-            text, color = (self.speech or IDLE_LINE), theme.IVORY
+            text, color = (self.speech or (p and p.line("idle")) or IDLE_LINE), theme.IVORY
         pygame.draw.rect(surface, theme.DARK, box, border_radius=10)
         pygame.draw.rect(surface, theme.CHAOS_PURPLE, box, 1, border_radius=10)
         tip = [(box.x + 26, box.y), (box.x + 36, box.y - 8), (box.x + 46, box.y)]
