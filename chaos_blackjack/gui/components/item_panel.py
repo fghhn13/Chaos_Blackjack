@@ -59,6 +59,9 @@ class ItemPanel(Widget):
 
     def sync(self, v: GameView) -> None:
         self.items = tuple(i for i in v.items if i.count > 0)
+        # Each view builds new ItemView objects; keep the hover on the same item id.
+        if self.hovered is not None:
+            self.hovered = next((i for i in self.items if i.id == self.hovered.id), None)
         self.can_use = v.can(Action.USE_ITEM)
         self.shop_button.enabled = v.can(Action.BUY)
         self.restock_in = v.shop_restock_in
@@ -130,5 +133,7 @@ class ItemPanel(Widget):
             text = f"{asset_name(self.hovered.id)}: {description}"
             if not self.can_use:
                 text += " (usable on your turn)"
-            row = next(rect for rect, i in self.item_rects if i is self.hovered)
+            row = next((rect for rect, i in self.item_rects if i is self.hovered), None)
+            if row is None:
+                return  # hovered row not laid out yet (e.g. synced after the last draw)
             draw_tooltip(surface, self.assets, text, (self.rect.x - 292, row.y))
