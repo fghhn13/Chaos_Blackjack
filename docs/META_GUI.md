@@ -42,7 +42,9 @@ Home ──┬─ Continue run ────────────────�
   locked modes say how to unlock them), a showcase with the selected mode's full
   rules using live numbers (Chaos shows the dealer in grey violet), a summary of
   the permanent upgrades in effect with the numbers they change, and a scrolling
-  list of owned consumables with check boxes. Each checked kind brings one copy.
+  list of owned consumables with check boxes. Each checked kind brings one copy;
+  the number of kinds is capped (2 by default, raised by Bag Space) and the list
+  says how many are in use.
   Browsing and checking spend nothing; `start_run` performs the consumption. With
   an unfinished run, only the final **Start run** asks before abandoning it. The
   mode and checked items are remembered per player for the session.

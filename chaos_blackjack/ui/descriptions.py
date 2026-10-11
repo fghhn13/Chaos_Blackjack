@@ -26,7 +26,7 @@ def describe_active_modifiers(modifiers: ActiveModifiers) -> list[str]:
     if "reverse_bust" in flags and not any(
         "reverse" in x.lower() for x in lines
     ):
-        lines.append("Bust may not auto-lose for the player (while active).")
+        lines.append("A player bust is a push this round.")
     return lines if lines else ["No numeric perturbations (baseline blackjack)."]
 
 
@@ -37,7 +37,7 @@ def _describe_one(tid: str, m: Any) -> str:
             return f"Rank values shifted by {d:+} per card (until cleared)."
         return "Rank values modified by active chaos rule."
     if tid == "reverse_bust":
-        return "Reverse bust: high player totals may not count as bust for outcome."
+        return "Reverse Bust: if you bust this round, it is a push instead of a loss."
     if tid == "great_crash":
         return f"The Great Crash: all 10/J/Q/K become value {getattr(m, 'ten_value', 1)} (until cleared)."
     if tid == "odd_even_chaos":

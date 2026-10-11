@@ -40,7 +40,7 @@ def test_rule_details_use_fixed_params_over_stub_proposals():
     assert "reduced to 16" in entries["fragile_bust"].detail(cfg)
     assert "ties go to Player" in entries["tiebreaker_shift"].detail(cfg)
     assert "-1 per card" in entries["modify_card_value"].detail(RunConfig())
-    assert "ties go to Player" in entries["tiebreaker_shift"].detail(RunConfig())
+    assert "ties go to Dealer" in entries["tiebreaker_shift"].detail(RunConfig())  # the offline AI's proposal
     dealer_ties = RunConfig(chaos_rule_params={"tiebreaker_shift": {"ties_to": "dealer"}})
     assert "ties go to Dealer" in entries["tiebreaker_shift"].detail(dealer_ties)
 

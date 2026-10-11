@@ -47,6 +47,7 @@ _ACT_METHODS = {
 COMMANDS = {
     "observe": "Return the current observation (no state change).",
     "buy": "Buy a shop item while betting: {\"cmd\":\"buy\",\"item\":\"peek\"}",
+    "reroll": "Roll the shop's stock again while betting (once per stock): {\"cmd\":\"reroll\"}",
     "bet": "Place a bet: {\"cmd\":\"bet\",\"amount\":20}",
     "act": "Act in your turn: {\"cmd\":\"act\",\"action\":\"hit|stand|double|surrender|use_item\",\"item\":\"peek\"}",
     "help": "List commands.",
@@ -110,7 +111,7 @@ class AgentSession:
             return self._reply()
         if cmd == "help":
             return self._reply(extra={"commands": COMMANDS})
-        if cmd not in ("bet", "buy", "act"):
+        if cmd not in ("bet", "buy", "reroll", "act"):
             return self._error("unknown_command", f"Unknown cmd {cmd!r}. Use one of: {', '.join(COMMANDS)}")
         if self.controller.phase == TablePhase.RUN_OVER:
             return self._error("run_over", "The run is over. Start a new one.")
@@ -122,6 +123,8 @@ class AgentSession:
                 self._bet(command)
             elif cmd == "buy":
                 self._buy(command)
+            elif cmd == "reroll":
+                self.controller.reroll_shop()
             else:
                 self._act(command)
         except ActionError as e:

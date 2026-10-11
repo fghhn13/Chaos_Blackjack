@@ -33,12 +33,16 @@ class ItemContext:
         peek_next_card_rank: Callable[[], str | None],
         active_rule_ids: tuple[str, ...] = (),
         params: Mapping[str, Any] | None = None,
+        next_hit_busts: Callable[[], bool | None] | None = None,
     ) -> None:
         self.state = state
         self.emit_event = emit_event
         self.peek_next_card_rank = peek_next_card_rank
         self.active_rule_ids = active_rule_ids  # chaos rules in force this round
         self.params = dict(params or {})  # item tuning from the balance profile
+        # Whether the top card would bust the player's hand under the rules in
+        # force (None: no card / not available). Read-only, like peek.
+        self.next_hit_busts = next_hit_busts
 
 
 @runtime_checkable

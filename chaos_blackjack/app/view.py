@@ -22,6 +22,7 @@ class Action:
 
     BET = "bet"
     BUY = "buy"
+    REROLL = "reroll"  # roll the shop's current stock again (once per stock)
     RESOLVE_CHAOS = "resolve_chaos"
     HIT = "hit"
     STAND = "stand"
@@ -107,6 +108,8 @@ class GameView:
     available_actions: frozenset[str]
     last_result: RoundResult | None
     run_end: RunEndResult | None
+    # Chips the next reroll costs (0 = free), or None when this stock cannot be rerolled.
+    shop_reroll_price: int | None = None
 
     def can(self, action: str) -> bool:
         return action in self.available_actions

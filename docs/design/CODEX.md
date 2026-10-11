@@ -98,7 +98,7 @@ items and illegal actions raise errors instead of faking an effect.
 
 All seven built-in Chaos rules and six items have demos in `codex/scripts.py`.
 Reverse Bust demonstrates the current controller behavior: a player bust
-ends the hand immediately, but settlement can still award a player win.
+ends the hand immediately and settles as a push.
 Modes, the Chaos AI, and plugins without demo metadata show text and an icon.
 
 ## Validation

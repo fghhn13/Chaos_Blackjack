@@ -285,8 +285,8 @@ class OfflineChaosStub(StubLLM):
     """The offline Chaos AI: applies a rule drawn by weight from `choices`.
 
     `reseed()` before each chaos turn makes the draw depend only on the run and
-    round, so a run replays the same way however it is resumed. With no positive
-    weight it answers noop.
+    round, so a run replays the same way however it is resumed. An entry with
+    rule_id "" is a calm round (noop); with no positive weight it answers noop.
     """
 
     response_json: str = ""
@@ -301,4 +301,6 @@ class OfflineChaosStub(StubLLM):
         if not live:
             return '{"action":"noop"}'
         rule_id, params, _ = self.rng.choices(live, weights=[c[2] for c in live])[0]
+        if not rule_id:
+            return '{"action":"noop"}'
         return json.dumps({"action": "apply_rule", "rule_id": rule_id, "params": params})

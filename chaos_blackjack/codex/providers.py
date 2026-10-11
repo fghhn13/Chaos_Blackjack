@@ -27,14 +27,14 @@ _RULE_SUMMARIES = {
     "odd_even_chaos": "Even and odd numeric ranks change differently.",
     "suit_power": "Red and black suits change differently.",
     "fragile_bust": "The table's bust threshold falls.",
-    "reverse_bust": "A player bust can still win at settlement.",
+    "reverse_bust": "A player bust becomes a push.",
     "tiebreaker_shift": "Equal totals award a win instead of a push.",
 }
 _ITEM_SUMMARIES = {
     "peek": "Reveal the next card's rank.",
     "swap": "Replace your first card with the top deck card.",
     "shield": "Dispel all active Chaos rules for this round.",
-    "danger_radar": "Measure how many tens and face cards remain.",
+    "danger_radar": "Learn whether your next hit would bust.",
     "fate_oracle": "Reveal the ranks of the next cards.",
     "hole_card_hacker": "Reveal the dealer's hidden card.",
 }
@@ -60,7 +60,7 @@ def _rule_detail(rule_id: str, config: RunConfig) -> str:
         raise ValueError(f"Rule is no longer registered: {rule_id!r}")
     text = describe_modifier(modifier)
     if rule_id == "reverse_bust":
-        text += " A hit that busts still ends the hand immediately; settlement ignores the player's bust when comparing hands."
+        text += " A hit that busts still ends the hand immediately, but the bet is returned instead of lost."
     if rule_id == "odd_even_chaos":
         text += " Only numeric ranks from 2 through 9 change; aces, tens and face cards keep their values."
     if rule_id in config.disabled_rules:
@@ -92,7 +92,7 @@ def _item_detail(item_id: str, config: RunConfig) -> str:
         count = max(1, int(config.item_params.get(item_id, {}).get("cards", defaults["cards"])))
         text = f"Reveal the ranks of the next {count} cards, or all remaining cards if fewer remain."
     elif item_id == "danger_radar":
-        text += " Counts ranks 10/J/Q/K, even when Chaos changes their effective values."
+        text += " The answer uses the rules in force, including Chaos value changes and bust limits."
     elif item_id == "shield":
         text += " It is consumed only when at least one rule can be dispelled."
     elif item_id not in _ITEM_SUMMARIES and config.item_params.get(item_id):
@@ -100,6 +100,9 @@ def _item_detail(item_id: str, config: RunConfig) -> str:
     price = config.shop_prices.get(item_id)
     if price is None:
         text += " Not offered by this balance profile's shop."
+    elif item_id in getattr(config, "shop_bankroll_pct", ()):
+        text += (f" Shop price: {price}% of your bankroll when the stock rolls "
+                 f"({max(1, int(price * config.shop_price_floor / 100 + 0.5))} chips at the least).")
     else:
         text += f" Shop price: {price} chips."
     text += (f" The shop offers up to {config.shop_slots} different items and restocks every "

@@ -48,6 +48,7 @@ Subcommands:
 | `observe` | current observation; changes nothing, not logged |
 | `help` | list game commands |
 | `buy <item_id>` | buy an item from the shop (phase `betting`, before you bet) |
+| `reroll` | roll the shop's current stock again, once per stock (phase `betting`; costs `obs.shop.reroll_price`) |
 | `bet <amount>` | place a bet (phase `betting`) |
 | `act hit` / `act stand` / `act double` / `act surrender` | play your hand (phase `player_turn`) |
 | `act use_item <item_id>` | use an item from your inventory (phase `player_turn`) |
@@ -58,7 +59,7 @@ Subcommands:
 - `--seed N` — deterministic shuffle. Omit for a random seed (it is reported in `run.seed`).
 - `--chaos` — the Chaos AI may change a rule every round (§7).
 - `--llm` — the Chaos AI is a **real, billed** model behind the GPTsAPI relay instead of the offline stub. Needs `GPTSAPI_API_KEY` in `.env`. Only use it when your instructions say so.
-- `--start-money N`, `--target-money N` — change the economy (defaults 100 → 400).
+- `--start-money N`, `--target-money N` — change the economy (defaults 100 → 300).
 - `--profile NAME` — use a balance profile from `data/game.db` (default: `$CHAOS_PROFILE` or `default`). The reply's `run.profile` names it; a resumed run keeps its numbers even if the profile changes.
 - `--max-steps N` — cap on accepted `bet` / `act` commands (default 2000).
 
@@ -86,7 +87,7 @@ settlement   ──► bankroll, win streak
                  (every 2nd round the shop restocks)
 ```
 
-So a full round is usually zero or more `buy` → `bet` → zero or more `act` → back at `betting`.
+So a full round is usually zero or more `buy` / `reroll` → `bet` → zero or more `act` → back at `betting`.
 
 ## 4. Observation reference
 
@@ -151,12 +152,12 @@ descriptions. For example, a 40-chip run with `bet.min=5` and
 
 Economy
 
-- Start with 100, win at 400 (bankroll `>=` target), lose at 0 or when you cannot place a legal bet (you need at least 2 to bet 1).
+- Start with 100, win at 300 (bankroll `>=` target), lose at 0 or when you cannot place a legal bet (you need at least 2 to bet 1).
 - Bet: integer from 1 to `floor(bankroll / 2)`. You can never bet everything.
 
 Card values
 
-- 2–10 face value, J/Q/K = 10, A = 11, but an Ace drops by 10 (to 1) whenever the hand would otherwise bust under the active bust limit (21, or 18 under Fragile Bust).
+- 2–10 face value, J/Q/K = 10, A = 11, but an Ace drops by 10 (to 1) whenever the hand would otherwise bust under the active bust limit (21, or 19 under Fragile Bust).
 - Chaos rules change card values before summing, and shift **both** Ace values: under "values −1" an Ace is 10 or 0, under Suit Power a red Ace is 12 or 2. Aces stay soft under every rule.
 
 Round
@@ -168,7 +169,7 @@ Round
 - Surrender: you get `floor(bet / 2)` back, i.e. lose `bet - floor(bet/2)` (bet 15 → −8).
 - Dealer draws until 17 or more and stands on any 17 (no soft-17 rule).
 - Settlement: win `+bet`, loss `-bet`, push `0`, blackjack `+floor(bet*3/2)`.
-- Bust (over 21, or over 18 under Fragile Bust) on your own hit/double settles the round immediately; the dealer does not draw.
+- Bust (over 21, or over 19 under Fragile Bust) on your own hit/double settles the round immediately; the dealer does not draw. Under Reverse Bust that bust is a push.
 - Win streak: each win or blackjack adds 1; anything else resets it. It is only a statistic.
 
 Shop
@@ -176,7 +177,8 @@ Shop
 - Open only in `betting`. It offers 3 different items from the catalog below; each offer can be bought once (`sold` afterwards).
 - The stock is rolled in round 1 and again every 2 rounds (rounds 3, 5, …); `shop.restock_in` counts down. Unbought offers are lost on restock.
 - A purchase must leave you at least 2 chips (enough for a minimum bet); `affordable` says whether it does.
-- Placeholder prices: `peek` 10, `danger_radar` 10, `swap` 20, `hole_card_hacker` 25, `fate_oracle` 25, `shield` 30.
+- Prices are a percentage of your bankroll when the stock rolls, never below the price at 100 chips: `peek` 6 %, `danger_radar` 6 %, `swap` 10 %, `hole_card_hacker` 12 %, `fate_oracle` 18 %, `shield` 15 % (rounded, at least 1). With 100 chips that is 6 / 6 / 10 / 12 / 18 / 15.
+- `reroll` rolls the current stock again, once per stock, for `shop.reroll_price` (10) chips; it must leave you 2 chips. `obs.shop.reroll_price` is the cost (0 = free, from the Reroll Pass upgrade) or `null` once this stock was rerolled.
 - The same seed always shows the same shelves; buying never changes the cards dealt.
 
 ## 7. Chaos AI and chaos rules
@@ -209,16 +211,16 @@ With `--chaos`, after every deal the Chaos AI gets **one** chance to act, before
 - **use one of your items** (it is consumed — yes, it can burn your items), or
 - do nothing.
 
-At most one rule is active at a time; rules are cleared when the next round is dealt. Every action is checked against a permission profile; blocked actions show up as events and have no effect. The default profile's offline stub applies "values −1"; other profiles can change its rule weights and parameters. With `--llm` a real model chooses (and may add a line of narration).
+At most one rule is active at a time; rules are cleared when the next round is dealt. Every action is checked against a permission profile; blocked actions show up as events and have no effect. The default profile's offline stub picks by weight: a calm round (no rule) 15, `odd_even_chaos` 22, `suit_power` 20, `modify_card_value` −1 15, `fragile_bust` 15, `tiebreaker_shift` (to the dealer) 15, `great_crash` 10, `reverse_bust` 3. Other profiles can change its rule weights and parameters. With `--llm` a real model chooses (and may add a line of narration).
 
 | Rule id | Effect | Implications |
 | ------- | ------ | ------------ |
 | `modify_card_value` | every card's value shifts by `delta` (stub: −1) | totals drop (an Ace is 10 or 0); more room before busting |
-| `great_crash` | 10, J, Q, K are worth 1 | high cards stop being dangerous; naturals become impossible |
+| `great_crash` | 10, J, Q, K are worth 8 | high cards shrink; naturals become impossible |
 | `odd_even_chaos` | 2/4/6/8 +2 each, 3/5/7/9 −1 each | even cards push you toward bust |
 | `suit_power` | red cards (♥ ♦) +1, black (♠ ♣) −1 | read suits, not just ranks |
-| `fragile_bust` | bust threshold is 18 for both sides | stand earlier; dealer busts on 19+ too; a 21 is a bust, so no naturals |
-| `reverse_bust` | the player's bust no longer counts as an automatic loss | if you bust on a hit the round still ends at once, but totals are compared and the higher total wins |
+| `fragile_bust` | bust threshold is 19 for both sides | stand earlier; the dealer, who must reach 17, busts much more often; no naturals |
+| `reverse_bust` | a player bust is a push instead of a loss | hitting is free of risk this round: a bust returns your bet |
 | `tiebreaker_shift` | ties go to the dealer or to the player instead of a push (see the rule's `help`) | a tie is no longer safe (or becomes a win) |
 
 ## 8. Items
@@ -229,13 +231,13 @@ Buy them in the shop, use with `act use_item <id>` during `player_turn`. Each us
 | ------- | ------ |
 | `peek` | reveals the rank of the next card in the deck |
 | `fate_oracle` | reveals the ranks of the next 3 cards |
-| `danger_radar` | how many 10/J/Q/K remain in the deck, and the ratio |
+| `danger_radar` | whether your next hit would bust you, under the rules in force ("would BUST" / "is safe") |
 | `hole_card_hacker` | flips the dealer's face-down card face up for the rest of the round (`dealer.cards` and `dealer.total` show it) |
 | `swap` | replaces your first card with the top card of the deck |
 | `shield` | dispels every active chaos rule for the rest of the round; refused (and kept) when no rule is active |
 
 If an item pushes your total over the limit (a `swap`, or a `shield` removing a rule that kept you under), you bust and the round settles at once.
-Ranks revealed by `peek`, `fate_oracle` and `danger_radar` only appear in `events`; remember them yourself.
+What `peek`, `fate_oracle` and `danger_radar` reveal only appears in `events`; remember it yourself.
 
 ## 9. Worked examples
 
@@ -245,16 +247,16 @@ Real transcripts (`--brief --compact`, `run` field omitted).
 
 ```text
 $ python -m chaos_blackjack.agent new --seed 7
-{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/400. Shop: danger_radar 10, swap 20, hole_card_hacker 25 (restocks in 2 rounds).","hint":"Place a bet: bet <amount> with 1 <= amount <= 50. Or buy first: buy <item_id> (see obs.shop).","legal_actions":["bet","buy"],"bet_range":[1,50],"shop":{...}}}
+{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/300. Shop: danger_radar 6, swap 10, hole_card_hacker 12 (restocks in 2 rounds; reroll 10).","hint":"Place a bet: bet <amount> with 1 <= amount <= 50. Or first: buy <item_id> / reroll (see obs.shop).","legal_actions":["bet","buy","reroll"],"bet_range":[1,50],"shop":{...}}}
 
 $ python -m chaos_blackjack.agent --brief --compact bet 20
-{"ok":true,"events":["Round 1 started, bet 20"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/400. Bet 20. You: 8♣ 3♥ = 11. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand | double | surrender","legal_actions":["hit","stand","double","surrender"]}}
+{"ok":true,"events":["Round 1 started, bet 20"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/300. Bet 20. You: 8♣ 3♥ = 11. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand | double | surrender","legal_actions":["hit","stand","double","surrender"]}}
 
 $ python -m chaos_blackjack.agent --brief --compact act hit
-{"ok":true,"events":["You draw: Q"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/400. Bet 20. You: 8♣ 3♥ Q♥ = 21. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand","legal_actions":["hit","stand"]}}
+{"ok":true,"events":["You draw: Q"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/300. Bet 20. You: 8♣ 3♥ Q♥ = 21. Dealer: K♣ ?? = ?.","hint":"Your move: act hit | stand","legal_actions":["hit","stand"]}}
 
 $ python -m chaos_blackjack.agent --brief --compact act stand
-{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/400. Shop: ...","hint":"...","legal_actions":["bet","buy"],"bet_range":[1,60],"shop":{...},
+{"ok":true,"events":["Dealer draws: 8","Dealer busts."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 120/300. Shop: ...","hint":"...","legal_actions":["bet","buy"],"bet_range":[1,60],"shop":{...},
  "last_round":{"round":1,"outcome":"player","player_total":21,"dealer_total":23,"player_bust":false,"bet":20,"delta":20,"money_after":120,"doubled":false,"dealer_blackjack":false,"your_cards":["8♣","3♥","Q♥"],"dealer_cards":["K♣","5♥","8♦"]}}}
 ```
 
@@ -265,10 +267,10 @@ $ python -m chaos_blackjack.agent --brief --compact act stand
 ```text
 $ python -m chaos_blackjack.agent new --seed 11 --chaos
 $ python -m chaos_blackjack.agent --brief --compact bet 25
-{"ok":true,"events":["Round 1 started, bet 25","⚡ Chaos Effect Triggered: rank adjustment -1 per card"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/400. Bet 25. You: J♠ 7♠ = 15. Dealer: 7♦ ?? = ?. Active chaos rules: Rank values shifted by -1 per card (until cleared).", ...}}
+{"ok":true,"events":["Round 1 started, bet 25","⚡ Chaos Effect Triggered: rank adjustment -1 per card"],"obs":{"phase":"player_turn","summary":"Round 1. Bankroll 100/300. Bet 25. You: J♠ 7♠ = 15. Dealer: 7♦ ?? = ?. Active chaos rules: Rank values shifted by -1 per card (until cleared).", ...}}
 
 $ python -m chaos_blackjack.agent --brief --compact act double
-{"ok":true,"events":["Double down! Bet is now 50.","You draw: Q","💀 BUST!"],"obs":{"phase":"betting","summary":"Round 2. Bankroll 50/400.", ...,
+{"ok":true,"events":["Double down! Bet is now 50.","You draw: Q","💀 BUST!"],"obs":{"phase":"betting","summary":"Round 2. Bankroll 50/300.", ...,
  "last_round":{"outcome":"dealer","player_total":24,"bet":50,"delta":-50,"doubled":true,"your_cards":["J♠","7♠","Q♣"],"dealer_cards":["7♦","5♠"], ...}}}
 ```
 
@@ -293,9 +295,9 @@ Plain blackjack basic strategy is a good baseline when no chaos rule is active (
 Chaos adjustments:
 
 - Re-read `you.total` and `chaos.active_rules` after every bet — the rule is chosen after the deal.
-- `fragile_bust`: treat 18 as your 21; stand much earlier.
-- `great_crash`: 10/J/Q/K are 1 — hitting is cheap.
-- `reverse_bust`: a high bust total can still win; compare against the dealer's visible card.
+- `fragile_bust`: treat 19 as your 21; stand earlier — the dealer busts often.
+- `great_crash`: 10/J/Q/K are 8 — totals run lower, hit more.
+- `reverse_bust`: a bust is only a push, so hitting toward a strong total costs nothing.
 - `tiebreaker_shift`: check whether ties now favour you or the dealer.
 
 Bankroll: you must quadruple your money with bets capped at half your bankroll. Small flat bets are slow; the cap protects you from going broke in one hand but not in three.
@@ -313,6 +315,7 @@ python -m chaos_blackjack.agent play --seed 7 --chaos
 {"cmd":"bet","amount":20}
 {"cmd":"act","action":"hit"}
 {"cmd":"buy","item":"peek"}
+{"cmd":"reroll"}
 {"cmd":"act","action":"use_item","item":"peek"}
 {"cmd":"new","seed":8,"chaos":true}
 {"cmd":"help"}

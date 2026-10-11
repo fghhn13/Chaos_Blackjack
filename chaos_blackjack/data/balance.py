@@ -39,10 +39,13 @@ class BalanceError(ValueError):
     """A profile is missing, incomplete or holds an invalid value."""
 
 
+PRICE_MODES = ("fixed", "bankroll_pct")
+
+
 @dataclass(frozen=True)
 class ShopItemBalance:
     item_id: str
-    price: int
+    price: int                 # chips (fixed) or percent of the bankroll (bankroll_pct)
     price_mode: str = "fixed"
     weight: float = 1.0
     params: tuple[tuple[str, Any], ...] = ()
@@ -101,6 +104,11 @@ class Balance:
     meta_loss_per_round: float
     meta_loss_per_peak_gain: float
     meta_loss_cap: int
+    # Added after the first profiles were cloned; optional with these defaults.
+    shop_reroll_price: int = 10
+    chaos_stub_calm_weight: float = 0.0
+    meta_chaos_win_bonus: int = 0
+    meta_bring_kinds: int = 99
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
@@ -109,6 +117,11 @@ class Balance:
     @property
     def shop_prices(self) -> dict[str, int]:
         return {i.item_id: i.price for i in self.shop_items}
+
+    @property
+    def shop_bankroll_pct(self) -> tuple[str, ...]:
+        """Items priced as a percentage of the bankroll."""
+        return tuple(i.item_id for i in self.shop_items if i.price_mode == "bankroll_pct")
 
     @property
     def item_params(self) -> dict[str, dict[str, Any]]:
@@ -124,9 +137,12 @@ class Balance:
 
     @property
     def chaos_stub(self) -> tuple[tuple[str, dict[str, Any], float], ...]:
-        """(rule_id, params, weight) for the offline Chaos AI; enabled rules only."""
-        return tuple((r.rule_id, dict(r.stub_params), r.stub_weight)
-                     for r in self.chaos_rules if r.enabled and r.stub_weight > 0)
+        """(rule_id, params, weight) for the offline Chaos AI; enabled rules only.
+        A calm round (no rule) is the entry with rule_id ""."""
+        rules = tuple((r.rule_id, dict(r.stub_params), r.stub_weight)
+                      for r in self.chaos_rules if r.enabled and r.stub_weight > 0)
+        calm = (("", {}, self.chaos_stub_calm_weight),) if self.chaos_stub_calm_weight > 0 and rules else ()
+        return rules + calm
 
     @property
     def fingerprint(self) -> str:
@@ -159,6 +175,13 @@ _SETTINGS: dict[str, str] = {
     "meta.loss_per_round": "meta_loss_per_round",
     "meta.loss_per_peak_gain": "meta_loss_per_peak_gain",
     "meta.loss_cap": "meta_loss_cap",
+}
+# Settings added later: profiles cloned before them load with the field default.
+_OPTIONAL_SETTINGS: dict[str, str] = {
+    "shop.reroll_price": "shop_reroll_price",
+    "chaos.stub_calm_weight": "chaos_stub_calm_weight",
+    "meta.chaos_win_bonus": "meta_chaos_win_bonus",
+    "meta.bring_kinds": "meta_bring_kinds",
 }
 
 
@@ -223,9 +246,10 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
     for key, raw, typ, lo, hi in conn.execute(
         "SELECT key, value, type, min, max FROM setting WHERE profile_id = ?", (pid,)
     ):
-        if key not in _SETTINGS:
+        field_name = _SETTINGS.get(key) or _OPTIONAL_SETTINGS.get(key)
+        if field_name is None:
             raise BalanceError(f"Profile {name!r}: unknown setting {key!r}")
-        values[_SETTINGS[key]] = _parse(key, raw, typ, lo, hi)
+        values[field_name] = _parse(key, raw, typ, lo, hi)
     missing = sorted(k for k, f in _SETTINGS.items() if f not in values)
     if missing:
         raise BalanceError(f"Profile {name!r} is missing settings: {', '.join(missing)}")
@@ -235,10 +259,10 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
         "SELECT item_id, price_mode, price, weight, params FROM shop_item "
         "WHERE profile_id = ? AND enabled = 1 ORDER BY item_id", (pid,)
     ):
-        if mode != "fixed":
-            raise BalanceError(f"Profile {name!r}: price mode {mode!r} for {item_id} is not supported yet")
+        if mode not in PRICE_MODES:
+            raise BalanceError(f"Profile {name!r}: price mode {mode!r} for {item_id} is not supported")
         if price != int(price):
-            raise BalanceError(f"Profile {name!r}: fixed price of {item_id} must be a whole number")
+            raise BalanceError(f"Profile {name!r}: price of {item_id} must be a whole number")
         items.append(ShopItemBalance(item_id, int(price), mode, float(weight),
                                      _params(f"Profile {name!r}, item {item_id}", params)))
     tuning = tuple(

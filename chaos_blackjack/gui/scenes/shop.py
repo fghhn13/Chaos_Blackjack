@@ -2,8 +2,9 @@
 
     app.scenes.push("shop", controller=ctrl, on_change=callback)
 
-The scene only calls `controller.buy()` and redraws from `controller.view()`;
-`on_change` lets the table refresh its widgets and event feed after a buy.
+The scene only calls `controller.buy()` / `controller.reroll_shop()` and
+redraws from `controller.view()`; `on_change` lets the table refresh its
+widgets and event feed after a purchase.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import pygame
 
 from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.help_text import ITEM_HELP
-from chaos_blackjack.app.view import GameView, ShopOfferView
+from chaos_blackjack.app.view import Action, GameView, ShopOfferView
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
@@ -49,8 +50,12 @@ class ShopScene(Scene):
         self.box = pygame.Rect(0, 0, 3 * CARD_W + 2 * CARD_GAP + 64, 500)
         self.box.center = (W // 2, H // 2)
         self.close_button = Button(
-            self.app.assets, (self.box.centerx - 90, self.box.bottom - 72, 180, 52), "Close",
+            self.app.assets, (self.box.centerx + 10, self.box.bottom - 72, 180, 52), "Close",
             self.app.scenes.pop, style="ghost", hotkey=pygame.K_ESCAPE,
+        )
+        self.reroll_button = Button(
+            self.app.assets, (self.box.centerx - 210, self.box.bottom - 72, 200, 52), "Reroll",
+            self._reroll, hotkey=pygame.K_r, font_size=theme.FONT_BODY,
         )
         self._build()
 
@@ -69,7 +74,23 @@ class ShopScene(Scene):
                             self._buyer(offer.item), enabled=offer.affordable,
                             font_size=theme.FONT_BODY, hotkey=pygame.K_1 + i)
             self.buy_buttons.append(button)
-        self.ui = WidgetGroup(*self.buy_buttons, self.close_button)
+        price = self.view.shop_reroll_price
+        self.reroll_button.text = ("Rerolled" if price is None else "Free reroll" if price == 0
+                                   else f"Reroll  {price}")
+        self.reroll_button.enabled = self.view.can(Action.REROLL)
+        self.ui = WidgetGroup(*self.buy_buttons, self.reroll_button, self.close_button)
+
+    def _reroll(self) -> None:
+        if self._poke_pending:
+            return
+        try:
+            self.controller.reroll_shop()
+            self.message = ("New stock on the shelves.", theme.GOLD)
+        except ActionError as e:
+            self.message = (str(e), BAD)
+        if self.on_change is not None:
+            self.on_change()
+        self._build()
 
     def _buyer(self, item_id: str) -> Callable[[], None]:
         def buy() -> None:

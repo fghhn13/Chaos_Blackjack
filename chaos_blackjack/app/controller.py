@@ -15,7 +15,8 @@ rules count): a player natural pays `blackjack_pays` (3:2), a dealer natural
 wins at once, both is a push. Double and surrender are first-decision only.
 
 The shop is open while betting: `buy(item_id)` spends bankroll on one of a
-few offers, and the stock rolls again every `shop_refresh_rounds` rounds.
+few offers, `reroll_shop()` rolls the current stock again once, and the stock
+rolls again every `shop_refresh_rounds` rounds.
 
 Every step is explicit (e.g. the dealer draws one card per `dealer_step()`),
 so a GUI can animate between steps and a CLI can just loop.
@@ -45,7 +46,7 @@ from chaos_blackjack.app.persistence import (
     deserialize_active_modifiers,
     snapshot_to_game_state,
 )
-from chaos_blackjack.app.shop import ShopState, needs_restock, roll_stock, rounds_until_restock
+from chaos_blackjack.app.shop import ShopState, needs_restock, roll_stock, rounds_until_restock, shop_prices
 from chaos_blackjack.app.view import (
     Action,
     CardView,
@@ -360,12 +361,39 @@ class GameController:
         while self.phase == TablePhase.DEALER_TURN and self.dealer_step():
             pass
 
+    def reroll_price(self) -> int | None:
+        """Chips the next shop reroll costs (0 when a free reroll is left), or
+        None when this stock was already rerolled."""
+        if self.shop.rerolled:
+            return None
+        return 0 if self.shop.free_rerolls_used < self.config.free_rerolls else self.config.shop_reroll_price
+
+    def reroll_shop(self) -> None:
+        """Roll the current stock again (once per stock); keep enough bankroll to bet."""
+        self._require(Action.REROLL)
+        price = self.reroll_price()
+        if price is None:
+            raise ActionError("This stock was already rerolled; wait for the next restock")
+        if not self.can_bet(self.run.money - price):
+            raise ActionError(f"Not enough chips: a reroll costs {price} and you must keep enough to bet")
+        self.run.money -= price
+        free_used = self.shop.free_rerolls_used + (1 if price == 0 else 0)
+        stock = self._roll_shop(reroll=True)
+        self.shop = ShopState(self.shop.stock_round, stock.offers, rerolled=True, free_rerolls_used=free_used)
+        self._notify(
+            NoticeKind.SHOP_REROLLED,
+            "The shop rerolled its stock." + (f" Cost {price}." if price else " Free reroll used."),
+            {"price": price},
+        )
+
     def next_round(self) -> None:
         self._require(Action.NEXT_ROUND)
         self.state = None
         self._set_phase(TablePhase.BETTING)
         if needs_restock(self.shop, self.run.round, self.config.shop_refresh_rounds):
+            used = self.shop.free_rerolls_used
             self.shop = self._roll_shop()
+            self.shop = ShopState(self.shop.stock_round, self.shop.offers, free_rerolls_used=used)
             self._notify(NoticeKind.SHOP_RESTOCKED, "The shop has new stock.")
         self._check_can_bet()
 
@@ -465,6 +493,7 @@ class GameController:
             available_actions=self._available_actions(),
             last_result=self.last_result,
             run_end=self.run_end,
+            shop_reroll_price=self.reroll_price() if self.phase == TablePhase.BETTING else None,
         )
 
     # -------------------------------------------------------------- internal
@@ -479,6 +508,10 @@ class GameController:
 
     def _available_actions(self) -> frozenset[str]:
         actions = _ACTIONS_BY_PHASE[self.phase]
+        if self.phase == TablePhase.BETTING and self.shop.offers:
+            price = self.reroll_price()
+            if price is not None and self.can_bet(self.run.money - price):
+                actions = actions | {Action.REROLL}
         if self.phase == TablePhase.PLAYER_TURN and len(self._st.player_hand) == 2:
             extra = set()
             if self.config.allow_double and self.run.money >= self.run.current_bet * 2:
@@ -595,10 +628,12 @@ class GameController:
         if isinstance(pipeline.llm, OfflineChaosStub):
             pipeline.llm.choices = tuple(self.config.chaos_stub)
 
-    def _roll_shop(self) -> ShopState:
-        prices = {item: price for item, price in self.config.shop_prices.items()
+    def _roll_shop(self, *, reroll: bool = False) -> ShopState:
+        listed = {item: price for item, price in self.config.shop_prices.items()
                   if self.registry.resolve_item(item) is not None}
-        return roll_stock(self.shop_seed, self.run.round, prices, self.config.shop_slots)
+        prices = shop_prices(listed, frozenset(self.config.shop_bankroll_pct), self.run.money,
+                             self.config.shop_price_floor)
+        return roll_stock(self.shop_seed, self.run.round, prices, self.config.shop_slots, reroll=reroll)
 
     def _check_can_bet(self) -> None:
         if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):

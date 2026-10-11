@@ -25,6 +25,14 @@ def remove_one(inv: tuple[str, ...], item_id: str) -> tuple[str, ...]:
     return tuple(lst)
 
 
+def next_hit_busts(loop: GameLoop, state: GameState) -> bool | None:
+    """Whether drawing the top card would bust the player under the active rules."""
+    if not state.deck:
+        return None
+    ctx = loop.context()
+    return loop.rules.is_bust(loop.rules.hand_value(state.player_hand + (state.deck[0],), ctx), ctx)
+
+
 def use_item(loop: GameLoop, state: GameState, item_id: str,
              params: dict[str, Any] | None = None) -> tuple[GameState, ItemResult]:
     after, result = execute_item(
@@ -32,6 +40,7 @@ def use_item(loop: GameLoop, state: GameState, item_id: str,
         emit=loop.emit_event,
         peek_next_card_rank=lambda: state.deck[0].rank if state.deck else None,
         active_rule_ids=tuple(str(m.id) for m in loop.modifiers.items), params=params,
+        next_hit_busts=lambda: next_hit_busts(loop, state),
     )
     if result.ok and (result.extra or {}).get("dispel_chaos_rules"):
         loop.modifiers = loop.modifiers.with_cleared()

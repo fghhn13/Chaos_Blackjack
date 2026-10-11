@@ -85,18 +85,9 @@ class FeedbackLog:
             self.add(f"🎒 Item [{item}] — swap queued: {swap_from} -> {swap_to}")
             return
 
-        danger_high_count = pl.get("danger_high_count")
-        danger_total = pl.get("danger_total")
-        if (
-            isinstance(danger_high_count, int)
-            and isinstance(danger_total, int)
-            and danger_total > 0
-        ):
-            rate = pl.get("danger_rate")
-            rate_s = f"{rate:.0%}" if isinstance(rate, float) else "?"
-            self.add(
-                f"🎒 Item [{item}] — high cards: {danger_high_count}/{danger_total} (rate {rate_s})"
-            )
+        busts = pl.get("next_hit_busts")
+        if isinstance(busts, bool):
+            self.add(f"🎒 Item [{item}] — next hit {'would BUST' if busts else 'is safe'}")
             return
 
         self.add(f"🎒 Item used: {item}")

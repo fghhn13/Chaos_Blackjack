@@ -28,7 +28,7 @@ def seed_demo(svc: MetaService) -> None:
     """Slot 1: a veteran with tokens, upgrades and history. Slot 2: a new player. Slot 3: empty."""
     ace = svc.create_player(1, "Ace")
     svc.grant_tokens(ace.id, 200)
-    for upgrade in ("start_money", "start_money", "shop_slot", "start_peek", "start_peek", "start_shield"):
+    for upgrade in ("start_money", "start_money", "bag_space", "start_peek", "start_peek", "start_shield"):
         svc.buy_upgrade(ace.id, upgrade)
     svc.grant_tokens(ace.id, 60 - svc.get_player(ace.id).tokens)
     svc.create_player(2, "Rookie")

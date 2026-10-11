@@ -86,7 +86,7 @@ def test_sqlite_save_restores_profile_and_memory_after_settings_change(db) -> No
                                ("chaos.memory_enabled", "1"), ("chaos.memory_limit", "2")):
                 conn.execute("UPDATE setting SET value = ? WHERE profile_id = ? AND key = ?", (value, pid, key))
         cfg = RunConfig.from_balance(load_balance("memory-tight", conn), seed=3, enable_chaos=True,
-                                     shop_prices={"peek": 10})
+                                     shop_prices={"peek": 10}, shop_bankroll_pct=())
         c = GameController(cfg)
         c.buy("peek")
         assert c.accept_poke_reply(c.prepare_poke(), PokeReply("Save your peek for the next hand."))
