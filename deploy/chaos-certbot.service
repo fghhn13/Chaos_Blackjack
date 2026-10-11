@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew the Chaos Blackjack IP certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/chaos-certbot/bin/certbot renew --quiet --no-random-sleep-on-renew --deploy-hook "systemctl reload nginx"

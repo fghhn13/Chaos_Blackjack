@@ -1,0 +1,31 @@
+[Unit]
+Description=Chaos Blackjack browser game
+After=network.target
+
+[Service]
+Type=simple
+User=chaos-web
+Group=chaos-web
+WorkingDirectory=/opt/chaos-blackjack/current
+EnvironmentFile=/etc/chaos-blackjack.env
+EnvironmentFile=/opt/chaos-blackjack/current/revision.env
+Environment=PYTHONUNBUFFERED=1
+Environment=CHAOS_USE_LLM=0
+Environment=CHAOS_DB=/var/lib/chaos-blackjack/game.db
+Environment=BLACKJACK_WEB_DB=/var/lib/chaos-blackjack/web.db
+Environment=BLACKJACK_SECURE_COOKIE=1
+Environment=BLACKJACK_TRUST_PROXY=1
+ExecStart=/opt/chaos-blackjack/current/.venv/bin/gunicorn --bind 127.0.0.1:8088 --workers 1 --threads 4 --timeout 45 --access-logfile - --error-logfile - chaos_blackjack.web.server:create_app()
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/chaos-blackjack
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Test and deploy new Chaos Blackjack commits
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/chaos-blackjack-deploy
+TimeoutStartSec=1200

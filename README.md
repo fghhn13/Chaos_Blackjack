@@ -48,6 +48,11 @@ python -m chaos_blackjack.gui --scene codex
 
 Other ways to play:
 
+The authenticated browser edition supports Classic/Chaos runs, the shop,
+items and saved games. Registration requires a 16-digit invitation token.
+See [browser deployment and continuous delivery](deploy/README.md) for local
+setup, HTTPS hosting, account administration and the production branch.
+
 ```bash
 python cli/main.py                                   # text CLI (menu driven)
 python -m chaos_blackjack.agent new --seed 7 --chaos # agent / scripted play, see AGENTS.md

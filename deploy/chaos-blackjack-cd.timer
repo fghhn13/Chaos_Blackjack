@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the Chaos Blackjack deployment branch every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=60s
+RandomizedDelaySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
