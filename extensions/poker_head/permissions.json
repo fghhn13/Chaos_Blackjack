@@ -1,0 +1,12 @@
+{
+  "allowed_rules": ["modify_card_value", "suit_power", "odd_even_chaos", "tiebreaker_shift", "fragile_bust", "great_crash"],
+  "allowed_items": [],
+  "attempt_limits": {
+    "max_actions_per_turn": 1,
+    "max_active_effects": 1
+  },
+  "budget": {
+    "chaos_budget": 5,
+    "charge_per_effect": 1
+  }
+}

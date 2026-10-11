@@ -196,7 +196,7 @@ def ai_entries(config: RunConfig) -> list[CodexEntry]:
         if ai_id == "default":
             continue
         profile = registry.resolve_ai(ai_id)
-        entries.append(CodexEntry("ai", ai_id, getattr(profile, "codex_name", _title(ai_id)),
+        entries.append(CodexEntry("ai", ai_id, getattr(profile, "codex_name", None) or _title(ai_id),
                                   getattr(profile, "codex_icon", "chaos_calm"), profile.description,
                                   partial(_pack_ai_detail, ai_id), getattr(profile, "codex_demo", None)))
     return entries
