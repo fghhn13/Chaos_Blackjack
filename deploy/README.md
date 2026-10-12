@@ -16,13 +16,13 @@ scrypt hashes; sessions use hashed random tokens and CSRF protection.
 
 ## Production on 43.153.209.136
 
-The deployed branch is **`codex/pygame-wasm`**. The root-owned
+The deployed branch is **`main`**. The root-owned
 `/usr/local/sbin/chaos-blackjack-deploy` fetches that public branch every minute
 using `chaos-blackjack-cd.timer`. No GitHub Actions SSH secret is required.
 Only push reviewed production code to this branch:
 
 ```sh
-git push origin codex/pygame-wasm
+git push origin main
 ```
 
 Every new commit installs its own environment, runs the full offline pytest

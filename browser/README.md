@@ -28,7 +28,12 @@ card-back PNG files are intentionally excluded. The smaller WASM standard librar
 needs the pure Python `sqlite3.dump` helper, which is bundled from the build Python.
 
 All runtime files and the Pygame wheel are served from `/play/runtime/` on the
-same host. First load downloads approximately 24 MB; no third-party CDN is needed
+same host. The uncompressed bundle is approximately 24 MB; production Nginx
+compresses runtime downloads. Game assets use private caches with ETag
+revalidation after authentication, so reloads avoid transferring unchanged
+files. Account responses and the game HTML retain `no-store`. The loading
+message shows elapsed time and tells players when to click the game to unlock
+audio. A slow first download may take a few minutes; no third-party CDN is needed
 by players. Builds download upstream files to an operator-configurable cache.
 The game frame needs inline scripts and JavaScript/WASM evaluation for Emscripten;
 the account page retains its stricter CSP. Game files require an active account.

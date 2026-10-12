@@ -81,6 +81,25 @@ window.chaosInitialSave = window.parent.chaosInitialSave || '';
 window.chaosSave = snapshot => window.parent.chaosSave(snapshot);
 window.chaosClosed = () => window.parent.chaosClosed();
 window.chaosFailed = () => window.parent.chaosFailed();
+const loadingStarted = Date.now();
+const loadingTimer = setInterval(() => {
+  const running = Boolean(window.chaosState);
+  const box = document.getElementById('infobox');
+  const ready = Boolean(box?.textContent.includes('click/touch'));
+  window.parent.chaosLoading({stage: running ? 'running' : ready ? 'ready' : 'loading',
+    elapsed: Math.floor((Date.now() - loadingStarted) / 1000)});
+  if (running) clearInterval(loadingTimer);
+}, 500);
+window.addEventListener('error', event => {
+  if (event.error || event.target?.tagName === 'SCRIPT') {
+    clearInterval(loadingTimer);
+    window.chaosFailed();
+  }
+}, true);
+window.addEventListener('unhandledrejection', () => {
+  clearInterval(loadingTimer);
+  window.chaosFailed();
+});
 </script><style>
 html,body{background:#111016!important;overflow:hidden}#pyconsole,#crt,#system{display:none!important}
 #stdout{display:none!important}#infobox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#111016;color:#e5d8b8;font:18px system-ui;z-index:10}

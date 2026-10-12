@@ -49,6 +49,41 @@ def test_wasm_assets_require_session_and_confine_paths(app, tmp_path, monkeypatc
     assert c.request("/play/")[0] == 401
 
 
+def test_game_cache_revalidates_changes_and_disabled_sessions(app, tmp_path, monkeypatch):
+    root = tmp_path / "bundle"
+    root.mkdir()
+    asset = root / "main.wasm"
+    asset.write_bytes(b"wasm-one")
+    (root / "index.html").write_text("<html>game</html>")
+    monkeypatch.setenv("BLACKJACK_BROWSER_BUILD", str(root))
+    c = Client(app)
+    c.register()
+
+    def get(path, etag="", method="GET"):
+        response = {}
+        def start(status, headers):
+            response.update(status=int(status.split()[0]), headers=dict(headers))
+        body = b"".join(app({"PATH_INFO": path, "REQUEST_METHOD": method,
+                              "HTTP_COOKIE": c.cookie, "HTTP_IF_NONE_MATCH": etag}, start))
+        return response["status"], body, response["headers"]
+
+    status, body, headers = get("/play/main.wasm")
+    assert status == 200 and body == b"wasm-one"
+    assert headers["Content-Type"] == "application/wasm"
+    assert headers["Cache-Control"] == "private, no-cache"
+    tag = headers["ETag"]
+    status, body, headers = get("/play/main.wasm", tag)
+    assert status == 304 and body == b"" and "Content-Length" not in headers
+    assert get("/play/main.wasm", '"other", ' + tag[2:])[0] == 304
+    assert get("/play/", "*")[2]["Cache-Control"] == "no-store"
+    asset.write_bytes(b"changed-wasm-content")
+    status, body, headers = get("/play/main.wasm", tag)
+    assert status == 200 and body == b"changed-wasm-content" and headers["ETag"] != tag
+    assert get("/play/main.wasm", method="HEAD")[1] == b""
+    c.request("/api/logout", {})
+    assert get("/play/main.wasm", headers["ETag"])[0] == 401
+
+
 class Client:
     def __init__(self, app):
         self.app, self.cookie, self.csrf = app, "", ""

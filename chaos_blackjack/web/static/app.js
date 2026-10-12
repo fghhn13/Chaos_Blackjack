@@ -49,8 +49,14 @@ async function flushSave(){
 }
 setInterval(flushSave,1000);
 window.chaosClosed=()=>{flushSave();$('launch').textContent='Play again';$('launch').hidden=false;};
-window.chaosFailed=()=>{$('game-error').textContent='The game could not continue. Reload to try your latest account save, or contact the host.';};
-$('launch').onclick=async()=>{try{await flushSave();if(conflicted)return;$('pygame').src='/play/?v='+Date.now();$('pygame').hidden=false;$('launch').hidden=true;$('save-status').textContent='Loading game. Click the game when prompted.';}catch(e){$('game-error').textContent=e.message;}};
+window.chaosLoading=info=>{
+ if(!user||$('pygame').hidden)return;
+ if(info.stage==='running'){if(pendingSave===null&&!saving)$('save-status').textContent='Game ready. Saves sync to your account.';}
+ else if(info.stage==='ready')$('save-status').textContent='Download complete. Click inside the game to start.';
+ else $('save-status').textContent=`Loading game files… ${info.elapsed}s elapsed. First load can take a few minutes on a slow connection.`;
+};
+window.chaosFailed=()=>{$('game-error').textContent='The game could not load or continue. Check your connection and retry, or reload your latest account save.';$('launch').textContent='Retry';$('launch').hidden=false;};
+$('launch').onclick=async()=>{try{await flushSave();if(conflicted)return;$('game-error').textContent='';$('pygame').src='/play/?v='+Date.now();$('pygame').hidden=false;$('launch').hidden=true;$('save-status').textContent='Loading game files. First load can take a few minutes on a slow connection.';}catch(e){$('game-error').textContent=e.message;}};
 $('fullscreen').onclick=()=>$('game-container').requestFullscreen().catch(e=>{$('game-error').textContent=e.message;});
 $('logout').onclick=async()=>{try{await flushSave();await api('/api/logout',{});signedOut();}catch(e){$('game-error').textContent=e.message;}};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());

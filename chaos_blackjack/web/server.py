@@ -301,7 +301,18 @@ class Application:
                 target = (root / (path[6:] or "index.html")).resolve()
                 if not target.is_relative_to(root) or not target.is_file():
                     raise APIError(404, "Game asset not found.")
-                body = target.read_bytes()
+                # Revalidate cached game files after authentication. Account data
+                # and the HTML frame retain no-store; a new release changes tags.
+                if target.suffix != ".html":
+                    stat = target.stat()
+                    etag = f'W/"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+                    headers = [(k, v) for k, v in headers if k != "Cache-Control"]
+                    headers += [("Cache-Control", "private, no-cache"), ("ETag", etag)]
+                    tags = env.get("HTTP_IF_NONE_MATCH", "").split(",")
+                    if any(tag.strip() == "*" or tag.strip().removeprefix("W/") == etag[2:]
+                           for tag in tags):
+                        status = 304
+                body = b"" if status == 304 else target.read_bytes()
                 mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
                 if target.suffix == ".wasm":
                     mime = "application/wasm"
@@ -349,7 +360,8 @@ class Application:
             headers.append(("Content-Type", "application/json; charset=utf-8"))
             body = b'{"ok":false,"error":{"message":"Server error. Please try again."}}'
         from http import HTTPStatus
-        headers.append(("Content-Length", str(len(body))))
+        if status != 304:
+            headers.append(("Content-Length", str(len(body))))
         start_response(f"{status} {HTTPStatus(status).phrase}", headers)
         return [] if head_only else [body]
 
