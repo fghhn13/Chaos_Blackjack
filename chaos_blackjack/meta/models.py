@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from chaos_blackjack.achievements import Achievement
     from chaos_blackjack.app.config import RunConfig
     from chaos_blackjack.app.controller import GameController
+    from chaos_blackjack.cosmetics import Cosmetic
 
 SLOTS = (1, 2, 3)
 MAX_NAME_LENGTH = 24
@@ -37,6 +39,7 @@ class Player:
     stats: PlayerStats
     created_at: str = ""
     last_played_at: str | None = None
+    avatar: str = "avatar"            # asset id of the equipped avatar
 
 
 @dataclass(frozen=True)
@@ -79,11 +82,44 @@ class PendingRun:
 
 
 @dataclass(frozen=True)
-class RunReward:
+class Unlock:
+    """An achievement unlocked by a run (or by backfilling old runs) and what it paid."""
+
+    achievement_id: str
+    name: str
     tokens: int
-    breakdown: tuple[tuple[str, int], ...]   # (label, tokens)
+    cosmetic_id: str | None = None
+
+
+@dataclass(frozen=True)
+class RunReward:
+    tokens: int                              # run tokens plus achievement tokens
+    breakdown: tuple[tuple[str, int], ...]   # (label, tokens); achievement lines last
     result: str                              # victory | defeat
     player: Player
+    unlocked: tuple[Unlock, ...] = ()
+
+
+@dataclass(frozen=True)
+class CosmeticOffer:
+    cosmetic: "Cosmetic"
+    owned: bool
+    equipped: bool
+    price: int | None                 # None: not sold
+    can_buy: bool
+    reason: str = ""                  # why it cannot be bought (when not owned)
+    unlock_hint: str = ""             # how to get it, e.g. "Achievement: First Win" or "40 tokens"
+
+
+@dataclass(frozen=True)
+class AchievementState:
+    achievement: "Achievement"
+    unlocked: bool
+    unlocked_at: str | None
+    progress: int
+    goal: int
+    reward_tokens: int = 0
+    reward_cosmetic: str | None = None
 
 
 @dataclass(frozen=True)

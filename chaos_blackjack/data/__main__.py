@@ -11,13 +11,18 @@ Balance profiles
 
   KEY is a setting (run.start_money, bet.max_fraction, ...), item.<id>.<field>
   (price, enabled, weight, params, price_mode), rule.<id>.<field>
-  (enabled, params, stub_weight, stub_params) or upgrade.<id>.<field>
-  (cost, cost_step, max_level, enabled, params, requires). JSON values: '{"ten_value": 5}'.
+  (enabled, params, stub_weight, stub_params), upgrade.<id>.<field>
+  (cost, cost_step, max_level, enabled, params, requires), cosmetic.<id>.<field>
+  (cost, enabled) or reward.<achievement id>.<field> (tokens, cosmetic_id).
+  JSON values: '{"ten_value": 5}'.
 
 Players (meta progression)
   players                           the 3 player slots: tokens, upgrades, record
   history SLOT [-n N]               the player's last runs
   grant SLOT TOKENS                 add tokens (development and testing)
+  achievements SLOT                 achievements with progress and rewards
+  cosmetics SLOT                    the wardrobe: owned, equipped and how to get the rest
+  grant-cosmetic SLOT ID            give a cosmetic (development and testing)
 
 Saves
   saves                             list saves
@@ -145,6 +150,31 @@ def _grant(conn, a) -> int:
     return 0
 
 
+def _achievements(conn, a) -> int:
+    for st in _meta(conn).achievements(_slot_player(conn, a.slot).id):
+        ach = st.achievement
+        name = "???" if ach.hidden and not st.unlocked else ach.name
+        mark = "x" if st.unlocked else " "
+        reward = f"+{st.reward_tokens}" + (f" {st.reward_cosmetic}" if st.reward_cosmetic else "")
+        print(f"  [{mark}] {ach.id:22s} {name:22s} {st.progress}/{st.goal:<6d} {reward}")
+    return 0
+
+
+def _cosmetics(conn, a) -> int:
+    for o in _meta(conn).wardrobe(_slot_player(conn, a.slot).id):
+        c = o.cosmetic
+        state = "equipped" if o.equipped else "owned" if o.owned else o.unlock_hint
+        print(f"  {c.slot:10s} {c.id:22s} {c.name:20s} {state}")
+    return 0
+
+
+def _grant_cosmetic(conn, a) -> int:
+    player = _slot_player(conn, a.slot)
+    added = _meta(conn).grant_cosmetic(player.id, a.cosmetic)
+    print(f"  {player.name}: {a.cosmetic} {'granted' if added else 'already owned'}")
+    return 0
+
+
 def _saves(conn, a) -> int:
     runs = list_runs(conn=conn)
     for s in runs:
@@ -203,6 +233,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("slot", type=int)
     s.add_argument("tokens", type=int)
     s.set_defaults(fn=_grant)
+    s = sub.add_parser("achievements")
+    s.add_argument("slot", type=int)
+    s.set_defaults(fn=_achievements)
+    s = sub.add_parser("cosmetics")
+    s.add_argument("slot", type=int)
+    s.set_defaults(fn=_cosmetics)
+    s = sub.add_parser("grant-cosmetic")
+    s.add_argument("slot", type=int)
+    s.add_argument("cosmetic")
+    s.set_defaults(fn=_grant_cosmetic)
     sub.add_parser("saves").set_defaults(fn=_saves)
     s = sub.add_parser("import-saves")
     s.add_argument("folder", nargs="?", default=str(LEGACY_SAVE_DIR))

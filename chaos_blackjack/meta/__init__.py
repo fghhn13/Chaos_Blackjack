@@ -3,7 +3,8 @@
 Front-ends call these functions; they use one MetaService on data/game.db
 (or $CHAOS_DB). `use_service(MetaService(conn))` swaps it, e.g.
 `chaos_blackjack.meta.fake.install_fake()` for GUI work without a database.
-Contract: docs/design/META_PROGRESSION.md §5.1.
+Contracts: docs/design/META_PROGRESSION.md §5.1 and
+docs/design/COSMETICS_ACHIEVEMENTS.md §6 (wardrobe, equip, achievements).
 
     slot = meta.list_slots()[0]
     player = slot.player or meta.create_player(1, "Ace")
@@ -18,7 +19,8 @@ from collections.abc import Iterable
 
 from chaos_blackjack.meta.effects import Effect, effect_ids, get_effect, register_effect
 from chaos_blackjack.meta.models import (
-    SLOTS, MetaError, PendingRun, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart, UpgradeOffer,
+    SLOTS, AchievementState, CosmeticOffer, MetaError, PendingRun, Player, PlayerSlot, PlayerStats, RunRecord,
+    RunReward, RunStart, Unlock, UpgradeOffer,
 )
 from chaos_blackjack.meta.service import (
     LoopFactory, MetaService, ModeOption, build_run_config, consolation_tokens, reward_tokens,
@@ -102,10 +104,39 @@ def codex_seen(player_id: int) -> dict[tuple[str, str], int]:
     return service().codex_seen(player_id)
 
 
+def wardrobe(player_id: int, slot: str | None = None, profile: str | None = None) -> list[CosmeticOffer]:
+    return service().wardrobe(player_id, slot, profile)
+
+
+def loadout(player_id: int) -> dict[str, str]:
+    return service().loadout(player_id)
+
+
+def asset_aliases(player_id: int) -> dict[str, str]:
+    return service().asset_aliases(player_id)
+
+
+def equip(player_id: int, cosmetic_id: str) -> dict[str, str]:
+    return service().equip(player_id, cosmetic_id)
+
+
+def buy_cosmetic(player_id: int, cosmetic_id: str, profile: str | None = None) -> Player:
+    return service().buy_cosmetic(player_id, cosmetic_id, profile)
+
+
+def achievements(player_id: int, profile: str | None = None) -> list[AchievementState]:
+    return service().achievements(player_id, profile)
+
+
+def player_stats(player_id: int, *, best: bool = False) -> dict[str, int]:
+    return service().player_stats(player_id, best=best)
+
+
 __all__ = [
-    "SLOTS", "Effect", "MetaError", "MetaService", "ModeOption", "PendingRun", "Player", "PlayerSlot", "PlayerStats",
-    "RunRecord", "RunReward", "RunStart", "UpgradeOffer", "abandon_run", "build_run_config", "buy_upgrade",
-    "codex_seen", "reward_tokens",
+    "SLOTS", "AchievementState", "CosmeticOffer", "Effect", "MetaError", "MetaService", "ModeOption", "PendingRun",
+    "Player", "PlayerSlot", "PlayerStats", "RunRecord", "RunReward", "RunStart", "Unlock", "UpgradeOffer",
+    "abandon_run", "achievements", "asset_aliases", "build_run_config", "buy_cosmetic", "buy_upgrade",
+    "codex_seen", "equip", "loadout", "player_stats", "reward_tokens", "wardrobe",
     "consolation_tokens", "create_player", "delete_player", "effect_ids", "finish_run", "get_effect",
     "get_player", "history", "list_slots", "meta_shop", "modes", "pending_run", "register_effect", "rename_player",
     "resume_run", "service", "start_run", "use_service",

@@ -2,8 +2,8 @@
 
 Front-ends use the module-level functions in `chaos_blackjack.meta`, which
 delegate to one service. Tests and GUI development can install a service on
-an in-memory database (`chaos_blackjack.meta.fake`). Contract:
-docs/design/META_PROGRESSION.md §5.1.
+an in-memory database (`chaos_blackjack.meta.fake`). Contracts:
+docs/design/META_PROGRESSION.md §5.1 and docs/design/COSMETICS_ACHIEVEMENTS.md §6.
 """
 
 from __future__ import annotations
@@ -17,15 +17,18 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
+from chaos_blackjack.achievements import achievements_catalog, get_achievement
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.controller import GameController
+from chaos_blackjack.cosmetics import COSMETIC_SLOTS, cosmetics, get_cosmetic
 from chaos_blackjack.data.balance import Balance, BalanceError, MetaUpgradeBalance, default_balance, load_balance
 from chaos_blackjack.data.db import connect
 from chaos_blackjack.data.saves import SaveNotFound, load_run, save_run
+from chaos_blackjack.meta import unlocks
 from chaos_blackjack.meta.effects import get_effect
 from chaos_blackjack.meta.models import (
-    MAX_NAME_LENGTH, SLOTS, MetaError, PendingRun, Player, PlayerSlot, PlayerStats, RunRecord, RunReward, RunStart,
-    UpgradeOffer,
+    MAX_NAME_LENGTH, SLOTS, AchievementState, CosmeticOffer, MetaError, PendingRun, Player, PlayerSlot, PlayerStats,
+    RunRecord, RunReward, RunStart, UpgradeOffer,
 )
 from chaos_blackjack.meta.tracker import RunTracker
 from chaos_blackjack.modes import GameMode, get_mode, modes as all_modes
@@ -320,11 +323,13 @@ class MetaService:
             if run["result"] is not None:
                 raise MetaError("This run has already been settled")
             balance = self._balance(db, run["balance_profile"], fallback=True)
+            player_id = run["player_id"]
+            with db:
+                backfilled = unlocks.backfill(db, player_id, balance)  # earlier runs first, without this one
             result = controller.run_end.kind
             breakdown = reward_tokens(balance, result, summary["rounds"], controller.run.start_money,
                                       summary["peak_money"], chaos=controller.config.enable_chaos)
             tokens = max(0, sum(t for _, t in breakdown))
-            player_id = run["player_id"]
             with db:
                 db.execute(
                     "UPDATE run_history SET ended_at = datetime('now'), result = ?, rounds = ?, final_money = ?, "
@@ -336,7 +341,13 @@ class MetaService:
                            (tokens, player_id))
                 db.execute("DELETE FROM run_save WHERE run_id = ?", (run_id,))
                 self._record_seen(db, player_id, run["mode"], summary)
-            return RunReward(tokens, tuple(breakdown), result, self._player(db, player_id))
+                facts = unlocks.facts(db.execute("SELECT * FROM run_history WHERE id = ?", (run_id,)).fetchone(),
+                                      summary)
+                unlocks.fold_run(db, player_id, facts)
+                unlocked = backfilled + unlocks.evaluate(db, player_id, balance, facts, run_id)
+            breakdown += [(f"Achievement: {u.name}", u.tokens) for u in unlocked if u.tokens]
+            tokens += sum(u.tokens for u in unlocked)
+            return RunReward(tokens, tuple(breakdown), result, self._player(db, player_id), tuple(unlocked))
 
     def abandon_run(self, run_id: int) -> None:
         """Give up a run: recorded as abandoned, no tokens (consumables stay used)."""
@@ -365,6 +376,129 @@ class MetaService:
                     for r in db.execute("SELECT kind, entry_id, times FROM codex_seen WHERE player_id = ?",
                                         (player_id,))}
 
+    # -------------------------------------------------------------- cosmetics
+
+    def wardrobe(self, player_id: int, slot: str | None = None, profile: str | None = None) -> list[CosmeticOffer]:
+        """Every cosmetic (of one slot) and its state for the player; hidden ones only once owned."""
+        if slot is not None and slot not in COSMETIC_SLOTS:
+            raise MetaError(f"Unknown cosmetic slot {slot!r}")
+        with self._db() as db:
+            player = self._player(db, player_id)
+            balance = self._balance(db, profile)
+            owned = unlocks.owned_cosmetics(db, player_id)
+            equipped = {c.id for c in unlocks.loadout(db, player_id).values()}
+        prices = {p.cosmetic_id: p.cost for p in balance.cosmetic_prices}
+        rewarded_by: dict[str, list[str]] = {}
+        for r in balance.achievement_rewards:
+            a = get_achievement(r.achievement_id)
+            if r.cosmetic_id and a is not None:
+                rewarded_by.setdefault(r.cosmetic_id, []).append("???" if a.hidden else a.name)
+        offers = []
+        for c in cosmetics(slot):
+            have = c.default or c.id in owned
+            if c.hidden and not have:
+                continue
+            price = None if c.default else prices.get(c.id)
+            hints = [f"{price} tokens"] if price is not None else []
+            hints += [f"Achievement: {name}" for name in rewarded_by.get(c.id, ())]
+            if have:
+                reason = "Owned"
+            elif price is None:
+                reason = "Not for sale"
+            elif player.tokens < price:
+                reason = f"Needs {price} tokens"
+            else:
+                reason = ""
+            hint = "Starter look" if c.default else " or ".join(hints) or "Not available yet"
+            offers.append(CosmeticOffer(c, have, c.id in equipped, price, not reason, reason, hint))
+        return offers
+
+    def loadout(self, player_id: int) -> dict[str, str]:
+        """Slot -> equipped cosmetic id; every slot is filled (defaults included)."""
+        with self._db() as db:
+            self._player(db, player_id)
+            return {slot: c.id for slot, c in unlocks.loadout(db, player_id).items()}
+
+    def asset_aliases(self, player_id: int) -> dict[str, str]:
+        """Base asset id -> asset id of the player's equipped looks, for the GUI's AssetManager."""
+        with self._db() as db:
+            self._player(db, player_id)
+            return unlocks.asset_aliases(unlocks.loadout(db, player_id))
+
+    def equip(self, player_id: int, cosmetic_id: str) -> dict[str, str]:
+        """Equip an owned cosmetic in its slot; returns the new loadout."""
+        c = get_cosmetic(cosmetic_id)
+        if c is None:
+            raise MetaError(f"Unknown cosmetic {cosmetic_id!r}")
+        with self._db() as db:
+            self._player(db, player_id)
+            if not unlocks.owns(db, player_id, c):
+                raise MetaError(f"You do not own {c.name} yet")
+            with db:
+                db.execute(
+                    "INSERT INTO player_loadout (player_id, slot, cosmetic_id) VALUES (?, ?, ?) "
+                    "ON CONFLICT(player_id, slot) DO UPDATE SET cosmetic_id = excluded.cosmetic_id",
+                    (player_id, c.slot, c.id),
+                )
+            return {slot: e.id for slot, e in unlocks.loadout(db, player_id).items()}
+
+    def buy_cosmetic(self, player_id: int, cosmetic_id: str, profile: str | None = None) -> Player:
+        c = get_cosmetic(cosmetic_id)
+        if c is None:
+            raise MetaError(f"Unknown cosmetic {cosmetic_id!r}")
+        with self._db() as db:
+            player = self._player(db, player_id)
+            if unlocks.owns(db, player_id, c):
+                raise MetaError(f"You already own {c.name}")
+            price = next((p.cost for p in self._balance(db, profile).cosmetic_prices if p.cosmetic_id == c.id), None)
+            if price is None:
+                raise MetaError(f"{c.name} is not for sale")
+            if player.tokens < price:
+                raise MetaError(f"Needs {price} tokens")
+            with db:
+                db.execute("UPDATE player SET tokens = tokens - ? WHERE id = ?", (price, player_id))
+                unlocks.add_cosmetic(db, player_id, c.id, "shop")
+            return self._player(db, player_id)
+
+    def grant_cosmetic(self, player_id: int, cosmetic_id: str) -> bool:
+        """Development / testing helper; False when the player already owns it."""
+        if get_cosmetic(cosmetic_id) is None:
+            raise MetaError(f"Unknown cosmetic {cosmetic_id!r}")
+        with self._db() as db:
+            self._player(db, player_id)
+            with db:
+                return unlocks.add_cosmetic(db, player_id, cosmetic_id, "grant")
+
+    # ----------------------------------------------------------- achievements
+
+    def achievements(self, player_id: int, profile: str | None = None) -> list[AchievementState]:
+        """Every achievement with its progress. A player from before stats existed
+        is backfilled from run history first (which may unlock and pay)."""
+        with self._db() as db:
+            self._player(db, player_id)
+            balance = self._balance(db, profile)
+            with db:
+                unlocks.backfill(db, player_id, balance)
+            ctx = unlocks.context(db, player_id)
+            done = unlocks.unlocked(db, player_id)
+        rewards = {r.achievement_id: r for r in balance.achievement_rewards}
+        out = []
+        for a in achievements_catalog():
+            progress, goal = a.progress(ctx)
+            r = rewards.get(a.id)
+            out.append(AchievementState(a, a.id in done, done.get(a.id), goal if a.id in done else progress, goal,
+                                        r.tokens if r else 0, r.cosmetic_id if r else None))
+        return out
+
+    def player_stats(self, player_id: int, *, best: bool = False) -> dict[str, int]:
+        """Lifetime stat totals, or with `best` each stat's best single run
+        (chaos_blackjack.achievements.stats)."""
+        with self._db() as db:
+            self._player(db, player_id)
+            with db:
+                unlocks.backfill(db, player_id, self._balance(db, None, fallback=True))
+            return unlocks.stat_values(db, player_id)[1 if best else 0]
+
     # -------------------------------------------------------------- internals
 
     def _player(self, db: sqlite3.Connection, player_id: int) -> Player:
@@ -380,8 +514,9 @@ class MetaService:
             "WHERE player_id = ? AND result IS NOT NULL", (player_id,),
         ).fetchone()
         stats = PlayerStats(s["runs"] or 0, s["v"] or 0, s["d"] or 0, s["a"] or 0, s["best"] or 0, s["t"] or 0)
+        avatar = unlocks.loadout(db, player_id)["avatar"].asset_map()["avatar"]
         return Player(row["id"], row["slot"], row["name"], row["tokens"], upgrades, stats,
-                      row["created_at"], row["last_played_at"])
+                      row["created_at"], row["last_played_at"], avatar)
 
     @staticmethod
     def _balance(db: sqlite3.Connection, profile: str | None, *, fallback: bool = False) -> Balance:

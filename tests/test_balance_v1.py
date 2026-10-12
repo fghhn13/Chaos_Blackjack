@@ -114,4 +114,7 @@ def test_chaos_victory_pays_the_bonus(svc) -> None:
     c.run_end = RunEndResult("victory", "Won")
     c.phase = TablePhase.RUN_OVER
     reward = meta.finish_run(run.run_id, c)
-    assert dict(reward.breakdown) == {"Victory": 10, "Chaos bonus": 4} and reward.tokens == 14
+    run_lines = {k: v for k, v in reward.breakdown if not k.startswith("Achievement: ")}
+    assert run_lines == {"Victory": 10, "Chaos bonus": 4}
+    assert reward.tokens == 14 + sum(u.tokens for u in reward.unlocked)
+    assert any(u.cosmetic_id == "table_chaos" for u in reward.unlocked)
