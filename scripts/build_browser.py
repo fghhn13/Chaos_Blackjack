@@ -79,8 +79,17 @@ def main():
     bridge = '''<script>
 window.chaosInitialSave = window.parent.chaosInitialSave || '';
 window.chaosSave = snapshot => window.parent.chaosSave(snapshot);
+// ASCII JSON avoids runtime bridge string conversions corrupting Unicode saves.
+const bridgeASCII = raw => raw.split('').map(char => char.charCodeAt(0) > 127
+  ? String.fromCharCode(92) + 'u' + char.charCodeAt(0).toString(16).padStart(4, '0') : char).join('');
+window.chaosReadSave = () => bridgeASCII(JSON.stringify(window.chaosInitialSave));
+window.chaosSaveJSON = snapshot => window.parent.chaosSave(JSON.parse(snapshot));
 window.chaosClosed = () => window.parent.chaosClosed();
 window.chaosFailed = () => window.parent.chaosFailed();
+window.chaosTouchInput = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+window.chaosInputId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+window.chaosNameInput = state => window.parent.chaosNameInput?.(state);
+window.chaosNameNext = () => bridgeASCII(window.parent.chaosNameNext?.() || '');
 const loadingStarted = Date.now();
 const loadingTimer = setInterval(() => {
   const running = Boolean(window.chaosState);

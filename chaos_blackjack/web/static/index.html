@@ -15,7 +15,17 @@
     <section id="game" hidden>
       <div class="game-top"><p id="save-status" role="status">Loading your save…</p><div><button id="launch" class="primary">Play</button><button id="fullscreen" class="outline">Fullscreen</button></div></div>
       <p id="game-error" class="error" role="alert"></p>
-      <div id="game-container"><iframe id="pygame" title="Chaos Blackjack game" allow="autoplay; fullscreen" hidden></iframe></div>
+      <div id="game-container"><iframe id="pygame" title="Chaos Blackjack game" allow="autoplay; fullscreen" hidden></iframe>
+        <dialog id="player-name-dialog" aria-labelledby="player-name-title">
+          <h2 id="player-name-title" tabindex="-1">Player name</h2>
+          <form id="player-name-form">
+            <label>Name<input id="player-name-input" type="text" maxlength="24" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="Your player name"></label>
+            <small>Tap the name field to open your keyboard.</small>
+            <p id="player-name-error" class="error" role="alert"></p>
+            <div class="dialog-actions"><button id="player-name-cancel" type="button" class="outline">Cancel</button><button id="player-name-save" type="submit" class="primary">Save</button></div>
+          </form>
+        </dialog>
+      </div>
       <small>H hit · S stand · D double · R surrender · M mute. Saves sync to your account. Landscape works best on phones.</small>
     </section>
   </main>

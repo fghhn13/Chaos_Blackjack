@@ -4,6 +4,32 @@ const textNode=(tag,text,cls)=>{const el=document.createElement(tag);el.textCont
 let user=null,csrf='',registering=false,saveRevision=0,pendingSave=null,saving=false,conflicted=false;
 let saveKey='',launchVersion=0;
 let saveWaiters=[];
+let nameState=null,nameCommand='',nameSequence=0,namePending=0,nameComposing=false;
+function closeNameInput(){nameState=null;nameCommand='';namePending=0;nameComposing=false;if($('player-name-dialog').open)$('player-name-dialog').close();}
+window.chaosNameInput=raw=>{
+ const state=JSON.parse(raw);
+ if(!state||!user||$('pygame').hidden){closeNameInput();return;}
+ const changed=nameState?.id!==state.id;
+ nameState=state;
+ $('player-name-title').textContent=state.title;$('player-name-error').textContent=state.message;
+ if(changed){namePending=0;nameComposing=false;$('player-name-input').value=state.value;$('player-name-input').maxLength=state.maxLength;}
+ if(state.ack>=namePending){namePending=0;$('player-name-save').disabled=false;}
+ if(!$('player-name-dialog').open){$('player-name-dialog').showModal();$('player-name-title').focus();}
+};
+function queueNameInput(action){
+ if(!nameState)return;
+ const seq=++nameSequence;
+ nameCommand=JSON.stringify({id:nameState.id,seq,action,value:$('player-name-input').value});
+ if(action==='submit'){namePending=seq;$('player-name-save').disabled=true;}
+}
+window.chaosNameNext=()=>{const command=nameCommand;nameCommand='';return command;};
+$('player-name-input').oninput=event=>{if(!event.isComposing)queueNameInput('input');};
+$('player-name-input').addEventListener('compositionstart',()=>{nameComposing=true;});
+$('player-name-input').addEventListener('compositionend',()=>{nameComposing=false;queueNameInput('input');});
+$('player-name-input').onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing&&!nameComposing){event.preventDefault();queueNameInput('submit');}};
+$('player-name-form').onsubmit=event=>{event.preventDefault();if(!nameComposing)queueNameInput('submit');};
+$('player-name-cancel').onclick=()=>queueNameInput('cancel');
+$('player-name-dialog').oncancel=event=>{event.preventDefault();queueNameInput('cancel');};
 window.chaosInitialSave='';
 async function api(path,data){
  const options={credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000)};
@@ -14,7 +40,7 @@ async function api(path,data){
 }
 function setAuthMode(register){registering=register;$('token-field').hidden=!register;$('auth-token').required=register;$('login-tab').classList.toggle('selected',!register);$('register-tab').classList.toggle('selected',register);$('auth-title').textContent=register?'Join the table':'Welcome back';$('auth-password').autocomplete=register?'new-password':'current-password';$('auth-submit').textContent=register?'Create account':'Take your seat';$('auth-error').textContent='';}
 $('login-tab').onclick=()=>setAuthMode(false);$('register-tab').onclick=()=>setAuthMode(true);
-function stopGame(){launchVersion++;$('pygame').removeAttribute('src');$('pygame').hidden=true;}
+function stopGame(){closeNameInput();launchVersion++;$('pygame').removeAttribute('src');$('pygame').hidden=true;}
 function signedOut(){stopGame();user=null;csrf='';pendingSave=null;$('auth').hidden=false;$('game').hidden=true;$('identity').hidden=true;document.querySelectorAll('dialog[open]').forEach(d=>d.close());}
 async function signedIn(result){
  user=result.user;csrf=result.csrf;saveKey='chaos-save:'+user.id;
@@ -48,15 +74,15 @@ async function flushSave(){
  }finally{saving=false;saveWaiters.splice(0).forEach(resolve=>resolve());}
 }
 setInterval(flushSave,1000);
-window.chaosClosed=()=>{flushSave();$('launch').textContent='Play again';$('launch').hidden=false;};
+window.chaosClosed=()=>{closeNameInput();flushSave();$('launch').textContent='Play again';$('launch').hidden=false;};
 window.chaosLoading=info=>{
  if(!user||$('pygame').hidden)return;
  if(info.stage==='running'){if(pendingSave===null&&!saving)$('save-status').textContent='Game ready. Saves sync to your account.';}
  else if(info.stage==='ready')$('save-status').textContent='Download complete. Click inside the game to start.';
  else $('save-status').textContent=`Loading game files… ${info.elapsed}s elapsed. First load can take a few minutes on a slow connection.`;
 };
-window.chaosFailed=()=>{$('game-error').textContent='The game could not load or continue. Check your connection and retry, or reload your latest account save.';$('launch').textContent='Retry';$('launch').hidden=false;};
-$('launch').onclick=async()=>{try{await flushSave();if(conflicted)return;$('game-error').textContent='';$('pygame').src='/play/?v='+Date.now();$('pygame').hidden=false;$('launch').hidden=true;$('save-status').textContent='Loading game files. First load can take a few minutes on a slow connection.';}catch(e){$('game-error').textContent=e.message;}};
+window.chaosFailed=()=>{closeNameInput();$('game-error').textContent='The game could not load or continue. Check your connection and retry, or reload your latest account save.';$('launch').textContent='Retry';$('launch').hidden=false;};
+$('launch').onclick=async()=>{try{await flushSave();if(conflicted)return;closeNameInput();$('game-error').textContent='';$('pygame').src='/play/?v='+Date.now();$('pygame').hidden=false;$('launch').hidden=true;$('save-status').textContent='Loading game files. First load can take a few minutes on a slow connection.';}catch(e){$('game-error').textContent=e.message;}};
 $('fullscreen').onclick=()=>$('game-container').requestFullscreen().catch(e=>{$('game-error').textContent=e.message;});
 $('logout').onclick=async()=>{try{await flushSave();await api('/api/logout',{});signedOut();}catch(e){$('game-error').textContent=e.message;}};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());

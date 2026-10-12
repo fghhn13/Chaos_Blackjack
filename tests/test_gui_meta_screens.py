@@ -90,6 +90,61 @@ def test_invalid_name_stays_in_dialog_and_cancel_keeps_slot_empty(app):
     assert app.scenes.top.slots[2].player is None
 
 
+def touch_name_bridge():
+    import json
+    from types import SimpleNamespace
+    from chaos_blackjack.gui.browser import BrowserStore
+    commands, states = [], []
+    window = SimpleNamespace(chaosInitialSave="", chaosTouchInput=True, chaosInputId="touch-test",
+                             chaosNameNext=lambda: commands.pop(0) if commands else "",
+                             chaosNameInput=lambda raw: states.append(json.loads(raw)))
+    return BrowserStore(window), commands, states
+
+
+def test_touch_name_submit_validates_and_saves_complete_unicode_value(app):
+    import json
+    select = open_saves(app)
+    click(app, select.buttons[(3, "create")])
+    scene = app.scenes.top
+    bridge, commands, states = touch_name_bridge()
+    bridge.name_input(scene)
+    request_id = states[-1]["id"]
+    commands.append(json.dumps({"id": request_id, "seq": 1, "action": "submit", "value": " "}))
+    bridge.name_input(scene)
+    assert states[-1]["message"] and states[-1]["ack"] == 1
+    assert meta.list_slots()[2].player is None
+    # Submission carries the whole input, including a final composed character;
+    # it does not depend on an earlier per-frame input update.
+    commands.append(json.dumps({"id": request_id, "seq": 2, "action": "submit", "value": "测试玩家 Zoë"}))
+    bridge.name_input(scene)
+    app.scenes.apply_pending()
+    bridge.name_input(app.scenes.top)
+    assert meta.list_slots()[2].player.name == "测试玩家 Zoë"
+    assert states[-1] is None
+
+
+def test_touch_name_cancel_preserves_player_and_rejects_stale_dialog_commands(app):
+    import json
+    select = open_saves(app)
+    click(app, select.buttons[(1, "rename")])
+    bridge, commands, states = touch_name_bridge()
+    scene = app.scenes.top
+    bridge.name_input(scene)
+    previous_id = states[-1]["id"]
+    commands.append(json.dumps({"id": previous_id, "seq": 1, "action": "cancel", "value": "Discarded"}))
+    bridge.name_input(scene)
+    app.scenes.apply_pending()
+    bridge.name_input(app.scenes.top)
+    assert meta.list_slots()[0].player.name == "Ace"
+    click(app, app.scenes.top.buttons[(2, "rename")])
+    scene = app.scenes.top
+    bridge.name_input(scene)
+    assert states[-1]["id"] != previous_id
+    commands.append(json.dumps({"id": previous_id, "seq": 2, "action": "submit", "value": "Late input"}))
+    bridge.name_input(scene)
+    assert not scene.submitted and meta.list_slots()[1].player.name == "Rookie"
+
+
 def test_rename_replaces_selected_text(app):
     select = open_screen(app, "player_select")
     click(app, select.buttons[(1, "rename")])

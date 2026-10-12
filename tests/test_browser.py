@@ -1,5 +1,6 @@
 """Real SQLite restore and the asynchronous native scene lifecycle."""
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -34,6 +35,23 @@ def test_browser_worker_completes_without_threads(monkeypatch):
     result = []
     worker.start_worker(result.append, ("done",), name="offline")
     assert result == ["done"]
+
+
+def test_browser_json_bridge_roundtrips_unicode_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("CHAOS_DB", str(tmp_path / "unicode.db"))
+    db = connect()
+    with db:
+        db.execute("INSERT INTO preference(key,value) VALUES ('name','手机玩家 Zoë 🂡')")
+    db.close()
+    saved = []
+    store = BrowserStore(SimpleNamespace(chaosReadSave=lambda: '""', chaosSaveJSON=saved.append))
+    store.flush()
+    assert len(saved) == 1 and saved[0].isascii()
+    monkeypatch.setenv("CHAOS_DB", str(tmp_path / "restored-unicode.db"))
+    BrowserStore(SimpleNamespace(chaosReadSave=lambda: saved[0]))
+    db = connect()
+    assert db.execute("SELECT value FROM preference WHERE key='name'").fetchone()[0] == "手机玩家 Zoë 🂡"
+    db.close()
 
 
 def test_async_loop_renders_existing_home_and_yields(monkeypatch):

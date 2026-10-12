@@ -19,6 +19,11 @@ to unlock browser audio. The original menu, three player slots, Classic/Chaos,
 upgrades, Collection, history, settings and animations are used directly.
 Keyboard and mouse work on desktop. Phones can use touch controls; landscape and
 the Fullscreen button offer more room for the fixed 1280x720 layout.
+On touch devices, creating or renaming a player opens a native HTML name field.
+Tap that field to open the system keyboard, then use Save or the keyboard's Done
+action. Composition input is supported; validation and persistence still use the
+original Pygame name dialog. Cancel leaves the existing player unchanged. The
+HTML editor is inside the fullscreen container. Desktop text entry is unchanged.
 
 `package-files.txt` explicitly selects shipped assets and package resources.
 The builder adds Python source under `chaos_blackjack` except the server package.

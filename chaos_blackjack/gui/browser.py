@@ -10,8 +10,13 @@ from chaos_blackjack.data.db import db_path
 class BrowserStore:
     def __init__(self, window):
         self.window = window
-        self.previous = str(window.chaosInitialSave or "")
+        reader = getattr(window, "chaosReadSave", None)
+        self.previous = json.loads(str(reader())) if reader else str(window.chaosInitialSave or "")
         self.next_save = 0.0
+        self.name_scene = None
+        self.name_sequence = 0
+        self.name_ack = 0
+        self.name_state = "null"
         if self.previous:
             with closing(sqlite3.connect(db_path())) as conn:
                 conn.executescript(self.previous)
@@ -22,6 +27,7 @@ class BrowserStore:
 
     def frame(self, app):
         top = app.scenes.top
+        self.name_input(top)
         # Visible state only: useful for diagnosing startup without inspecting a deck.
         state = {"scene": type(top).__name__, "running": app.running}
         if type(top).__name__ == "NameDialog":
@@ -34,8 +40,54 @@ class BrowserStore:
             self.next_save = time.monotonic() + 1
             self.flush()
 
+    def name_input(self, scene):
+        """Route touch-device HTML editing through the original name dialog."""
+        if not getattr(self.window, "chaosTouchInput", False):
+            return
+        from chaos_blackjack.meta.models import MAX_NAME_LENGTH
+
+        active = type(scene).__name__ == "NameDialog" and not scene.submitted
+        state = "null"
+        if active:
+            if scene is not self.name_scene:
+                self.name_scene = scene
+                self.name_sequence += 1
+                self.name_ack = 0
+            request_id = f"{self.window.chaosInputId}:{self.name_sequence}"
+            raw = str(self.window.chaosNameNext() or "")
+            try:
+                command = json.loads(raw) if raw else {}
+            except (ValueError, TypeError):
+                command = {}
+            if (isinstance(command, dict) and command.get("id") == request_id
+                    and type(command.get("seq")) is int and command["seq"] > self.name_ack
+                    and command.get("action") in ("input", "submit", "cancel")
+                    and isinstance(command.get("value"), str)):
+                self.name_ack = command["seq"]
+                scene.value = command["value"][:MAX_NAME_LENGTH]
+                scene.replace_value = False
+                scene.message = ""
+                if command["action"] == "submit":
+                    scene.submit()
+                elif command["action"] == "cancel":
+                    scene.app.scenes.pop()
+                    active = False
+            if active and not scene.submitted:
+                state = json.dumps({"id": request_id, "ack": self.name_ack,
+                                    "title": scene.title, "value": scene.value,
+                                    "message": scene.message, "maxLength": MAX_NAME_LENGTH})
+        else:
+            self.name_scene = None
+        if state != self.name_state:
+            self.window.chaosNameInput(state)
+            self.name_state = state
+
     def flush(self):
         snapshot = self.snapshot()
         if snapshot != self.previous:
-            self.window.chaosSave(snapshot)
+            sender = getattr(self.window, "chaosSaveJSON", None)
+            if sender:
+                sender(json.dumps(snapshot))
+            else:
+                self.window.chaosSave(snapshot)
             self.previous = snapshot
