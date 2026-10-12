@@ -1,4 +1,4 @@
-"""Cosmetics — unlockable looks for the card back, table, chip set and avatar.
+"""Cosmetics — unlockable looks for the deck (card back and face), table, chip set and avatar.
 
 A cosmetic only changes art: it maps a slot's base asset ids to its own asset
 ids, and the GUI's AssetManager draws those instead. Game logic, RunConfig and
@@ -14,17 +14,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-COSMETIC_SLOTS = ("card_back", "table", "chips", "avatar")
+COSMETIC_SLOTS = ("deck", "table", "chips", "avatar")
 
-# Base asset ids each slot replaces.
+# Base asset ids each slot replaces. A deck may leave out the face and keep the default one.
 SLOT_ASSETS: dict[str, tuple[str, ...]] = {
-    "card_back": ("card_back",),
+    "deck": ("card_back", "card_front_blank"),
     "table": ("table_background",),
     "chips": ("chip_1", "chip_5", "chip_10", "chip_25"),
     "avatar": ("avatar",),
 }
 
-SLOT_LABELS = {"card_back": "Card backs", "table": "Tables", "chips": "Chips", "avatar": "Avatars"}
+SLOT_LABELS = {"deck": "Decks", "table": "Tables", "chips": "Chips", "avatar": "Avatars"}
 RARITIES = ("common", "rare", "epic", "legendary")
 
 
@@ -40,6 +40,7 @@ class Cosmetic:
     default: bool = False         # owned by every player
     hidden: bool = False          # not listed until owned
     order: int = 0
+    series: str = "core"          # "core" or an expansion id (chaos_blackjack.modes.register_series)
 
     def asset_map(self) -> dict[str, str]:
         """Every base asset id of the slot -> the asset id this cosmetic draws."""

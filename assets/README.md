@@ -6,9 +6,10 @@ built-in placeholder; press F5 in the game to rescan.
 
 Also searched: `black-jack-assets/exports/` and any dirs in `CHAOS_ASSETS_DIR`.
 
-Cosmetic looks (card backs, tables, chip sets, avatars) are asset ids too, with
+Cosmetic looks (decks, tables, chip sets, avatars) are asset ids too, with
 the same size and alpha rules as the base asset they replace: e.g.
-`card_back_crimson.png`, `table_midnight.png`, `chips_neon_1.png` to
+`card_back_crimson.png`, `card_back_poker_head.png` and `card_front_poker_head.png`
+(a deck's back and face), `table_midnight.png`, `table_poker_head.png`, `chips_neon_1.png` to
 `chips_neon_25.png`, `avatar_spade.png`; the base avatar is `avatar.png`
 (256×256). Ids are listed in `chaos_blackjack/cosmetics/catalog.py`; see
 `docs/design/COSMETICS_ACHIEVEMENTS.md`.

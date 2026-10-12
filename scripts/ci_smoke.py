@@ -128,6 +128,7 @@ def gui_smoke(player_id: int, config) -> None:
                         ("overview", "wardrobe", "achievements")]
         for name, params in (("player_select", {}), ("run_setup", {"player_id": player_id}),
                              ("meta_shop", {"player_id": player_id}),
+                             ("meta_shop", {"player_id": player_id, "area": "cosmetics"}),
                              ("history", {"player_id": player_id}),
                              *profile_tabs,
                              ("home", {})):

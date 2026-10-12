@@ -2,11 +2,11 @@
 
 The menu adapts to the player's state:
   - no players yet:   Start game (creates a player, then opens run setup);
-                      Upgrades, Run history and the badge explain that they
+                      Shop, Run history and the badge explain that they
                       need a player and point at Start game
   - unfinished run:   Continue run (with a summary) above New run
   - otherwise:        New run
-Upgrades, Collection and Run history follow; Settings and Quit sit low.
+Shop, Collection and Run history follow; Settings and Quit sit low.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class HomeScene(Scene):
         if self.player is None:
             entry("start", "Start game", self.start_game, "primary", 84, "Create your player and take a seat.")
             y += 6
-            entry("upgrades", "Upgrades", self.need_player, "secondary", 46, note="Needs a player")
+            entry("upgrades", "Shop", self.need_player, "secondary", 46, note="Needs a player")
             entry("codex", "Collection", self.open_collection, "secondary", 46)
             entry("history", "Run history", self.need_player, "secondary", 46, note="Needs a player")
         else:
@@ -90,7 +90,7 @@ class HomeScene(Scene):
             else:
                 entry("new", "New run", self.new_run, "primary", 84, "Choose a table and take a seat.")
             y += 6
-            entry("upgrades", "Upgrades", lambda: self.open("meta_shop", player_id=self.player.id), "secondary", 46)
+            entry("upgrades", "Shop", lambda: self.open("meta_shop", player_id=self.player.id), "secondary", 46)
             entry("codex", "Collection", self.open_collection, "secondary", 46)
             entry("history", "Run history", lambda: self.open("history", player_id=self.player.id), "secondary", 46)
         self.settings = TextButton(a, (MENU_X, 648, 120, 40), "Settings", lambda: self.open("meta_settings"))

@@ -51,5 +51,5 @@ def seed_demo(svc: MetaService) -> None:
             )
     svc.achievements(ace.id)  # stats and achievements from the history above
     svc.grant_cosmetic(ace.id, "card_back_crimson")
-    for cosmetic in ("card_back_crimson", "table_chaos"):
+    for cosmetic in ("card_back_crimson", "table_poker_head"):
         svc.equip(ace.id, cosmetic)

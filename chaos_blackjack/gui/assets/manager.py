@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pygame
 
+from chaos_blackjack.content import builtin_persona  # noqa: F401  (registers the bundled host portraits)
 from chaos_blackjack.content.ai_profile import persona_image
 from chaos_blackjack.gui.assets import placeholders
 from chaos_blackjack.gui.assets.manifest import MANIFEST, AssetSpec

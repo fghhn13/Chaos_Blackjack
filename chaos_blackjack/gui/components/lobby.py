@@ -17,10 +17,10 @@ import pygame
 
 from chaos_blackjack import meta
 from chaos_blackjack.app.view import CardView
+from chaos_blackjack.content.builtin_persona import default_persona
 from chaos_blackjack.data.prefs import get_pref, set_pref
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.cards import CardRenderer
-from chaos_blackjack.gui.components.chaos_panel import mood_face
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, draw_focus_ring, fit_text, wrap_text
 
@@ -154,18 +154,18 @@ class DealerScene:
         self.cards = CardRenderer(assets)
         self.cx = center_x
         self.time = 0.0
-        self.mood = "calm"
+        self.mood = "neutral"
 
     def update(self, dt: float) -> None:
         self.time += dt
-        # A brief smirk every few seconds; otherwise calm.
-        self.mood = "smug" if self.time % 7.0 > 5.9 else "calm"
+        # A brief welcoming gesture every few seconds; otherwise composed.
+        self.mood = "welcome" if self.time % 7.0 > 5.6 else "neutral"
 
     def draw(self, surface: pygame.Surface, *, intensity: float = 1.0) -> None:
         a, t, cx = self.assets, self.time, self.cx
         bob = int(math.sin(t * 1.3) * 4)
         draw_glow(surface, (cx, 285 + bob), 230, theme.CHAOS_PURPLE, int(5 + 4 * intensity))
-        face = a.image_fit(mood_face(a, self.mood), (330, 330))
+        face = a.image_fit(default_persona().asset_id(self.mood), (330, 330))
         surface.blit(face, face.get_rect(center=(cx, 290 + bob)))
         # Felt table edge in front of the dealer.
         table = pygame.Rect(0, 0, 980, 420)

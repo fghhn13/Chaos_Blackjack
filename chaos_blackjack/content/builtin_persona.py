@@ -1,4 +1,8 @@
-"""Bundled default dealer presentation, independent of Chaos rule selection."""
+"""Bundled table hosts (presentation only, independent of Chaos rule selection).
+
+A mode names its host (docs/design/AI_MODES.md). The only bundled host is
+Poker Head; he hosts Classic (without bending rules) and his own mode.
+"""
 
 from functools import lru_cache
 import json
@@ -19,3 +23,16 @@ def default_persona() -> Persona:
         lines={key: tuple(value) for key, value in data["lines"].items()},
         default=data["default"],
     )
+
+
+HOSTS = ("poker_head",)
+HOST_NAMES = {"poker_head": "Poker Head"}
+
+
+def host_persona(host: str | None) -> Persona:
+    """The persona of a bundled host. Runs from before hosts (None) and hosts
+    this version no longer ships fall back to Poker Head."""
+    return default_persona()
+
+
+default_persona()  # register the bundled portraits (asset ids default_poker_head_<expression>)

@@ -24,9 +24,16 @@ ROW_EDGE = (0x34, 0x3B, 0x38)
 
 
 def draw_look(surface: pygame.Surface, assets, cosmetic: Cosmetic, box: pygame.Rect) -> None:
-    """A cosmetic's own art fitted in `box` (a chip set shows its four chips).
-    Previews never follow the equipped aliases, so each look shows itself."""
+    """A cosmetic's own art fitted in `box` (a chip set shows its four chips, a
+    deck its back and face). Previews never follow the equipped aliases, so each
+    look shows itself."""
     m = cosmetic.asset_map()
+    if cosmetic.slot == "deck":
+        half = pygame.Rect(box.x, box.y, box.w // 2 - 2, box.h)
+        for i, base in enumerate(("card_back", "card_front_blank")):
+            img = assets.image_fit(m[base], half.size, alias=False)
+            surface.blit(img, img.get_rect(center=half.move(i * (box.w // 2 + 2), 0).center))
+        return
     if cosmetic.slot == "chips":
         size = min(box.h, box.w // 2)
         for i, base in enumerate(("chip_1", "chip_5", "chip_10", "chip_25")):
@@ -48,7 +55,7 @@ def action_label(offer) -> str:
 
 
 class CosmeticRow(Button):
-    """One look. The row is its button: equip it, or buy and equip it."""
+    """One look. The row is its button: buy it (Shop) or equip it (Shop and Wardrobe)."""
 
     def __init__(self, assets, offer, on_click):
         enabled = (offer.owned and not offer.equipped) or offer.can_buy
@@ -102,10 +109,10 @@ class AchievementRow(Button):
     """One achievement: progress and reward. Rows only take focus so the
     keyboard can scroll the list."""
 
-    def __init__(self, assets, state, cosmetic_name: str | None):
+    def __init__(self, assets, state, cosmetic_names: tuple[str, ...] = ()):
         super().__init__(assets, (0, 0, 10, 74), state.achievement.name, None, key_hint="", sound=False)
         self.state = state
-        self.cosmetic_name = cosmetic_name
+        self.cosmetic_names = cosmetic_names or state.reward_cosmetics
 
     def draw(self, surface):
         if not self.visible:
@@ -127,8 +134,7 @@ class AchievementRow(Button):
         reward_parts = []
         if s.reward_tokens:
             reward_parts.append(f"+{s.reward_tokens} tokens")
-        if s.reward_cosmetic:
-            reward_parts.append(self.cosmetic_name or s.reward_cosmetic)
+        reward_parts += list(self.cosmetic_names)
         reward = "  ·  ".join(reward_parts)
         small = a.font(theme.FONT_SMALL)
         reward_img = a.font(theme.FONT_SMALL, bold=True).render(reward, True,
@@ -160,18 +166,19 @@ class AchievementRow(Button):
 
 
 def draw_table_preview(surface: pygame.Surface, assets, looks: dict[str, Cosmetic], rect: pygame.Rect) -> None:
-    """A small table showing a loadout together: felt, two card backs, a chip stack and the avatar."""
+    """A small table showing a loadout together: felt, a card back and face, chip stacks and the avatar."""
     table = assets.image(looks["table"].asset_map()["table_background"], rect.size, alias=False)
     surface.blit(table, rect)
     pygame.draw.rect(surface, theme.GOLD_DIM, rect, 1, border_radius=4)
-    back = assets.image(looks["card_back"].asset_map()["card_back"], (74, 111), alias=False)
+    deck = looks["deck"].asset_map()
     cx, cy = rect.centerx, rect.centery
-    for i, dx in enumerate((-70, -34)):
-        surface.blit(back, back.get_rect(center=(cx + dx, cy - 6 + i * 4)))
+    for base, dx in (("card_back", -88), ("card_front_blank", -8)):
+        img = assets.image(deck[base], (74, 111), alias=False)
+        surface.blit(img, img.get_rect(center=(cx + dx, cy - 6)))
     chips = looks["chips"].asset_map()
     for i, base in enumerate(("chip_25", "chip_10", "chip_5", "chip_1")):
         img = assets.image(chips[base], (46, 46), alias=False)
         for k in range(3 if i < 2 else 2):
-            surface.blit(img, img.get_rect(center=(cx + 60 + i * 30, cy + 40 - k * 5)))
+            surface.blit(img, img.get_rect(center=(cx + 72 + i * 30, cy + 40 - k * 5)))
     avatar = assets.image(looks["avatar"].asset_map()["avatar"], (58, 58), alias=False)
     surface.blit(avatar, avatar.get_rect(topleft=(rect.x + 14, rect.y + 14)))

@@ -42,25 +42,34 @@ class RunResultScene(MetaScreen):
             self.title = "Victory" if victory else "Defeat"
             self.app.audio.play("ending_victory" if victory else "ending_bankrupt")
             for i, u in enumerate(self.cards()):
-                if u.cosmetic_id and get_cosmetic(u.cosmetic_id) is not None:
+                if self.looks(u):
                     y = 214 + i * (CARD_H + CARD_GAP)
                     b = Button(self.app.assets, (UNLOCK_X + UNLOCK_W - 112, y + (CARD_H - 38) // 2, 96, 38), "Equip",
-                               lambda cid=u.cosmetic_id: self.equip(cid), style="ghost",
+                               lambda aid=u.achievement_id: self.equip(aid), style="ghost",
                                font_size=theme.FONT_SMALL, key_hint="")
-                    self.equip_buttons[u.cosmetic_id] = b
+                    self.equip_buttons[u.achievement_id] = b
                     self.ui.add(b)
 
     def cards(self):
         return self.reward.unlocked[:MAX_CARDS] if self.reward else ()
 
-    def equip(self, cosmetic_id):
-        if self.action(lambda: meta.equip(self.player_id, cosmetic_id)) is not None:
+    @staticmethod
+    def looks(unlock):
+        """The new looks an unlock gave that this version knows."""
+        return [c for c in map(get_cosmetic, unlock.cosmetic_ids) if c is not None]
+
+    def equip(self, achievement_id):
+        """Equip every look an achievement gave (one per slot)."""
+        unlock = next(u for u in self.reward.unlocked if u.achievement_id == achievement_id)
+        looks = self.looks(unlock)
+        if all(self.action(lambda c=c: meta.equip(self.player_id, c.id)) is not None for c in looks):
             apply_loadout(self.app, self.player_id)
-            button = self.equip_buttons[cosmetic_id]
+            button = self.equip_buttons[achievement_id]
             button.text, button.enabled = "Equipped", False
+            slots = {c.slot for c in looks}
             for other_id, other in self.equip_buttons.items():
-                same_slot = get_cosmetic(other_id).slot == get_cosmetic(cosmetic_id).slot
-                if other_id != cosmetic_id and same_slot:
+                other_unlock = next(u for u in self.reward.unlocked if u.achievement_id == other_id)
+                if other_id != achievement_id and slots & {c.slot for c in self.looks(other_unlock)}:
                     other.text, other.enabled = "Equip", True
 
     def back_to_hub(self):
@@ -102,7 +111,8 @@ class RunResultScene(MetaScreen):
             card = pygame.Rect(UNLOCK_X, 214 + i * (CARD_H + CARD_GAP), UNLOCK_W, CARD_H)
             pygame.draw.rect(surface, (0x26, 0x2B, 0x24), card, border_radius=10)
             pygame.draw.rect(surface, theme.GOLD_DIM, card, 1, border_radius=10)
-            look = get_cosmetic(u.cosmetic_id) if u.cosmetic_id else None
+            looks = self.looks(u)
+            look = looks[0] if looks else None
             x = card.x + 16
             if look is not None:
                 draw_look(surface, a, look, pygame.Rect(x, card.y + 9, 72, CARD_H - 18))
@@ -111,8 +121,8 @@ class RunResultScene(MetaScreen):
             name_font = a.font(theme.FONT_BODY, bold=True)
             surface.blit(name_font.render(fit_text(name_font, u.name, right - x), True, theme.IVORY), (x, card.y + 10))
             parts = [f"+{u.tokens} tokens"] if u.tokens else []
-            if look is not None:
-                parts.append(f"New look: {look.name}")
+            if looks:
+                parts.append(("New look: " if len(looks) == 1 else "New looks: ") + ", ".join(c.name for c in looks))
             small = a.font(theme.FONT_SMALL)
             reward = fit_text(small, "  ·  ".join(parts), right - x)
             surface.blit(small.render(reward, True, theme.GOLD), (x, card.y + 38))

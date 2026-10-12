@@ -61,9 +61,9 @@ def test_modes_describe_the_supplied_config():
                     allow_surrender=False)
     for entry in codex_entries("mode", cfg):
         detail = entry.detail(cfg)
-        assert "230 chips" in detail and "reach 920" in detail
-        assert "from 7 to 25%" in detail and "stands on 19" in detail
-        assert "7:4" in detail and "Double down is disabled" in detail and "surrender is disabled" in detail
+        assert "230 chips" in detail and "into 920" in detail
+        assert "Bet 7 up to 25%" in detail and "stands on 19" in detail
+        assert "7:4" in detail and "No double down or surrender" in detail
 
 
 def test_modes_registry_replaces_fallback_at_query_time(monkeypatch):

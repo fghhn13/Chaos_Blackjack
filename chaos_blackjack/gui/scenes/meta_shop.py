@@ -1,24 +1,42 @@
-"""Upgrades: spend tokens on permanent upgrades and consumables.
+"""Shop: the one place tokens are spent.
 
-Everything comes from the meta API's offers. Categories are the offer kinds
-present, and the list scrolls, so new upgrades need no layout changes.
+Three areas, each split by series (the Classic Table, then "Dealers" with one
+tab per dealer such as Poker Head; a dealer with nothing in an area is left
+out):
+
+* Upgrades: permanent upgrades. An upgrade tied to a mode belongs to that
+  mode's series.
+* Cosmetics: decks, tables, chip sets and avatars, grouped by slot, with a live
+  table preview. Looks earned through achievements are listed locked with how
+  to get them. A bought look can be equipped here or in the Wardrobe.
+* Starter items: consumables brought into a run. One tied to a mode belongs to
+  that mode's series; otherwise to the series whose tables sell the item.
+
+Everything comes from the meta API's offers and the lists scroll, so new
+content needs no layout changes. Design: docs/design/COSMETICS_ACHIEVEMENTS.md.
 """
 
 import pygame
 
 from chaos_blackjack import meta
+from chaos_blackjack.cosmetics import COSMETIC_SLOTS, SLOT_LABELS, get_cosmetic
 from chaos_blackjack.gui import theme
-from chaos_blackjack.gui.components.lobby import MARGIN, back_button, draw_paragraph
+from chaos_blackjack.gui.components.lobby import MARGIN, apply_loadout, back_button, draw_paragraph, mode_name
 from chaos_blackjack.gui.components.meta_screen import MetaScreen
+from chaos_blackjack.gui.components.wardrobe import CosmeticRow, draw_look, draw_table_preview
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.widgets import Button, ScrollColumn, WidgetGroup, draw_focus_ring, fit_text, wrap_text
+from chaos_blackjack.modes import EXPANSIONS_LABEL, get_mode, get_series, item_series, series_list
 
-LIST = pygame.Rect(MARGIN, 206, 1140, 380)
-KIND_LABELS = {"permanent": "Permanent", "consumable": "Consumables"}
-KIND_NOTES = {
-    "permanent": "Permanent upgrades apply to every run you start.",
-    "consumable": "Consumables wait in your bag; choose which to bring in New run.",
+AREAS = (("upgrades", "Upgrades"), ("cosmetics", "Cosmetics"), ("starter", "Starter items"))
+AREA_NOTES = {
+    "upgrades": "Permanent upgrades apply to every run you start.",
+    "cosmetics": "Looks change only the art. Equip them here or in your Wardrobe.",
+    "starter": "Starter items wait in your bag; choose which to bring in New run.",
 }
+LIST = pygame.Rect(MARGIN, 248, 1140, 340)
+COSMETIC_LIST = pygame.Rect(MARGIN, 248, 640, 340)
+PREVIEW = pygame.Rect(MARGIN + 676, 248, 476, 268)
 
 
 class UpgradeRow(Button):
@@ -57,6 +75,11 @@ class UpgradeRow(Button):
         name_font = a.font(theme.FONT_BODY, bold=True)
         surface.blit(name_font.render(fit_text(name_font, o.name, text_w - 160), True, theme.IVORY), (x, r.y + 14))
         status_x = x + min(name_font.size(o.name)[0], text_w - 160) + 16
+        if o.mode:
+            tag_font = a.font(theme.FONT_TINY, bold=True)
+            tag = tag_font.render(f"{mode_name(o.mode).upper()} ONLY", True, theme.CHAOS_MAGENTA)
+            surface.blit(tag, (status_x, r.y + 19))
+            status_x += tag.get_width() + 14
         if o.kind == "permanent":
             for level in range(min(o.max_level, 12)):
                 pygame.draw.circle(surface, theme.GOLD if level < o.owned else theme.FELT_LIGHT,
@@ -71,79 +94,222 @@ class UpgradeRow(Button):
             draw_focus_ring(surface, r)
 
 
+class HeadingRow(Button):
+    """A slot heading inside the cosmetics list (not clickable or focusable)."""
+
+    focusable = False
+
+    def __init__(self, assets, text):
+        super().__init__(assets, (0, 0, 10, 30), text, None, key_hint="", enabled=False, sound=False)
+
+    def draw(self, surface):
+        if not self.visible:
+            return
+        img = self.assets.font(theme.FONT_TINY, bold=True).render(self.text.upper(), True, theme.GOLD_DIM)
+        surface.blit(img, (self.rect.x, self.rect.y + 8))
+        pygame.draw.line(surface, theme.GOLD_DIM, (self.rect.x, self.rect.bottom - 2),
+                         (self.rect.right, self.rect.bottom - 2), 1)
+
+
 @register_scene("meta_shop")
 class MetaShopScene(MetaScreen):
-    title = "Upgrades"
+    title = "Shop"
 
-    def on_enter(self, player_id, kind=None, **params):
+    def on_enter(self, player_id, area=None, series=None, kind=None, **params):
         self.setup()
         self.player_id = player_id
-        self.kind = kind or self.app.session.get("upgrades_tab", "permanent")
+        if area is None and kind is not None:  # earlier callers named the kind
+            area = "starter" if kind == "consumable" else "upgrades"
+        self.area = area or self.app.session.get("shop_area", "upgrades")
+        if self.area not in dict(AREAS):
+            self.area = "upgrades"
+        self.series = series or self.app.session.get("shop_series", "core")
         self.scroll = 0
         self.refresh()
 
+    # ------------------------------------------------------------------ data
+
+    @property
+    def profile(self):
+        return self.app.run_config.balance_profile
+
+    def upgrade_item(self, upgrade_id) -> str:
+        u = next((u for u in self.app.balance.meta_upgrades if u.upgrade_id == upgrade_id), None)
+        return str(dict(u.params).get("item", "")) if u is not None else ""
+
+    icon = upgrade_item  # a starter item's icon is its item
+
+    def series_of(self, offer) -> str:
+        """The series an offer belongs to (see the module docstring)."""
+        cosmetic = getattr(offer, "cosmetic", None)
+        if cosmetic is not None:
+            return cosmetic.series
+        if offer.mode:
+            try:
+                return get_mode(offer.mode).series
+            except KeyError:
+                return offer.mode
+        item = self.upgrade_item(offer.upgrade_id) if offer.kind == "consumable" else ""
+        return item_series(item, self.app.run_config) if item else "core"
+
+    def area_offers(self, area):
+        if area == "cosmetics":
+            return self.cosmetic_offers
+        kind = "permanent" if area == "upgrades" else "consumable"
+        return [o for o in self.upgrade_offers if o.kind == kind]
+
     def refresh(self):
         self.player = self.action(lambda: meta.get_player(self.player_id))
-        self.offers = self.action(lambda: meta.meta_shop(self.player_id, self.app.run_config.balance_profile)) or []
-        self.kinds = list(dict.fromkeys(o.kind for o in self.offers)) or ["permanent"]
-        if self.kind not in self.kinds:
-            self.kind = self.kinds[0]
+        self.upgrade_offers = self.action(lambda: meta.meta_shop(self.player_id, self.profile)) or []
+        self.cosmetic_offers = self.action(lambda: meta.wardrobe(self.player_id, None, self.profile)) or []
+        self.loadout = self.action(lambda: meta.loadout(self.player_id)) or {}
+        offers = self.area_offers(self.area)
+        present = {self.series_of(o) for o in offers}
+        # Core first, then the expansions that have something in this area.
+        self.series_options = [s for s in series_list() if not s.expansion or s.id in present]
+        if self.series not in {s.id for s in self.series_options}:
+            self.series = "core"
+        self.visible_offers = [o for o in offers if self.series_of(o) == self.series]
         self.subtitle = "Spend tokens between runs. Your bankroll stays at the table."
-        self.visible_offers = [o for o in self.offers if o.kind == self.kind]
+        self.build()
+
+    # ---------------------------------------------------------------- widgets
+
+    def build(self):
         a = self.app.assets
         self.ui = WidgetGroup(keyboard=True)
-        self.tabs = {}
+        self.area_tabs = {}
         x = MARGIN
-        for k in self.kinds:
-            label = KIND_LABELS.get(k, k.replace("_", " ").title())
-            width = a.font(theme.FONT_BODY).size(label)[0] + 48
-            tab = Button(a, (x, 136, width, 44), label, lambda k=k: self.tab(k), style="ghost",
+        for key, label in AREAS:
+            count = len(self.area_offers(key))
+            text = f"{label}  {count}"
+            width = max(150, a.font(theme.FONT_BODY).size(text)[0] + 48)
+            tab = Button(a, (x, 136, width, 44), text, lambda k=key: self.pick_area(k), style="ghost",
                          font_size=theme.FONT_BODY, key_hint="")
-            tab.selected = k == self.kind
-            self.tabs[k] = tab
+            tab.selected = key == self.area
+            if tab.selected:
+                tab.style = "primary"
+            self.area_tabs[key] = tab
             self.ui.add(tab)
             x += width + 10
-        self.list = ScrollColumn(LIST, gap=10)
-        self.buy_buttons = {}
-        for offer in self.visible_offers:
-            row = UpgradeRow(a, offer, self.icon(offer.upgrade_id), lambda uid=offer.upgrade_id: self.buy(uid))
-            self.buy_buttons[offer.upgrade_id] = self.list.add(row)
+        # Series: the Classic Table, then "Dealers" and one tab per dealer with content here.
+        self.series_tabs = {}
+        self.expansions_label_x = None
+        x = MARGIN
+        for s in self.series_options:
+            if s.expansion and self.expansions_label_x is None:
+                x += 10
+                self.expansions_label_x = x
+                x += a.font(theme.FONT_TINY, bold=True).size(EXPANSIONS_LABEL.upper())[0] + 12
+            count = sum(1 for o in self.area_offers(self.area) if self.series_of(o) == s.id)
+            text = f"{s.name}  {count}"
+            width = a.font(theme.FONT_SMALL).size(text)[0] + 40
+            tab = Button(a, (x, 194, width, 38), text, lambda sid=s.id: self.pick_series(sid), style="ghost",
+                         font_size=theme.FONT_SMALL, key_hint="")
+            tab.selected = s.id == self.series
+            if tab.selected and s.expansion:
+                tab.style = "chaos"
+            self.series_tabs[s.id] = tab
+            self.ui.add(tab)
+            x += width + 8
+        self.rows = {}
+        self.buy_buttons = self.rows  # kept for callers that look rows up by id
+        if self.area == "cosmetics":
+            self.list = ScrollColumn(COSMETIC_LIST, gap=8)
+            for slot in COSMETIC_SLOTS:
+                looks = [o for o in self.visible_offers if o.cosmetic.slot == slot]
+                if not looks:
+                    continue
+                self.list.add(HeadingRow(a, SLOT_LABELS[slot]))
+                for offer in looks:
+                    self.rows[offer.cosmetic.id] = self.list.add(
+                        CosmeticRow(a, offer, lambda o=offer: self.choose(o)))
+        else:
+            self.list = ScrollColumn(LIST, gap=10)
+            for offer in self.visible_offers:
+                row = UpgradeRow(a, offer, self.icon(offer.upgrade_id), lambda uid=offer.upgrade_id: self.buy(uid))
+                self.rows[offer.upgrade_id] = self.list.add(row)
         self.list.scroll_by(self.scroll)
         self.ui.add(self.list)
         self.ui.add(back_button(a, self.app.scenes.pop))
 
-    def icon(self, upgrade_id):
-        u = next((u for u in self.app.balance.meta_upgrades if u.upgrade_id == upgrade_id), None)
-        return str(dict(u.params).get("item", "")) if u is not None else ""
+    # --------------------------------------------------------------- actions
 
-    def tab(self, kind):
-        self.kind, self.scroll = kind, 0
-        self.app.session["upgrades_tab"] = kind
-        self.message = ""
+    def pick_area(self, area):
+        self.area, self.scroll, self.message = area, 0, ""
+        self.app.session["shop_area"] = area
         self.refresh()
+
+    def pick_series(self, series_id):
+        self.series, self.scroll, self.message = series_id, 0, ""
+        self.app.session["shop_series"] = series_id
+        self.refresh()
+
+    def _keep_focus(self, key):
+        self.scroll = self.list.scroll
+        self.refresh()
+        row = self.rows.get(key)
+        if row is not None and row.enabled:
+            self.ui.set_focus(row)
 
     def buy(self, upgrade_id):
         self.message = ""
-        result = self.action(lambda: meta.buy_upgrade(self.player_id, upgrade_id, self.app.run_config.balance_profile))
-        if result is not None:
-            name = next((o.name for o in self.offers if o.upgrade_id == upgrade_id), upgrade_id)
+        if self.action(lambda: meta.buy_upgrade(self.player_id, upgrade_id, self.profile)) is not None:
+            name = next((o.name for o in self.upgrade_offers if o.upgrade_id == upgrade_id), upgrade_id)
             self.message = f"{name} purchased."
-        self.scroll = self.list.scroll
-        focus = self.ui.focus.offer.upgrade_id if isinstance(self.ui.focus, UpgradeRow) else None
-        self.refresh()
-        if focus in self.buy_buttons and self.buy_buttons[focus].enabled:
-            self.ui.set_focus(self.buy_buttons[focus])
+        self._keep_focus(upgrade_id)
+
+    def choose(self, offer):
+        """Buy a look for sale; equip one already owned."""
+        self.message = ""
+        c = offer.cosmetic
+        if not offer.owned:
+            if self.action(lambda: meta.buy_cosmetic(self.player_id, c.id, self.profile)) is not None:
+                self.message = f"{c.name} purchased. Click it again to equip it, or change looks in your Wardrobe."
+        elif self.action(lambda: meta.equip(self.player_id, c.id)) is not None:
+            apply_loadout(self.app, self.player_id)
+            self.message = f"{c.name} equipped."
+        self._keep_focus(c.id)
 
     def update(self, dt):
         self.ui.update(dt)
 
+    # ---------------------------------------------------------------- drawing
+
+    def preview_looks(self):
+        """The loadout with the hovered (or focused) look swapped in."""
+        looks = {slot: get_cosmetic(cid) for slot, cid in self.loadout.items()}
+        shown = next((r.offer.cosmetic for r in self.rows.values()
+                      if isinstance(r, CosmeticRow) and r.visible and (r.hovered or r.focused)), None)
+        if shown is not None:
+            looks[shown.slot] = shown
+        return looks, shown
+
     def draw(self, surface):
         super().draw(surface)
         a = self.app.assets
-        note = KIND_NOTES.get(self.kind, "")
+        if self.expansions_label_x is not None:
+            label = a.font(theme.FONT_TINY, bold=True).render(EXPANSIONS_LABEL.upper(), True, theme.GOLD_DIM)
+            surface.blit(label, label.get_rect(midleft=(self.expansions_label_x, 213)))
+        note = AREA_NOTES.get(self.area, "")
         if note:
             img = a.font(theme.FONT_SMALL).render(note, True, theme.TEXT_MUTED)
-            surface.blit(img, img.get_rect(bottomright=(MARGIN + 1152, 172)))
+            surface.blit(img, img.get_rect(midright=(MARGIN + 1152, 213)))
+        if self.area == "cosmetics":
+            looks, shown = self.preview_looks()
+            if all(looks.values()):
+                draw_table_preview(surface, a, looks, PREVIEW)
+            if shown is not None:
+                y = PREVIEW.bottom + 14
+                name_font = a.font(theme.FONT_BUTTON, bold=True)
+                surface.blit(name_font.render(fit_text(name_font, shown.name, PREVIEW.w - 160), True, theme.IVORY),
+                             (PREVIEW.x, y))
+                small = a.font(theme.FONT_SMALL)
+                for i, line in enumerate(wrap_text(small, shown.description, PREVIEW.w - 160, max_lines=2)):
+                    surface.blit(small.render(line, True, theme.TEXT_MUTED), (PREVIEW.x, y + 34 + i * 22))
+                if shown.slot in ("avatar", "chips"):
+                    draw_look(surface, a, shown, pygame.Rect(PREVIEW.right - 150, y, 150, 60))
         if not self.visible_offers:
-            draw_paragraph(surface, a, "Nothing to buy in this section yet.", (MARGIN, LIST.y + 10, 800, 40))
+            name = get_series(self.series).name
+            draw_paragraph(surface, a, f"Nothing for {name} here yet.", (MARGIN, LIST.y + 10, 900, 40))
         self.ui.draw(surface)

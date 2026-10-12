@@ -25,7 +25,8 @@ DEFAULT_PROFILE = "default"
 
 
 # RunConfig keys that describe a run rather than the balance.
-_NOT_BALANCE = frozenset({"enable_chaos", "seed", "balance_profile", "use_llm", "ai_id", "content_packs"})
+_NOT_BALANCE = frozenset({"enable_chaos", "seed", "balance_profile", "use_llm", "ai_id", "content_packs", "mode",
+                          "host"})
 
 
 def config_fingerprint(config: dict[str, Any]) -> str:
@@ -75,6 +76,7 @@ class MetaUpgradeBalance:
     cost_step: int = 0         # permanent: each further level costs this much more
     max_level: int = 1         # permanent: levels; consumable: most copies held
     requires: str | None = None
+    mode: str | None = None    # only in this game mode; None = every mode
 
     def cost_of_level(self, level: int) -> int:
         """Cost of level `level` (1-based) of a permanent upgrade; consumables always cost `cost`."""
@@ -97,7 +99,7 @@ class AchievementRewardBalance:
 
     achievement_id: str
     tokens: int = 0
-    cosmetic_id: str | None = None
+    cosmetic_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -238,6 +240,11 @@ def _parse(key: str, raw: str, typ: str, lo: float | None, hi: float | None) -> 
     return value
 
 
+def split_ids(raw: str | None) -> tuple[str, ...]:
+    """Comma-separated ids (e.g. achievement_reward.cosmetic_ids) as a tuple."""
+    return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
+
+
 def active_profile() -> str:
     return os.environ.get("CHAOS_PROFILE") or DEFAULT_PROFILE
 
@@ -301,10 +308,10 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
     upgrades = tuple(
         MetaUpgradeBalance(
             upgrade_id, kind, effect, _params(f"Profile {name!r}, upgrade {upgrade_id}", params),
-            int(cost), int(cost_step), int(max_level), requires or None,
+            int(cost), int(cost_step), int(max_level), requires or None, mode or None,
         )
-        for upgrade_id, kind, effect, params, cost, cost_step, max_level, requires in conn.execute(
-            "SELECT upgrade_id, kind, effect, params, cost, cost_step, max_level, requires FROM meta_upgrade "
+        for upgrade_id, kind, effect, params, cost, cost_step, max_level, requires, mode in conn.execute(
+            "SELECT upgrade_id, kind, effect, params, cost, cost_step, max_level, requires, mode FROM meta_upgrade "
             "WHERE profile_id = ? AND enabled = 1 ORDER BY upgrade_id", (pid,))
     )
     known_upgrades = {u.upgrade_id for u in upgrades}
@@ -319,9 +326,9 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
             (pid,))
     )
     rewards = tuple(
-        AchievementRewardBalance(achievement_id, int(tokens), cosmetic_id or None)
-        for achievement_id, tokens, cosmetic_id in conn.execute(
-            "SELECT achievement_id, tokens, cosmetic_id FROM achievement_reward WHERE profile_id = ? "
+        AchievementRewardBalance(achievement_id, int(tokens), split_ids(cosmetic_ids))
+        for achievement_id, tokens, cosmetic_ids in conn.execute(
+            "SELECT achievement_id, tokens, cosmetic_ids FROM achievement_reward WHERE profile_id = ? "
             "ORDER BY achievement_id", (pid,))
     )
 
@@ -360,14 +367,14 @@ def clone_profile(conn: sqlite3.Connection, source: str, name: str, description:
             (pid, src[0]))
         conn.execute(
             "INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, max_level, "
-            "enabled, requires) SELECT ?, upgrade_id, kind, effect, params, cost, cost_step, max_level, enabled, "
-            "requires FROM meta_upgrade WHERE profile_id = ?", (pid, src[0]))
+            "enabled, requires, mode) SELECT ?, upgrade_id, kind, effect, params, cost, cost_step, max_level, enabled, "
+            "requires, mode FROM meta_upgrade WHERE profile_id = ?", (pid, src[0]))
         conn.execute(
             "INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost, enabled) "
             "SELECT ?, cosmetic_id, cost, enabled FROM cosmetic_price WHERE profile_id = ?", (pid, src[0]))
         conn.execute(
-            "INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_id) "
-            "SELECT ?, achievement_id, tokens, cosmetic_id FROM achievement_reward WHERE profile_id = ?",
+            "INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_ids) "
+            "SELECT ?, achievement_id, tokens, cosmetic_ids FROM achievement_reward WHERE profile_id = ?",
             (pid, src[0]))
     return int(pid)
 

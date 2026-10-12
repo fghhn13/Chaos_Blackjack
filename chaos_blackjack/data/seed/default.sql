@@ -82,13 +82,15 @@ INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost) VALUES
     (:profile, 'card_back_crimson', 40),
     (:profile, 'table_midnight',    60),
     (:profile, 'chips_neon',        50),
-    (:profile, 'avatar_spade',      30);
+    (:profile, 'avatar_spade',      30),
+    (:profile, 'table_chaos',       80);
 
 -- Achievement rewards (catalog: chaos_blackjack/achievements/catalog.py): tokens
--- and an optional cosmetic. An achievement without a row pays nothing. Placeholder values.
-INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_id) VALUES
+-- and optional cosmetics (comma-separated ids). An achievement without a row
+-- pays nothing. Placeholder values.
+INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_ids) VALUES
     (:profile, 'first_win',           10, NULL),
-    (:profile, 'chaos_conqueror',     10, 'table_chaos'),
+    (:profile, 'chaos_conqueror',     10, 'deck_poker_head,table_poker_head'),
     (:profile, 'regular',              8, NULL),
     (:profile, 'marathon',            15, NULL),
     (:profile, 'natural_talent',       8, NULL),

@@ -1,9 +1,10 @@
 """Profile: the current player's avatar and record, Wardrobe and Achievements.
 
-Opened from the player badge on Home. Wardrobe lists every look per slot from
-the meta API (equip, or buy with tokens and equip); the live preview shows the
-hovered look together with the rest of the loadout. Switch player opens the
-save slots; choosing another player returns home.
+Opened from the player badge on Home. Wardrobe switches between the looks the
+player owns (per slot, with how many of the slot's looks they own); new looks
+are bought in the Shop, which "More in the Shop" opens. The live preview shows
+the hovered look together with the rest of the loadout. Switch player opens
+the save slots; choosing another player returns home.
 Design: docs/design/COSMETICS_ACHIEVEMENTS.md §8.
 """
 
@@ -21,6 +22,7 @@ from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.widgets import Button, ScrollColumn, WidgetGroup, fit_text, wrap_text
 
 TABS = (("overview", "Overview"), ("wardrobe", "Wardrobe"), ("achievements", "Achievements"))
+SHOP_BUTTON = pygame.Rect(MARGIN + 676, 548, 240, 40)
 WARDROBE_LIST = pygame.Rect(MARGIN, 250, 640, 340)
 PREVIEW = pygame.Rect(MARGIN + 676, 196, 476, 268)
 ACHIEVEMENT_LIST = pygame.Rect(MARGIN, 236, 1140, 354)
@@ -38,7 +40,9 @@ class ProfileScene(MetaScreen):
         self.setup()
         self.player_id = player_id
         self.tab = tab or self.app.session.get("profile_tab", "overview")
-        self.slot = slot or self.app.session.get("wardrobe_slot", "card_back")
+        self.slot = slot or self.app.session.get("wardrobe_slot", "deck")
+        if self.slot not in COSMETIC_SLOTS:
+            self.slot = "deck"
         self.scroll = 0
         self.refresh()
 
@@ -57,7 +61,13 @@ class ProfileScene(MetaScreen):
         self.offers = []
         self.totals = {}
         if self.tab == "wardrobe":
-            self.offers = self.action(lambda: meta.wardrobe(self.player_id, self.slot, profile)) or []
+            looks = self.action(lambda: meta.wardrobe(self.player_id, None, profile)) or []
+            self.collection = {slot: (sum(o.owned for o in looks if o.cosmetic.slot == slot),
+                                      sum(1 for o in looks if o.cosmetic.slot == slot)) for slot in COSMETIC_SLOTS}
+            in_slot = [o for o in looks if o.cosmetic.slot == self.slot]
+            self.offers = [o for o in in_slot if o.owned]  # the Wardrobe only switches between owned looks
+            missing = [o.cosmetic.series for o in in_slot if not o.owned]
+            self.shop_series = missing[0] if missing else "core"
         elif self.tab == "overview":
             self.totals = self.action(lambda: meta.player_stats(self.player_id)) or {}
             self.best = self.action(lambda: meta.player_stats(self.player_id, best=True)) or {}
@@ -92,7 +102,8 @@ class ProfileScene(MetaScreen):
             self.slot_tabs = {}
             x = MARGIN
             for slot in COSMETIC_SLOTS:
-                label = SLOT_LABELS[slot]
+                owned, total = self.collection.get(slot, (0, 0))
+                label = f"{SLOT_LABELS[slot]}  {owned}/{total}"
                 width = a.font(theme.FONT_SMALL).size(label)[0] + 36
                 b = Button(a, (x, 198, width, 36), label, lambda s=slot: self.set_slot(s), style="ghost",
                            font_size=theme.FONT_SMALL, key_hint="")
@@ -104,12 +115,14 @@ class ProfileScene(MetaScreen):
             for offer in self.offers:
                 self.rows[offer.cosmetic.id] = self.list.add(
                     CosmeticRow(a, offer, lambda o=offer: self.choose(o)))
+            self.shop_button = Button(a, SHOP_BUTTON, "More in the Shop", self.open_shop, style="ghost",
+                                      font_size=theme.FONT_SMALL, key_hint="")
+            self.ui.add(self.shop_button)
         else:
             self.list = ScrollColumn(ACHIEVEMENT_LIST, gap=8)
             for state in sorted(self.achievements, key=lambda s: (not s.unlocked, -s.progress / s.goal)):
-                look = get_cosmetic(state.reward_cosmetic) if state.reward_cosmetic else None
-                self.rows[state.achievement.id] = self.list.add(
-                    AchievementRow(a, state, look.name if look else None))
+                names = tuple(c.name for c in map(get_cosmetic, state.reward_cosmetics) if c is not None)
+                self.rows[state.achievement.id] = self.list.add(AchievementRow(a, state, names))
         if self.list is not None:
             self.list.scroll_by(self.scroll)
             self.ui.add(self.list)
@@ -136,19 +149,18 @@ class ProfileScene(MetaScreen):
         self.set_slot(slot)
 
     def choose(self, offer):
-        """Equip an owned look; buy (then equip) one that is for sale."""
+        """Equip an owned look (looks are bought in the Shop)."""
         self.message = ""
         c = offer.cosmetic
-        profile = self.app.run_config.balance_profile
-        bought = not offer.owned
-        if bought and self.action(lambda: meta.buy_cosmetic(self.player_id, c.id, profile)) is None:
-            self.refresh()
-            return
         if self.action(lambda: meta.equip(self.player_id, c.id)) is not None:
             apply_loadout(self.app, self.player_id)
-            self.message = f"{c.name} {'purchased and ' if bought else ''}equipped."
+            self.message = f"{c.name} equipped."
         self.scroll = self.list.scroll if self.list else 0
         self.refresh()
+
+    def open_shop(self):
+        """The Shop's cosmetics, at the series that still has looks for this slot."""
+        self.navigate("meta_shop", player_id=self.player_id, area="cosmetics", series=self.shop_series)
 
     def rename(self):
         self.navigate("meta_name", title="Rename player", value=self.player.name,

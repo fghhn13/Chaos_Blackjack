@@ -14,11 +14,11 @@ import pygame
 
 from chaos_blackjack import meta
 from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.content.builtin_persona import HOST_NAMES, host_persona
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.lobby import (
     MARGIN, OptionRow, back_button, draw_glow, draw_paragraph, draw_section,
 )
-from chaos_blackjack.gui.components.chaos_panel import mood_face
 from chaos_blackjack.gui.components.meta_run import run_loop_factory
 from chaos_blackjack.gui.components.meta_screen import MetaScreen
 from chaos_blackjack.gui.scene import register_scene
@@ -88,18 +88,23 @@ class RunSetupScene(MetaScreen):
         self.player = self.action(lambda: meta.get_player(player_id))
         if self.player is None:
             self.ui = WidgetGroup(back_button(self.app.assets, self.app.scenes.pop), keyboard=True)
-            self.options, self.consumables, self.permanents = [], [], []
+            self.options, self.offers, self.consumables, self.permanents = [], [], [], []
             return
         self.options = self.action(lambda: meta.modes(player_id)) or []
-        offers = self.action(lambda: meta.meta_shop(player_id, self.profile)) or []
-        self.consumables = [o for o in offers if o.kind == "consumable" and o.owned > 0]
-        self.permanents = [o for o in offers if o.kind == "permanent" and o.owned > 0]
+        self.offers = [o for o in self.action(lambda: meta.meta_shop(player_id, self.profile)) or [] if o.owned > 0]
         self.pending = self.action(lambda: meta.pending_run(player_id))
         unlocked = [o.mode.id for o in self.options if o.unlocked]
         if memory["mode"] not in unlocked:
             memory["mode"] = unlocked[0] if unlocked else ""
-        memory["bring"].intersection_update(o.upgrade_id for o in self.consumables)
+        self.filter_offers()
         self.build()
+
+    def filter_offers(self):
+        """Owned upgrades usable in the selected mode (mode-specific ones only in theirs)."""
+        usable = [o for o in self.offers if not o.mode or o.mode == self.mode_id]
+        self.consumables = [o for o in usable if o.kind == "consumable"]
+        self.permanents = [o for o in usable if o.kind == "permanent"]
+        self.memory["bring"].intersection_update(o.upgrade_id for o in self.consumables)
 
     @property
     def profile(self):
@@ -127,15 +132,16 @@ class RunSetupScene(MetaScreen):
         for option in self.options:
             m = option.mode
             row = OptionRow(a, 76, m.name, lambda mid=m.id: self.choose_mode(mid), icon=m.icon,
-                            detail=m.description if option.unlocked else "Locked: unlock it in Upgrades",
+                            detail=m.description if option.unlocked else "Locked: unlock it in the Shop",
                             chaos=m.id == "chaos", enabled=option.unlocked)
             self.mode_rows[m.id] = modes.add(row)
         self.ui.add(modes)
         self.item_rows = {}
         items = ScrollColumn((RIGHT_X, ITEMS_TOP, RIGHT_W, 582 - ITEMS_TOP), gap=8)
         for offer in self.consumables:
+            only = f"  ·  {self.mode.name} only" if offer.mode and self.mode else ""
             row = OptionRow(a, 58, offer.name, lambda uid=offer.upgrade_id: self.toggle_consumable(uid),
-                            icon=self.item_icon(offer.upgrade_id), detail=f"Owned ×{offer.owned}",
+                            icon=self.item_icon(offer.upgrade_id), detail=f"Owned ×{offer.owned}{only}",
                             check=False, tooltip=offer.description)
             self.item_rows[offer.upgrade_id] = items.add(row)
         self.ui.add(items)
@@ -167,8 +173,13 @@ class RunSetupScene(MetaScreen):
 
     def choose_mode(self, mode_id):
         if any(o.mode.id == mode_id and o.unlocked for o in self.options):
+            changed = mode_id != self.memory["mode"]
             self.memory["mode"] = mode_id
-            self.sync()
+            if changed and any(o.mode for o in self.offers):
+                self.filter_offers()  # mode-specific upgrades come and go with the mode
+                self.build()
+            else:
+                self.sync()
 
     @property
     def bring_limit(self) -> int:
@@ -178,7 +189,7 @@ class RunSetupScene(MetaScreen):
 
     def toggle_consumable(self, upgrade_id):
         if upgrade_id not in self.selected and len(self.selected) >= self.bring_limit:
-            self.message = f"Your bag holds {self.bring_limit} kinds of items. Bag Space in Upgrades adds more."
+            self.message = f"Your bag holds {self.bring_limit} kinds of items. Bag Space in the Shop adds more."
             return
         self.message = ""
         self.selected.symmetric_difference_update({upgrade_id})
@@ -229,7 +240,7 @@ class RunSetupScene(MetaScreen):
             return
         self.selected.clear()
         self.leaving = True
-        self.app.scenes.replace("meta_table", started=started, player_id=self.player_id)
+        self.app.scenes.replace("meta_table", started=started, player_id=self.player_id, intro=True)
 
     def on_resume(self, result=None):
         super().on_resume(result)
@@ -246,14 +257,14 @@ class RunSetupScene(MetaScreen):
         if self.player is None:
             self.ui.draw(surface)
             return
-        draw_section(surface, a, "Mode", (MODES.x, 136), MODES.w)
+        draw_section(surface, a, "Table", (MODES.x, 136), MODES.w)
         self.draw_showcase(surface)
         y = draw_section(surface, a, "Upgrades in effect", (RIGHT_X, 136), RIGHT_W)
         self.draw_upgrades(surface, y)
         y = draw_section(surface, a, f"Bring items  ({len(self.selected)}/{self.bring_limit} kinds)",
                          (RIGHT_X, ITEMS_TOP - 30), RIGHT_W)
         if not self.consumables:
-            draw_paragraph(surface, a, "Your bag is empty. Consumables bought in Upgrades show up here.",
+            draw_paragraph(surface, a, "Your bag is empty. Consumables bought in the Shop show up here.",
                            (RIGHT_X, ITEMS_TOP, RIGHT_W, 80))
         self.ui.draw(surface)
         note = "One copy of each checked item is used when the run starts." if self.consumables else ""
@@ -279,19 +290,49 @@ class RunSetupScene(MetaScreen):
             draw_paragraph(surface, a, "No mode is available yet.", r.inflate(-48, -48))
             return
         art = pygame.Rect(r.x, r.y + 12, r.w, 200)
-        if chaos:
-            draw_glow(surface, art.center, 120, theme.CHAOS_PURPLE, 10)
-            face = a.image_fit(mood_face(a, "smug"), (190, 190))
-            surface.blit(face, face.get_rect(center=art.center))
-        else:
-            draw_glow(surface, art.center, 110, theme.FELT_LIGHT, 10)
-            icon = a.image_fit(mode.icon or "mode_normal", (150, 150))
-            surface.blit(icon, icon.get_rect(center=art.center))
+        draw_glow(surface, art.center, 120 if chaos else 110, theme.CHAOS_PURPLE if chaos else theme.FELT_LIGHT, 10)
+        face = a.image_fit(self.host_portrait(mode), (190, 190))
+        surface.blit(face, face.get_rect(center=art.center))
         title = a.font(theme.FONT_HEADING, role="display").render(mode.name, True,
                                                                    theme.CHAOS_MAGENTA if chaos else theme.GOLD)
         surface.blit(title, title.get_rect(midtop=(r.centerx, art.bottom + 4)))
-        body = pygame.Rect(r.x + 28, art.bottom + 56, r.w - 56, r.bottom - art.bottom - 70)
-        draw_paragraph(surface, a, self.mode_text(mode), body, color=theme.TEXT, size=theme.FONT_SMALL)
+        body = pygame.Rect(r.x + 28, art.bottom + 52, r.w - 56, 70)
+        y = draw_paragraph(surface, a, mode.description, body, color=theme.TEXT, size=theme.FONT_SMALL)
+        # The numbers that differ between tables, one per row for easy comparison.
+        label_font, value_font = a.font(theme.FONT_TINY + 1, bold=True), a.font(theme.FONT_SMALL)
+        y += 10
+        for label, value in self.mode_facts(mode):
+            surface.blit(label_font.render(label.upper(), True, theme.GOLD_DIM), (r.x + 28, y + 2))
+            surface.blit(value_font.render(fit_text(value_font, value, r.w - 180), True, theme.IVORY), (r.x + 150, y))
+            y += value_font.get_linesize() + 4
+
+    def host_portrait(self, mode) -> str:
+        """The mode's host as it greets you."""
+        return host_persona(mode.host).asset_id("welcome")
+
+    def mode_facts(self, mode) -> list[tuple[str, str]]:
+        """Goal, bets, rules and dealer of the selected table, with upgrades applied (what you
+        may bring is listed beside it)."""
+        preview = self.preview_config()
+        if preview is None:
+            return []
+        cfg = preview[1]
+        num, den = cfg.blackjack_pays
+        if cfg.enable_chaos:
+            pool = [r for r, _, w in cfg.chaos_stub if r and w > 0]
+            if cfg.rule_pool is not None:
+                pool = [r for r in pool if r in cfg.rule_pool]
+            rules = f"One of {len(pool)} may change each round"
+        else:
+            rules = "Fixed for the whole run"
+        host = HOST_NAMES.get(mode.host, mode.host.replace("_", " ").title())
+        return [
+            ("Goal", f"Turn {cfg.start_money} chips into {cfg.target_money}"),
+            ("Bets", f"{cfg.min_bet} up to {cfg.max_bet_fraction * 100:g}% of your bankroll"),
+            ("Rules", rules),
+            ("Dealer", f"{host}, stands on {cfg.dealer_stand_on}"),
+            ("Blackjack", f"Pays {num}:{den}"),
+        ]
 
     def mode_text(self, mode) -> str:
         preview = self.preview_config()
@@ -309,7 +350,7 @@ class RunSetupScene(MetaScreen):
         a = self.app.assets
         font = a.font(theme.FONT_SMALL)
         if not self.permanents:
-            draw_paragraph(surface, a, "No permanent upgrades yet. Earn tokens and visit Upgrades.",
+            draw_paragraph(surface, a, "No permanent upgrades yet. Earn tokens and visit the Shop.",
                            (RIGHT_X, y, RIGHT_W, 60))
             return
         preview = self.preview_config()

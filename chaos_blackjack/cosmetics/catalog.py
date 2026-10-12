@@ -16,18 +16,25 @@ def _chips(prefix: str) -> dict[str, str]:
 
 
 for _c in (
-    # Card backs
-    Cosmetic("card_back_standard", "card_back", "House Standard", "The casino's own deck.", default=True),
-    Cosmetic("card_back_crimson", "card_back", "Crimson Lattice", "A deep red lattice back.",
+    # Decks (card back, and optionally the card face)
+    Cosmetic("card_back_standard", "deck", "House Standard", "The casino's own deck.", default=True),
+    Cosmetic("card_back_crimson", "deck", "Crimson Lattice", "A deep red lattice back.",
              assets={"card_back": "card_back_crimson"}, order=10),
-    Cosmetic("card_back_royal", "card_back", "Royal Flush", "Gold leaf for blackjack collectors.", rarity="epic",
+    Cosmetic("card_back_royal", "deck", "Royal Flush", "Gold leaf for blackjack collectors.", rarity="epic",
              assets={"card_back": "card_back_royal"}, order=20),
+    Cosmetic("deck_poker_head", "deck", "Poker Head's Deck", "Poker Head's own cards, earned at his table.",
+             rarity="legendary", assets={"card_back": "card_back_poker_head",
+                                         "card_front_blank": "card_front_poker_head"}, order=30,
+             series="poker_head"),
     # Tables
     Cosmetic("table_standard", "table", "Casino Green", "Classic green felt.", default=True),
     Cosmetic("table_midnight", "table", "Midnight Felt", "Dark blue felt for late games.", rarity="rare",
              assets={"table_background": "table_midnight"}, order=10),
-    Cosmetic("table_chaos", "table", "Chaos Velvet", "The dealer's own purple table.", rarity="epic",
+    Cosmetic("table_chaos", "table", "Chaos Velvet", "Purple velvet for a chaotic evening.", rarity="epic",
              assets={"table_background": "table_chaos"}, order=20),
+    Cosmetic("table_poker_head", "table", "Poker Head's Table", "Green felt and old gold, from his own room.",
+             rarity="legendary", assets={"table_background": "table_poker_head"}, order=30,
+             series="poker_head"),
     # Chip sets
     Cosmetic("chips_standard", "chips", "House Chips", "The casino's chips.", default=True),
     Cosmetic("chips_neon", "chips", "Neon Chips", "Chips that glow under the lamp.", rarity="rare",

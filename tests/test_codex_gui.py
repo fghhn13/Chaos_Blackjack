@@ -44,20 +44,26 @@ def click(app, pos):
     app.scenes.apply_pending()
 
 
-def test_gallery_tabs_and_detail_back_preserve_category(app):
+def test_gallery_core_series_then_expansions_and_detail_back_preserve_section(app):
     gallery = open_scene(app)
-    assert gallery.current == "rule" and len(gallery.tiles) == 7
+    assert [s.label for s in gallery.sections] == ["Classic Table", "Poker Head"]
+    assert gallery.current == "core" and gallery.expansions_label_x is not None
+    assert {e.kind for _, e in gallery.tiles} == {"mode", "item"} and not gallery.about.visible
     key(app, pygame.K_TAB)
-    assert gallery.current == "mode"
-    key(app, pygame.K_TAB)
-    assert gallery.current == "item" and len(gallery.tiles) == 6
+    assert gallery.current == "poker_head" and gallery.about.visible
+    assert gallery.section.profile and gallery.section.quote.startswith("Old friends")
+    assert len([e for _, e in gallery.tiles if e.kind == "rule"]) == 7
+    gallery.draw(app.canvas)
     rect, entry = gallery.tiles[0]
     click(app, rect.center)
     detail = app.scenes.top
     assert isinstance(detail, scenes.CodexDetailScene)
     assert detail.entry == entry and detail.demo.frames
     key(app, pygame.K_ESCAPE)
-    assert app.scenes.top is gallery and gallery.current == "item"
+    assert app.scenes.top is gallery and gallery.current == "poker_head"
+    click(app, gallery.about.rect.center)
+    assert app.scenes.top.entry.kind == "mode" and app.scenes.top.entry.id == "chaos"
+    key(app, pygame.K_ESCAPE)
     key(app, pygame.K_ESCAPE)
     assert app.scenes.top is None
 
@@ -125,20 +131,20 @@ def test_long_plugin_text_scrolls_and_stays_clipped(app):
     assert scene.text_offset == 0
 
 
-def test_content_pack_gallery_paginates_without_hiding_entries(app, monkeypatch):
+def test_long_sections_scroll_without_hiding_entries(app, monkeypatch):
     monkeypatch.setattr(codex_registry, "_PROVIDERS", {k: list(v) for k, v in codex_registry._PROVIDERS.items()})
     entries = [CodexEntry("item", f"test_{i}", f"Extra {i}", "peek", "Plugin item.",
                           lambda cfg: "Details", None) for i in range(15)]
     register_codex_provider("item", lambda cfg: entries)
-    scene = open_scene(app, kind="item")
-    assert len(scene.entries) == 21 and len(scene.tiles) == 10
-    assert not scene.previous.enabled and scene.next.enabled
-    key(app, pygame.K_RIGHT)
-    assert scene.page == 1 and len(scene.tiles) == 10
-    key(app, pygame.K_RIGHT)
-    assert scene.page == 2 and len(scene.tiles) == 1 and not scene.next.enabled
-    key(app, pygame.K_LEFT)
-    assert scene.page == 1
+    scene = open_scene(app, section="core")
+    assert len(scene.entries) == 21 and len(scene.tiles) == 21  # Classic + 5 shared items + 15 never sold
+    assert scene.max_scroll > 0 and len(scene.visible_tiles()) < 21
+    first = scene.tiles[0][0].y
+    key(app, pygame.K_PAGEDOWN)
+    assert scene.scroll > 0 and scene.tiles[0][0].y < first
+    for _ in range(10):
+        scene.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, {"y": -1}))
+    assert scene.scroll == scene.max_scroll and scene.tiles[-1] in scene.visible_tiles()
     scene.draw(app.canvas)
 
 
@@ -179,3 +185,42 @@ def test_integrated_content_packs_supply_item_and_ai_entries():
     assert "example_dealer" in ais and ais["example_dealer"].detail(cfg)
     assert "example_trim" not in {e.id for e in codex_entries("item")}
     assert "example_dealer" not in {e.id for e in codex_entries("ai")}
+
+
+def test_sections_place_every_entry_by_series():
+    from chaos_blackjack.codex import codex_sections
+
+    sections = {s.id: s for s in codex_sections(RunConfig())}
+    assert list(sections) == ["core", "poker_head"]
+    core, poker_head = sections["core"], sections["poker_head"]
+    assert not core.expansion and poker_head.expansion
+    assert [e.id for e in {g.id: g for g in core.groups}["tables"].entries] == ["normal"]
+    assert poker_head.host == "poker_head" and poker_head.portrait.startswith("default_poker_head_")
+    assert poker_head.mode.id == "chaos" and poker_head.quote
+    groups = {g.id: g for g in poker_head.groups}
+    assert {e.id for e in groups["rules"].entries} == {e.id for e in codex_entries("rule")}
+    assert [e.id for e in groups["items"].entries] == ["shield"]  # Classic never sells Shield
+    assert "shield" not in {e.id for e in core.entries} and "rules" not in {g.id for g in core.groups}
+    # Nothing is left out: every rule, item and mode appears somewhere.
+    placed = {(e.kind, e.id) for s in sections.values() for e in s.entries}
+    placed |= {("mode", s.mode.id) for s in sections.values() if s.mode is not None}
+    for kind in ("rule", "item", "mode"):
+        assert {(kind, e.id) for e in codex_entries(kind)} <= placed, kind
+
+
+def test_sections_follow_mode_pools(monkeypatch):
+    from chaos_blackjack import modes as modes_module
+    from chaos_blackjack.codex import codex_sections
+    from chaos_blackjack.modes import GameMode, register_mode
+
+    monkeypatch.setattr(modes_module, "_MODES", dict(modes_module._MODES))
+    register_mode(GameMode("trial", "Trial", "A narrow table.", icon="mode_chaos", order=5, series="trial_pack",
+                           overrides={"enable_chaos": True}, rules=("great_crash",), items=("peek", "fate_oracle")))
+    sections = {s.id: s for s in codex_sections(RunConfig())}
+    assert list(sections) == ["core", "poker_head", "trial_pack"]  # a new expansion gets its own tab
+    trial = {g.id: g for g in sections["trial_pack"].groups}
+    assert [e.id for e in trial["rules"].entries] == ["great_crash"]
+    # Peek and Fate Oracle are sold at the trial table too, so they stay in the core; Swap is
+    # still sold at the core Classic table, so it stays there as well.
+    core_items = {e.id for e in sections["core"].entries if e.kind == "item"}
+    assert {"peek", "fate_oracle", "swap"} <= core_items and "shield" not in core_items

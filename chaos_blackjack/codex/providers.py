@@ -148,14 +148,33 @@ def _modes():
 
 
 def _mode_detail(mode_id: str, config: RunConfig) -> str:
+    from chaos_blackjack.content.builtin_persona import HOST_NAMES
+
     mode = next(m for m in _modes() if m.id == mode_id)
-    cfg = replace(config, **mode.overrides)
+    apply = getattr(mode, "apply", None)
+    cfg = apply(config) if apply is not None else replace(config, **mode.overrides)
     num, den = cfg.blackjack_pays
-    text = (f"{mode.description} Start with {cfg.start_money} chips and reach {cfg.target_money}. "
-            f"Bets range from {cfg.min_bet} to {cfg.max_bet_fraction * 100:g}% of your bankroll, rounded down. "
-            f"Dealer stands on {cfg.dealer_stand_on} or more. Natural blackjack pays {num}:{den}. "
-            f"Double down is {'enabled' if cfg.allow_double else 'disabled'}; "
-            f"surrender is {'enabled' if cfg.allow_surrender else 'disabled'}.")
+    host = HOST_NAMES.get(getattr(mode, "host", ""), "")
+    moves = " and ".join(m for m, on in (("double", cfg.allow_double), ("surrender", cfg.allow_surrender)) if on)
+    text = mode.description
+    if host:
+        text += f" Your host: {host}."
+    text += (f" Turn {cfg.start_money} chips into {cfg.target_money}. Bet {cfg.min_bet} up to "
+             f"{cfg.max_bet_fraction * 100:g}% of your bankroll; the dealer stands on {cfg.dealer_stand_on} and "
+             f"blackjack pays {num}:{den}.")
+    banned = " or ".join(m for m, on in (("double down", cfg.allow_double), ("surrender", cfg.allow_surrender))
+                         if not on)
+    if moves:
+        text += f" You may {moves} on your first decision."
+    if banned:
+        text += f" No {banned} at this table."
+    if cfg.enable_chaos:
+        pool = [r for r, _, w in cfg.chaos_stub if r and w > 0]
+        if cfg.rule_pool is not None:
+            pool = [r for r in pool if r in cfg.rule_pool]
+        text += f" Before most hands one of {len(pool)} Chaos rules may change the game." if pool else ""
+    else:
+        text += " The rules never change."
     if mode.unlocked_by:
         text += f" Unlock requirement: {mode.unlocked_by}."
     return text

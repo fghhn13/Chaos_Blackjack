@@ -15,9 +15,9 @@
 - **Three front-ends** on one UI-agnostic `GameController`: a Pygame GUI, the original text CLI, and a JSON command interface for agent players.
 - **Plugins**: chaos rules (`rules/plugins/`) and items (`items/`) self-register; prompts (`ai/prompts/*.txt`) and permission profiles (`ai/permissions/*.json`) are data files.
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
-- **Player progression**: three named slots, Classic/Chaos modes, token rewards, permanent upgrades, starting consumables, checkpoints and run history.
+- **Player progression**: three named slots, the Classic Table and dealers' tables (Poker Head's Table), both dealt by Poker Head, token rewards, permanent and mode-specific upgrades, starting consumables, checkpoints and run history.
 - **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
-- **Cosmetics and achievements**: card backs, tables, chip sets and avatars, bought with tokens or earned through achievements; a player Profile with a wardrobe and live preview. Looks never change the rules.
+- **Cosmetics and achievements**: decks, tables, chip sets and avatars, bought with tokens or earned through achievements; a player Profile with a wardrobe and live preview. Looks never change the rules.
 - **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
 - **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
 
@@ -39,9 +39,9 @@ GUI options from a terminal: `start_game.bat --fullscreen` or
 existing `.env` settings.
 
 The game opens on the home screen. The first time, **Start game** creates your
-player; after that, **Continue run** or **New run** (pick **Classic** or **Chaos**,
-check your upgrades, choose items to bring) takes you to the table. Offline
-Chaos mode needs no API key. To open the collection directly:
+player; after that, **Continue run** or **New run** (pick the **Classic Table** or **Poker Head's Table**,
+check your upgrades, choose items to bring) takes you to the table, where the
+mode's host introduces the rules. Offline Poker Head mode needs no API key. To open the collection directly:
 
 ```bash
 python -m chaos_blackjack.gui --scene codex
@@ -81,7 +81,7 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
 - **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, minimum 1 chip), and you may **reroll** the stock once per restock for 3 chips. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
-- **Chaos mode**: before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos on earns 4 extra tokens.
+- **Chaos rules** (Poker Head's Table in the GUI, `--chaos` for agents and the CLI): before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos rules on earns 4 extra tokens.
 
 These are the default profile's values; a balance profile, game mode or player
 upgrade can change them. Natural blackjack, double down, surrender and the shop
@@ -119,7 +119,7 @@ elsewhere).
   ```
 
   Keys: settings (`run.start_money`, `bet.max_fraction`, ...), `item.<id>.<field>`,
-  `rule.<id>.<field>`, `upgrade.<id>.<field>`, `cosmetic.<id>.<field>` and
+  `rule.<id>.<field>`, `upgrade.<id>.<field>` (including `mode`), `cosmetic.<id>.<field>` and
   `reward.<achievement id>.<field>`; `python -m chaos_blackjack.data --help` lists them.
   Compare profiles in the balance simulator with `python -m bjsim --profile tune-a ...`.
 - Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
@@ -173,7 +173,7 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene codex, --prof
 | Round over | Next Round | Enter |
 | Anywhere | — | Esc (back to the main menu, asks first), F11 fullscreen, F5 reload assets |
 
-The window scales a fixed 1280×720 canvas with letterboxing. Choose **Chaos** in New run's mode list.
+The window scales a fixed 1280×720 canvas with letterboxing. Choose **Poker Head's Table** in New run's table list for Chaos rules.
 
 Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
 indicator appears while the table waits; gameplay controls stay disabled, and Esc,
@@ -181,7 +181,7 @@ fullscreen and window events remain responsive. Returning to the menu discards t
 old table's result without waiting for an in-flight request. No additional art is
 needed for the procedural indicator.
 
-In Chaos Mode, click the Chaos portrait while betting, choosing a player action,
+At Poker Head's Table, click his portrait while betting, choosing a player action,
 or reviewing a round result to ask for a suggestion. The portrait also works while
 the shop is open. A modal banner animates while the reply is generated and blocks
 repeated clicks and gameplay; click **Continue** or press Enter after the reply.
@@ -218,14 +218,20 @@ The standalone casino audio library and offline validator remain available: `pyt
 
 The home screen shows the current player (top right: avatar, name and tokens;
 click for the Profile) and the next step: **Continue run** with its mode, round and chips when a run is
-unfinished, otherwise **New run**, plus **Upgrades**, **Collection** and **Run
+unfinished, otherwise **New run**, plus **Shop**, **Collection** and **Run
 history**. **Players** (Profile, then **Switch player**) holds three named slots
-with play, create, rename and confirmed delete actions. **New run** selects **Classic** or **Chaos**, shows the
+with play, create, rename and confirmed delete actions. **New run** selects the **Classic Table** or **Poker Head's Table** (each with a short description and its goal, bets, rules and dealer listed side by side), shows the
 permanent upgrades in effect and lets you bring one copy of each checked
-consumable; nothing is spent until the run starts. Tokens persist between runs; bankroll belongs to the current run.
+consumable; nothing is spent until the run starts. Each mode is hosted by one
+Chaos AI with its own rule pool, item pool and goal; the host greets you before
+the first bet and comments when the run ends, with random lines and changing
+expressions from `chaos_blackjack/ai/hosts/<host>.json` (Esc skips). Upgrades are shared, but an upgrade can
+be tied to one mode (`upgrade.<id>.mode`). See [AI modes](docs/design/AI_MODES.md). Tokens persist between runs; bankroll belongs to the current run.
 
-**Upgrades** uses tokens for permanent starting-bankroll, shop-slot and
-discount upgrades, plus consumable starting items. The table's between-round
+The **Shop** (formerly Upgrades) is the only place tokens are spent. It has three
+areas, **Upgrades** (permanent), **Cosmetics** and **Starter items**
+(consumables), each split into the Classic Table and the dealers (currently Poker Head; a
+dealer appears in an area only when it has something there). The table's between-round
 shop uses bankroll. Victory earns the profile's win reward; defeat earns capped
 consolation based on rounds and peak bankroll. Abandoning earns no tokens and
 does not return consumed starting items. The result screen settles each run
@@ -237,17 +243,16 @@ abandons the run. Replacing an unfinished run also asks for confirmation.
 History shows outcomes, bankroll, tokens, applied upgrades and encounter counts.
 
 The **Profile** (scene id `profile`) has three tabs. **Overview** shows the
-avatar, tokens and lifetime record. **Wardrobe** lists card backs, tables, chip
-sets and avatars: equip an owned look, buy one with tokens (cosmetics are sold
-only here) or see which achievement unlocks it; a small table previews the
-hovered look with the rest of the loadout, and an equipped look is drawn
-everywhere at once. **Achievements** shows progress and rewards; most pay
+avatar, tokens and lifetime record. **Wardrobe** switches between the decks,
+tables, chip sets and avatars you own (looks are bought in the Shop's
+Cosmetics area, and achievement rewards are shown there locked); a small
+table previews the hovered look with the rest of the loadout, and an equipped
+look is drawn everywhere at once. **Achievements** shows progress and rewards; most pay
 tokens, a few give a cosmetic. Runs are evaluated when they settle, and the
 result screen lists new unlocks with an **Equip** button for rewarded looks.
 Cosmetics only change art, never rules or numbers.
 
-The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. Its rule, item, mode
-and AI tabs show every entry. Detail pages use the selected profile's numbers;
+The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. A **Classic Table** tab holds the classic table and the items every table sells; under **Dealers**, each dealer (Poker Head) has a tab introducing the character (portrait, profile and signature line) beside the Chaos rules and the items only their table sells. Every entry appears somewhere. Detail pages use the selected profile's numbers;
 card demonstrations run on a real controller with fixed deals and an offline
 backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
 **Page Up/Page Down** scrolls descriptions. Selected content packs appear in
@@ -261,7 +266,7 @@ tools include `python -m chaos_blackjack.data players`, `history SLOT`,
 [Cosmetics and achievements](docs/design/COSMETICS_ACHIEVEMENTS.md) and
 [Codex API and replay guide](docs/design/CODEX.md).
 
-**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; `python scripts/validate_assets.py` reports which are still placeholders and `python scripts/preview_assets.py` renders matte sheets on dark / felt / white backdrops to check alpha edges. A font in `assets/fonts/` overrides the UI font. Cosmetic looks are ordinary asset ids too (`card_back_crimson.png`, `table_midnight.png`, `chips_neon_1.png` ... `chips_neon_25.png`, `avatar_spade.png`); the equipped look replaces the base id through `AssetManager.set_aliases`, and a look without art falls back to the base image.
+**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; `python scripts/validate_assets.py` reports which are still placeholders and `python scripts/preview_assets.py` renders matte sheets on dark / felt / white backdrops to check alpha edges. A font in `assets/fonts/` overrides the UI font. Cosmetic looks are ordinary asset ids too (`card_back_crimson.png`, `card_front_poker_head.png`, `table_midnight.png`, `chips_neon_1.png` ... `chips_neon_25.png`, `avatar_spade.png`); the equipped look replaces the base id through `AssetManager.set_aliases`, and a look without art falls back to the base image.
 
 ### Text CLI
 
@@ -470,4 +475,4 @@ Pack items are sold only when their plugin is loaded; win streaks grant no items
 
 Made with controlled chaos.
 
-The default dealer portrait and event dialogue are Poker Head, with eight bundled expressions. Default Chaos rule weights are unchanged; the optional Poker Head pack also provides its own AI behaviour.
+Poker Head hosts both tables with eight bundled expressions and event dialogue: the Poker Head expansion (mode id `chaos`), where he bends rules, and the core Classic table, where he plays it straight. Default Chaos rule weights are unchanged; the optional Poker Head pack also provides its own AI behaviour. Winning against Poker Head for the first time (achievement Poker Face) unlocks his deck and table.

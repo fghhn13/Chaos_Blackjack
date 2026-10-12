@@ -24,13 +24,13 @@ def run_loop_factory(app):
 
 @register_scene("meta_table")
 class MetaTableScene(TableScene):
-    def on_enter(self, started, player_id, **params):
+    def on_enter(self, started, player_id, intro=False, **params):
         self.run_id, self.player_id = started.run_id, player_id
         self.finishing = False
         self.abandoned = False
         self.exit_pending = False
         self.save_name = f"player-{player_id}-run-{self.run_id}"
-        super().on_enter(controller=started.controller)
+        super().on_enter(controller=started.controller, intro=intro)
         self.checkpoint()
 
     def checkpoint(self):
@@ -48,6 +48,9 @@ class MetaTableScene(TableScene):
 
     def handle_event(self, event):
         if self._closed or self._poke_pending or self.exit_pending:
+            return
+        if self.intro_open():  # Esc skips the host's lines instead of abandoning
+            super().handle_event(event)
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.exit_pending = True
@@ -81,7 +84,7 @@ class MetaTableScene(TableScene):
         if self.fx.busy:
             return
         self._timer += dt
-        if self._timer >= RUN_END_DELAY:
+        if self._timer >= RUN_END_DELAY and self.outro_finished():
             self._ending_opened = self.finishing = True
             self.app.scenes.replace("run_result", run_id=self.run_id,
                                     player_id=self.player_id, controller=self.controller)

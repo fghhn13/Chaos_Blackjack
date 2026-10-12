@@ -76,8 +76,8 @@ def test_every_slot_has_exactly_one_default_covering_its_assets() -> None:
 def test_registries_reject_inconsistent_entries() -> None:
     with pytest.raises(ValueError, match="unknown slot"):
         register_cosmetic(Cosmetic("x", "hat", "X"))
-    with pytest.raises(ValueError, match="not card_back assets"):
-        register_cosmetic(Cosmetic("x", "card_back", "X", assets={"chip_1": "x_1"}))
+    with pytest.raises(ValueError, match="not deck assets"):
+        register_cosmetic(Cosmetic("x", "deck", "X", assets={"chip_1": "x_1"}))
     with pytest.raises(ValueError, match="exactly one"):
         register_achievement(Achievement("x", "X", ""))
     with pytest.raises(ValueError, match="unknown stat"):
@@ -99,7 +99,7 @@ def test_achievements_name_known_stats() -> None:
 def test_seed_rows_name_registered_entries_and_every_look_is_obtainable() -> None:
     b = default_balance()
     sold = {p.cosmetic_id for p in b.cosmetic_prices}
-    rewarded = {r.cosmetic_id for r in b.achievement_rewards if r.cosmetic_id}
+    rewarded = {c for r in b.achievement_rewards for c in r.cosmetic_ids}
     assert all(get_cosmetic(c) is not None and not get_cosmetic(c).default for c in sold | rewarded)
     assert all(get_achievement(r.achievement_id) is not None for r in b.achievement_rewards)
     for c in cosmetics():
@@ -127,7 +127,7 @@ def test_defaults_are_owned_and_equipped(svc) -> None:
 
 def test_buying_and_equipping(svc) -> None:
     p = meta.create_player(1, "A")
-    offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "card_back")}["card_back_crimson"]
+    offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "deck")}["card_back_crimson"]
     assert (offer.price, offer.can_buy, offer.reason, offer.unlock_hint) == (40, False, "Needs 40 tokens", "40 tokens")
     with pytest.raises(MetaError, match="Needs 40"):
         meta.buy_cosmetic(p.id, "card_back_crimson")
@@ -143,9 +143,9 @@ def test_buying_and_equipping(svc) -> None:
         meta.buy_cosmetic(p.id, "card_back_standard")
     with pytest.raises(MetaError, match="Unknown cosmetic"):
         meta.buy_cosmetic(p.id, "nope")
-    assert meta.equip(p.id, "card_back_crimson")["card_back"] == "card_back_crimson"
+    assert meta.equip(p.id, "card_back_crimson")["deck"] == "card_back_crimson"
     assert meta.asset_aliases(p.id) == {"card_back": "card_back_crimson"}
-    assert meta.equip(p.id, "card_back_standard")["card_back"] == "card_back_standard"
+    assert meta.equip(p.id, "card_back_standard")["deck"] == "card_back_standard"
     assert meta.asset_aliases(p.id) == {}
 
 
@@ -219,10 +219,17 @@ def test_cosmetic_rewards_are_owned_and_equippable(svc) -> None:
     p = meta.create_player(1, "C")
     _history_row(svc, p.id, "victory", mode="chaos")
     states = {s.achievement.id: s for s in meta.achievements(p.id)}
-    assert states["chaos_conqueror"].unlocked and states["chaos_conqueror"].reward_cosmetic == "table_chaos"
-    offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_chaos"]
-    assert offer.owned and not offer.can_buy and offer.unlock_hint == "Achievement: Chaos Conqueror"
-    assert meta.equip(p.id, "table_chaos")["table"] == "table_chaos"
+    poker_face = states["chaos_conqueror"]
+    assert poker_face.unlocked and poker_face.reward_cosmetics == ("deck_poker_head", "table_poker_head")
+    offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_poker_head"]
+    assert offer.owned and not offer.can_buy and offer.unlock_hint == "Achievement: Poker Face"
+    loadout = meta.equip(p.id, "deck_poker_head")
+    assert loadout["deck"] == "deck_poker_head"
+    assert meta.asset_aliases(p.id) == {"card_back": "card_back_poker_head",
+                                        "card_front_blank": "card_front_poker_head"}
+    assert meta.equip(p.id, "table_poker_head")["table"] == "table_poker_head"
+    # Chaos Velvet, the old reward, is sold now.
+    assert {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_chaos"].price == 80
 
 
 def test_run_scope_uses_the_best_run_and_total_scope_the_sum(svc) -> None:
@@ -245,7 +252,7 @@ def test_backfill_builds_stats_from_old_history_once(svc) -> None:
     assert totals["runs"] == 1 and totals["surrenders"] == 30   # abandoned runs count for nothing
     player = meta.get_player(p.id)
     assert player.tokens == 10 + 10 + 5
-    assert {o.cosmetic.id for o in meta.wardrobe(p.id) if o.owned} >= {"table_chaos", "avatar_joker"}
+    assert {o.cosmetic.id for o in meta.wardrobe(p.id) if o.owned} >= {"deck_poker_head", "table_poker_head", "avatar_joker"}
     meta.achievements(p.id)
     assert meta.get_player(p.id).tokens == player.tokens   # no second payout
 
@@ -297,7 +304,7 @@ def test_fake_demo_has_cosmetics_and_achievements() -> None:
     install_fake()
     try:
         ace = meta.list_slots()[0].player
-        assert meta.loadout(ace.id)["card_back"] == "card_back_crimson"
+        assert meta.loadout(ace.id)["deck"] == "card_back_crimson"
         assert any(s.unlocked for s in meta.achievements(ace.id))
     finally:
         meta.use_service(None)
@@ -316,3 +323,11 @@ def test_data_cli(tmp_path, monkeypatch, capsys) -> None:
     assert data_cli(["achievements", "1"]) == 0
     out = capsys.readouterr().out
     assert "chips_neon granted" in out and "Neon Chips" in out and "First Win" in out
+
+
+def test_every_cosmetic_belongs_to_a_registered_series() -> None:
+    from chaos_blackjack.modes import series_list
+
+    known = {s.id for s in series_list()}
+    assert all(c.series in known for c in cosmetics())
+    assert {c.id for c in cosmetics() if c.series == "poker_head"} == {"deck_poker_head", "table_poker_head"}

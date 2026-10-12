@@ -9,7 +9,7 @@ quick play and no in-game asset gallery.
 ```text
 Home ──┬─ Continue run ─────────────────────────────► table (restores the saved run)
        ├─ New run ─► Run setup ─► Start run ────────► table ─► Run result ─► Home
-       ├─ Upgrades        (Permanent / Consumables / any new kind)
+       ├─ Shop            (Upgrades / Cosmetics / Starter items) × (Classic Table / Dealers: Poker Head)
        ├─ Collection      (rules, modes, items, Chaos AI)
        ├─ Run history
        ├─ player badge ─► Profile (Overview / Wardrobe / Achievements) ─► Switch player ─► Players
@@ -23,7 +23,7 @@ Home ──┬─ Continue run ────────────────�
   dealer, felt, cards and chips on the right. The menu follows the player's state:
   - no player saves: **Start game** (primary) asks for a name, creates the player
     in the first free slot and opens Run setup. Tokens and upgrades need a player:
-    Upgrades and Run history carry a "Needs a player" tag and the badge reads "No
+    Shop and Run history carry a "Needs a player" tag and the badge reads "No
     player yet". Choosing any of them explains this, highlights Start game with a
     pulsing outline and a "Start here" tag, and gives it keyboard focus. Collection
     works without a player;
@@ -31,7 +31,7 @@ Home ──┬─ Continue run ────────────────�
     chips; **New run** is secondary;
   - otherwise **New run** is primary and Continue is not shown.
 
-  Upgrades, Collection and Run history follow; Settings and Quit are small text
+  Shop, Collection and Run history follow; Settings and Quit are small text
   actions at the bottom (Esc asks before quitting). The badge at the top right shows
   the current player's avatar, name and tokens and opens Profile. If a saved run cannot be
   restored, Home says so, hides Continue for that run and promotes New run.
@@ -40,21 +40,39 @@ Home ──┬─ Continue run ────────────────�
   Delete live only here; Delete names the player and asks for confirmation.
   Deleting the current player falls back to another save.
 - **Run setup** (`run_setup`): a scrolling mode list (each with icon and summary;
-  locked modes say how to unlock them), a showcase with the selected mode's full
-  rules using live numbers (Chaos shows the dealer in grey violet), a summary of
+  locked modes say how to unlock them), headed "Table": the **Classic Table**
+  and **Poker Head's Table** (mode id `chaos`), both dealt by Poker Head. A
+  showcase with the dealer's portrait, the table's short player-facing
+  description and its facts side by side (goal, bets, rules, dealer,
+  blackjack payout) with live numbers (Poker Head's Table in grey violet); a summary of
   the permanent upgrades in effect with the numbers they change, and a scrolling
-  list of owned consumables with check boxes. Each checked kind brings one copy;
+  list of owned consumables with check boxes. Upgrades tied to another mode are
+  left out; switching modes updates both lists. Each checked kind brings one copy;
   the number of kinds is capped (2 by default, raised by Bag Space) and the list
   says how many are in use.
   Browsing and checking spend nothing; `start_run` performs the consumption. With
   an unfinished run, only the final **Start run** asks before abandoning it. The
   mode and checked items are remembered per player for the session.
-- **Upgrades** (`meta_shop`): one tab per offer kind present in the catalog and a
-  scrolling list. Each row is its buy button and states the price, `Max level` or
-  the reason it cannot be bought. Permanent rows show level pips; consumables show
-  the owned count. Everything comes from `meta_shop`.
-- **Collection** (`codex`): tabs per kind, a grid of entries and animated detail
-  pages with live tuning (see `docs/design/CODEX.md`).
+- **Shop** (`meta_shop`, formerly Upgrades), the only place tokens are spent.
+  Three area tabs, each with a count: **Upgrades** (permanent), **Cosmetics**
+  and **Starter items** (consumables). Under each, series tabs: the Core
+  Classic Table, then a "Dealers" label and one tab per dealer that has
+  something in that area (an empty expansion is left out). An upgrade tied to
+  a mode is listed under that mode's series; a starter item otherwise under
+  the series whose tables sell its item (Shield: Poker Head); a cosmetic under
+  its own `series`. Upgrade rows are their buy button and state the price,
+  `Max level` or the reason it cannot be bought; permanent rows show level
+  pips, starter items the owned count. Cosmetics are grouped by slot beside
+  the live table preview: a click buys a look for sale (without equipping
+  it), and a second click equips it; achievement rewards are listed locked
+  with their achievement. The selected area and series are remembered for
+  the session.
+- **Collection** (`codex`): a **Classic Table** tab (its table and the items every
+  table sells) and, under "Dealers", one tab per dealer (Poker Head): the
+  character's portrait, profile and signature line (no system details),
+  with "About this table", beside its Chaos rules and table-only items.
+  Entries open animated detail pages with live tuning (see
+  `docs/design/CODEX.md`).
 - **Run history** (`history`): recent runs on the left, the selected run's
   details on the right. Long details scroll with the wheel or Page Up/Page Down.
 - **Run result** (`run_result`): victory/defeat, final bankroll, rounds, token
@@ -66,16 +84,25 @@ Home ──┬─ Continue run ────────────────�
   - **Overview**: avatar, slot, tokens, achievements and looks owned, a record
     panel (runs, victories, rounds, hands won, blackjacks, best win streak, best
     bankroll), **Rename** and **Change avatar** (opens Wardrobe on Avatars);
-  - **Wardrobe**: one sub-tab per cosmetic slot (Card backs, Tables, Chips,
-    Avatars) and a scrolling list. Each row is its button: **Equip** an owned
-    look, or **Buy · N tokens** to buy and equip it; locked rows say how to get
-    them (price and/or achievement). Hidden looks appear once owned. The live
+  - **Wardrobe**: switching only. One sub-tab per cosmetic slot with how many
+    of its looks the player owns (Decks 3/4, Tables, Chips, Avatars), and a
+    scrolling list of the owned looks; a deck shows its back and face. Each
+    row is its **Equip** button. **More in the Shop** opens the Shop's
+    Cosmetics at the series that still has looks for this slot. The live
     preview on the right shows the hovered (or focused) look on a small table
     with the rest of the loadout. Equipping applies the look everywhere at once;
   - **Achievements**: unlocked first, then by progress; each row shows the
     reward, a progress bar for counted goals, and "???" for hidden ones.
   **Switch player** opens Players; choosing another player (or deleting this
-  one) returns to Home. Cosmetics are bought only here, never in Upgrades.
+  one) returns to Home. Cosmetics are bought only here, never in the Shop.
+- **Host lines**: when Run setup starts a run, the mode's host (Poker Head;
+  at the Classic table he uses his rule-free lines) says a random greeting over the table before
+  the first bet, then the goal and which rules may change; when the run ends,
+  it says a random victory or defeat script before the results. Each line has
+  its own expression. Enter or a click advances, Esc skips (it never abandons
+  the run here). Continue run skips the introduction. New run's showcase shows
+  the host's portrait.
+- **Shop** rows tied to one mode also carry a tag ("POKER HEAD ONLY").
 - **Run result** also lists the achievements the run unlocked (up to five
   cards, the rest are in Profile) with an **Equip** button for a rewarded look.
 
@@ -109,7 +136,8 @@ Home's vignette draw the player's looks.
 - New modes and challenges: `register_mode` → they appear in Run setup's mode list
   and in Collection.
 - New permanent upgrades and consumables: `meta_upgrade` rows → they appear in
-  Upgrades (a new `kind` gets its own tab) and, when owned, in Run setup.
+  the Shop (a new `kind` gets its own tab; a `mode` puts it under that mode's
+  series) and, when owned, in Run setup.
 - New rules, items and Chaos AI: registries / content packs → Collection.
 - New cosmetics and achievements: catalog entries plus seed rows → Wardrobe,
   Achievements and Run result (docs/design/COSMETICS_ACHIEVEMENTS.md §2).

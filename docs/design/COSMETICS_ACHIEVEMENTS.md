@@ -10,16 +10,17 @@ before changing a contract below.
 |---|---|
 | Effect on play | None. Cosmetics only change art. Game logic, `RunConfig`, run fingerprints, the agent CLI and the simulator ignore them. |
 | Ownership | Per player (slot), like tokens and upgrades. Deleting a player deletes its cosmetics, stats and achievements. |
-| Cosmetic slots | `card_back`, `table`, `chips` (a whole set: 1, 5, 10, 25), `avatar`. The avatar is shown only on Home (player badge) and the profile for now. |
+| Cosmetic slots | `deck` (card back and face; a deck may keep the default face), `table`, `chips` (a whole set: 1, 5, 10, 25), `avatar`. The avatar is shown only on Home (player badge) and the profile for now. The slot was `card_back` before migration 0007 (docs/design/AI_MODES.md §5). |
 | How cosmetics are obtained | Default (every player owns it), bought with tokens, or rewarded by an achievement. One cosmetic may have several sources. |
 | Achievement rewards | Mostly tokens; a few give a cosmetic (optionally tokens as well). |
 | Entry point | The player badge on Home opens the new **Profile** screen (avatar, stats, Wardrobe, Achievements). Switching players moves into Profile. |
-| Where cosmetics are bought | Only in the Wardrobe; the Upgrades screen stays for upgrades. |
+| Where cosmetics are bought | Only in the Shop's **Cosmetics** area (tokens are spent only in the Shop). The Wardrobe only switches between owned looks. |
+| Cosmetic series | `Cosmetic.series` ("core" or an expansion, e.g. "poker_head"); the Shop groups looks by it. |
 | Simulator | Not involved. Cosmetic prices and achievement tokens are balance-profile numbers, but no bands are tuned for them yet. |
 | First delivery | The pipeline and contracts, so that adding a cosmetic or an achievement is data plus art, not code. The first catalog is small. |
 
 Naming: **cosmetic** = one unlockable look; **slot** = what it skins;
-**wardrobe** = the screen where cosmetics are equipped and bought. "Collection"
+**wardrobe** = the screen where owned cosmetics are equipped (they are bought in the Shop). "Collection"
 stays the codex.
 
 ## 2. Adding content (the goal of this design)
@@ -49,11 +50,11 @@ instead of shipping a broken unlock.
 ### 3.1 Catalog (code registry, `chaos_blackjack/cosmetics/`)
 
 ```python
-COSMETIC_SLOTS = ("card_back", "table", "chips", "avatar")
+COSMETIC_SLOTS = ("deck", "table", "chips", "avatar")
 
 # Base asset ids each slot replaces.
 SLOT_ASSETS = {
-    "card_back": ("card_back",),
+    "deck": ("card_back", "card_front_blank"),
     "table":     ("table_background",),
     "chips":     ("chip_1", "chip_5", "chip_10", "chip_25"),
     "avatar":    ("avatar",),
@@ -271,13 +272,13 @@ CREATE TABLE achievement_reward (
     profile_id     INTEGER NOT NULL REFERENCES balance_profile(id) ON DELETE CASCADE,
     achievement_id TEXT    NOT NULL,
     tokens         INTEGER NOT NULL DEFAULT 0 CHECK (tokens >= 0),
-    cosmetic_id    TEXT,                   -- NULL: tokens only
+    cosmetic_ids   TEXT,                   -- comma-separated cosmetic ids; NULL: tokens only (0007)
     PRIMARY KEY (profile_id, achievement_id)
 );
 ```
 
 `chaos_blackjack.data show/set/diff/export` and `clone_profile` cover both tables
-(keys `cosmetic.<id>.cost|enabled` and `reward.<achievement id>.tokens|cosmetic_id`).
+(keys `cosmetic.<id>.cost|enabled` and `reward.<achievement id>.tokens|cosmetic_ids`).
 An achievement without a reward row unlocks with no reward. Migration 0006
 gives existing editable profiles the starting rows.
 
@@ -292,8 +293,8 @@ CosmeticOffer(cosmetic: Cosmetic, owned: bool, equipped: bool,
               can_buy: bool, reason: str,   # reason when not owned and not buyable
               unlock_hint: str)             # e.g. "Achievement: First Win" or "120 tokens"
 AchievementState(achievement: Achievement, unlocked: bool, unlocked_at: str | None,
-                 progress: int, goal: int, reward_tokens: int, reward_cosmetic: str | None)
-Unlock(achievement_id, name, tokens, cosmetic_id: str | None)
+                 progress: int, goal: int, reward_tokens: int, reward_cosmetics: tuple[str, ...])
+Unlock(achievement_id, name, tokens, cosmetic_ids: tuple[str, ...])   # only looks that are new to the player
 
 # Service
 wardrobe(player_id, slot=None, profile=None) -> list[CosmeticOffer]   # hidden-and-unowned omitted
@@ -337,7 +338,7 @@ gives "Ace" a few cosmetics, an equipped card back and some achievements.
 ```text
 Home ── player badge (avatar · name · tokens) ─► Profile
                                                    ├─ Overview      avatar, name, lifetime stats; Rename
-                                                   ├─ Wardrobe      tabs per slot: Card backs / Tables / Chips / Avatars
+                                                   ├─ Wardrobe      tabs per slot: Decks / Tables / Chips / Avatars
                                                    ├─ Achievements  list with progress, rewards, hidden = ???
                                                    └─ Switch player ─► Players
 Run result ── unlock cards (achievement, tokens, cosmetic with "Equip" button)
@@ -345,12 +346,15 @@ Run result ── unlock cards (achievement, tokens, cosmetic with "Equip" butto
 
 - **Profile** (`profile`): opened from the badge. "Switch player" leads to the
   existing Players screen, which keeps create / rename / delete.
-- **Wardrobe**: a scrolling list per slot (rows, like Upgrades, so any number
-  of looks fits). Each row shows the look, name, rarity and one state:
-  Equipped, Equip, a price button (buy, then equip), or locked with the unlock
-  hint. A live mini table on the side shows the table, card back, chips and
-  avatar together, updating on hover and keyboard focus. Previews draw each
-  look's own asset ids (`assets.image(..., alias=False)`).
+- **Wardrobe**: switching only. A scrolling list of the owned looks per slot
+  (with "owned / total" on each slot tab) and a "More in the Shop" button.
+  A live mini table on the side shows the table, card back, chips and avatar
+  together, updating on hover and keyboard focus. Previews draw each look's
+  own asset ids (`assets.image(..., alias=False)`).
+- **Shop › Cosmetics**: every listed look of the selected series, grouped by
+  slot, with the same preview. Each row shows the look, name, rarity and one
+  state: Equipped, Equip, a price button (buy; a second click equips), or
+  locked with the unlock hint (achievement rewards).
 - **Achievements**: unlocked first by default, then by progress. Each row:
   icon, name, description, progress bar (`total` scope) and reward.
 - **Run result**: after the token breakdown, one card per unlock.
