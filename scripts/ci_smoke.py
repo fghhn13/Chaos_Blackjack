@@ -17,11 +17,15 @@ import sysconfig
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--installed", action="store_true")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--installed", action="store_true")
+    source.add_argument("--staged", type=Path, help="Check a selected browser package outside the checkout")
     parser.add_argument("--gui", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    if not args.installed:
+    if args.staged:
+        sys.path.insert(0, str(args.staged.resolve()))
+    elif not args.installed:
         sys.path.insert(0, str(root))
     os.environ["CHAOS_USE_LLM"] = "0"
     os.environ["CHAOS_DB"] = ":memory:"
@@ -44,6 +48,10 @@ def main() -> None:
         source = Path(chaos_blackjack.__file__).resolve()
         installed = Path(sysconfig.get_path("purelib")).resolve() / "chaos_blackjack"
         assert source.parent == installed, f"Imported the checkout instead of the wheel: {source}"
+    if args.staged:
+        source = Path(chaos_blackjack.__file__).resolve()
+        expected = args.staged.resolve() / "chaos_blackjack"
+        assert source.parent == expected, f"Imported the checkout instead of the browser stage: {source}"
     assert load_permission_profile("easy")
     assert load_prompt("chaotic")
     assert validate_assets()["ok"]

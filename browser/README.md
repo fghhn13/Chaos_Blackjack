@@ -26,7 +26,10 @@ original Pygame name dialog. Cancel leaves the existing player unchanged. The
 HTML editor is inside the fullscreen container. Desktop text entry is unchanged.
 
 `package-files.txt` explicitly selects shipped assets and package resources.
-The builder adds Python source under `chaos_blackjack` except the server package.
+The builder adds Python source under `chaos_blackjack` except the server package,
+and every shipped SQL migration and seed. It runs the integrated offline smoke
+check against this selected staging directory before producing the archive, so
+new database resources cannot be absent while checkout tests still pass.
 No .env, credentials, databases, raw artwork or local scratch are packaged.
 New non-Python resources must be added to that manifest. The two untracked local
 card-back PNG files are intentionally excluded. The smaller WASM standard library

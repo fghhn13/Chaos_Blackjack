@@ -28,6 +28,18 @@ def runtime_file(name):
     return name, cache
 
 
+def package_files():
+    files = (ROOT / "browser/package-files.txt").read_text(encoding="utf-8").splitlines()
+    files += [p.relative_to(ROOT).as_posix() for p in (ROOT / "chaos_blackjack").rglob("*.py")
+              if "__pycache__" not in p.parts]
+    # Database resources are a complete, versioned contract. Never omit a new
+    # migration when the corresponding Python code and seed have been shipped.
+    for folder in ("migrations", "seed"):
+        files += [p.relative_to(ROOT).as_posix()
+                  for p in (ROOT / "chaos_blackjack/data" / folder).glob("*.sql")]
+    return sorted(name for name in set(files) if name and not name.startswith("chaos_blackjack/web/"))
+
+
 def main():
     STAGE.mkdir(parents=True, exist_ok=True)
     # An allowlist excludes .env, databases, raw art and user scratch files.
@@ -35,12 +47,7 @@ def main():
         target = STAGE / folder
         if target.exists():
             shutil.rmtree(target)
-    files = (ROOT / "browser/package-files.txt").read_text(encoding="utf-8").splitlines()
-    files += [p.relative_to(ROOT).as_posix() for p in (ROOT / "chaos_blackjack").rglob("*.py")
-              if "__pycache__" not in p.parts]
-    for name in sorted(set(files)):
-        if not name or name.startswith("chaos_blackjack/web/"):
-            continue
+    for name in package_files():
         source = ROOT / name
         if source.is_file():
             dest = STAGE / name
@@ -51,6 +58,10 @@ def main():
     helper = STAGE / "stdlib/sqlite3/dump.py"
     helper.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(sqlite3.dump.__file__, helper)
+    # Exercise the selected browser sources and resources, rather than importing
+    # the checkout, so an incomplete archive cannot pass the deployment checks.
+    subprocess.run([sys.executable, str(ROOT / "scripts/ci_smoke.py"),
+                    "--staged", str(STAGE), "--gui"], cwd=STAGE, check=True)
     subprocess.run([sys.executable, "-m", "pygbag", "--build", "--no_opt", str(STAGE)],
                    cwd=ROOT, check=True)
     web = STAGE / "build/web"
@@ -84,8 +95,8 @@ const bridgeASCII = raw => raw.split('').map(char => char.charCodeAt(0) > 127
   ? String.fromCharCode(92) + 'u' + char.charCodeAt(0).toString(16).padStart(4, '0') : char).join('');
 window.chaosReadSave = () => bridgeASCII(JSON.stringify(window.chaosInitialSave));
 window.chaosSaveJSON = snapshot => window.parent.chaosSave(JSON.parse(snapshot));
-window.chaosClosed = () => window.parent.chaosClosed();
-window.chaosFailed = () => window.parent.chaosFailed();
+window.chaosClosed = () => { clearInterval(loadingTimer); window.parent.chaosClosed(); };
+window.chaosFailed = () => { clearInterval(loadingTimer); window.parent.chaosFailed(); };
 window.chaosTouchInput = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 window.chaosInputId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 window.chaosNameInput = state => window.parent.chaosNameInput?.(state);
