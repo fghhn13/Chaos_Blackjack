@@ -67,6 +67,7 @@ jobs:
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief bet 10
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief act stand
           CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data saves
+          CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data show default | grep -q "reward.first_win.tokens"
 
   package:
     name: Installed wheel (offline runtime)

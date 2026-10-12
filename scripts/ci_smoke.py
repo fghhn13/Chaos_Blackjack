@@ -1,7 +1,8 @@
 """Exercise the assembled application and packaged resources without billing.
 
 Use --installed outside the checkout to check a wheel, and --gui to render
-the player hub and its real codex handoff with SDL's dummy drivers.
+the player hub, the Profile tabs and the real codex handoff with SDL's dummy
+drivers.
 """
 
 from __future__ import annotations
@@ -82,6 +83,15 @@ def main() -> None:
         assert reward.tokens == sum(value for _, value in reward.breakdown)
         assert meta.history(player.id)[0].result == reward.result
         assert meta.resume_run(player.id) is None
+        # Cosmetics and achievements: seeded prices and rewards, buy, equip, aliases.
+        states = meta.achievements(player.id)
+        assert states and meta.player_stats(player.id)["runs"] == 1
+        assert {u.achievement_id for u in reward.unlocked} <= {s.achievement.id for s in states if s.unlocked}
+        offer = next(o for o in meta.wardrobe(player.id) if o.price is not None and not o.owned)
+        service.grant_tokens(player.id, offer.price)
+        meta.buy_cosmetic(player.id, offer.cosmetic.id)
+        assert meta.equip(player.id, offer.cosmetic.id)[offer.cosmetic.slot] == offer.cosmetic.id
+        assert meta.asset_aliases(player.id)
         config = RunConfig(use_llm=False)
         entries = codex_entries(config=config)
         demos = [run_demo(entry.demo, config) for entry in entries if entry.demo is not None]
@@ -89,7 +99,8 @@ def main() -> None:
         if args.gui:
             gui_smoke(player.id, config)
         print(json.dumps({"ok": True, "installed": args.installed, "gui": args.gui,
-                          "run_result": reward.result, "codex_entries": len(entries), "demos": len(demos)}))
+                          "run_result": reward.result, "codex_entries": len(entries), "demos": len(demos),
+                          "achievements": len(states), "equipped": offer.cosmetic.id}))
     finally:
         meta.use_service(None)
         db.close()
@@ -98,18 +109,25 @@ def main() -> None:
 def gui_smoke(player_id: int, config) -> None:
     import pygame
     from chaos_blackjack.gui.app import App
+    from chaos_blackjack.gui.components.lobby import choose_player
     import chaos_blackjack.gui.scenes  # noqa: F401
 
     app = App(run_config=config)
     try:
+        choose_player(app, player_id)
+        assert app.assets.aliases  # the equipped look is drawn everywhere
+        profile_tabs = [("profile", {"player_id": player_id, "tab": tab}) for tab in
+                        ("overview", "wardrobe", "achievements")]
         for name, params in (("player_select", {}), ("run_setup", {"player_id": player_id}),
                              ("meta_shop", {"player_id": player_id}),
                              ("history", {"player_id": player_id}),
+                             *profile_tabs,
                              ("home", {})):
             app.scenes.reset(name, **params)
             app.scenes.apply_pending()
             app.scenes.draw(app.canvas)
         home = app.scenes.top
+        assert home.badge.avatar == meta_avatar(player_id)
         home.open_collection()
         app.scenes.apply_pending()
         collection = app.scenes.top
@@ -128,6 +146,12 @@ def gui_smoke(player_id: int, config) -> None:
     finally:
         app.audio.close()
         pygame.quit()
+
+
+def meta_avatar(player_id: int) -> str:
+    from chaos_blackjack import meta
+
+    return meta.get_player(player_id).avatar
 
 
 if __name__ == "__main__":

@@ -6,6 +6,13 @@ built-in placeholder; press F5 in the game to rescan.
 
 Also searched: `black-jack-assets/exports/` and any dirs in `CHAOS_ASSETS_DIR`.
 
+Cosmetic looks (card backs, tables, chip sets, avatars) are asset ids too, with
+the same size and alpha rules as the base asset they replace: e.g.
+`card_back_crimson.png`, `table_midnight.png`, `chips_neon_1.png` to
+`chips_neon_25.png`, `avatar_spade.png`; the base avatar is `avatar.png`
+(256×256). Ids are listed in `chaos_blackjack/cosmetics/catalog.py`; see
+`docs/design/COSMETICS_ACHIEVEMENTS.md`.
+
 Fonts live in `assets/fonts/`, named by role: `ui`, `ui-bold`, `display`
 (titles and headlines), optionally `display-bold`. Shipped: Barlow (ui) and
 Playfair Display SC Bold (display), both SIL OFL 1.1; licences in
