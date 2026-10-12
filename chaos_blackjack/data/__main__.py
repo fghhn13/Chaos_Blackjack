@@ -12,8 +12,8 @@ Balance profiles
   KEY is a setting (run.start_money, bet.max_fraction, ...), item.<id>.<field>
   (price, enabled, weight, params, price_mode), rule.<id>.<field>
   (enabled, params, stub_weight, stub_params), upgrade.<id>.<field>
-  (cost, cost_step, max_level, enabled, params, requires), cosmetic.<id>.<field>
-  (cost, enabled) or reward.<achievement id>.<field> (tokens, cosmetic_id).
+  (cost, cost_step, max_level, enabled, params, requires, mode), cosmetic.<id>.<field>
+  (cost, enabled) or reward.<achievement id>.<field> (tokens, cosmetic_ids).
   JSON values: '{"ten_value": 5}'.
 
 Players (meta progression)
@@ -155,7 +155,7 @@ def _achievements(conn, a) -> int:
         ach = st.achievement
         name = "???" if ach.hidden and not st.unlocked else ach.name
         mark = "x" if st.unlocked else " "
-        reward = f"+{st.reward_tokens}" + (f" {st.reward_cosmetic}" if st.reward_cosmetic else "")
+        reward = " ".join([f"+{st.reward_tokens}", *st.reward_cosmetics])
         print(f"  [{mark}] {ach.id:22s} {name:22s} {st.progress}/{st.goal:<6d} {reward}")
     return 0
 

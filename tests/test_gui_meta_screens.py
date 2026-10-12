@@ -183,7 +183,8 @@ def test_duplicate_name_submit_creates_only_one_player(app):
 def test_meta_shop_buy_refreshes_cost_tokens_and_levels(app):
     pid = player_id()
     shop = open_screen(app, "meta_shop", player_id=pid)
-    offer = next(o for o in shop.offers if o.upgrade_id == "start_money")
+    assert shop.area == "upgrades"
+    offer = next(o for o in shop.upgrade_offers if o.upgrade_id == "start_money")
     before = meta.get_player(pid)
     click(app, shop.buy_buttons[offer.upgrade_id])
     after = meta.get_player(pid)
@@ -195,8 +196,8 @@ def test_meta_shop_buy_refreshes_cost_tokens_and_levels(app):
 def test_shop_tabs_consumables_and_rejected_stale_purchase(app):
     pid = player_id()
     shop = open_screen(app, "meta_shop", player_id=pid)
-    shop.tab("consumable")
-    offer = next(o for o in shop.offers if o.upgrade_id == "start_peek")
+    shop.pick_area("starter")
+    offer = next(o for o in shop.upgrade_offers if o.upgrade_id == "start_peek")
     click(app, shop.buy_buttons[offer.upgrade_id])
     assert meta.get_player(pid).upgrades[offer.upgrade_id] == offer.owned + 1
     app.meta_test_service.grant_tokens(pid, -10000)
@@ -209,7 +210,7 @@ def test_home_refreshes_after_upgrades_and_settings_keep_navigation(app):
     home = open_screen(app, "home")
     tokens = home.player.tokens
     click(app, home.entries["upgrades"])
-    app.scenes.top.tab("consumable")
+    app.scenes.top.pick_area("starter")
     click(app, app.scenes.top.buy_buttons["start_peek"])
     key(app, pygame.K_ESCAPE)
     assert app.scenes.top is home and home.player.tokens < tokens
@@ -332,7 +333,7 @@ def test_home_with_unfinished_run_leads_with_continue_and_summary(app):
     assert list(home.entries)[:2] == ["continue", "new"]
     assert home.entries["continue"].weight == "primary" and home.entries["new"].weight == "secondary"
     run = started.controller.run
-    assert home.entries["continue"].detail == f"Chaos  ·  Round {max(1, run.round)}  ·  {run.money} chips"
+    assert home.entries["continue"].detail == f"Poker Head's Table  ·  Round {max(1, run.round)}  ·  {run.money} chips"
 
 
 def test_first_launch_start_game_creates_player_and_opens_setup(app):
@@ -473,6 +474,9 @@ def test_finished_table_routes_to_reward_once_and_back_to_hub(app, kind):
     table._after_command()
     before = meta.get_player(pid).tokens
     table.update(3)
+    assert table.outro is not None and table.outro.beats  # the host comments on the result first
+    assert app.scenes.top is table
+    key(app, pygame.K_ESCAPE)  # skips the host's lines (it does not abandon the run)
     table.update(3)
     app.scenes.apply_pending()
     result = app.scenes.top

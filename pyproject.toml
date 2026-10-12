@@ -29,7 +29,8 @@ include = ["chaos_blackjack*"]
 
 [tool.setuptools.package-data]
 chaos_blackjack = ["py.typed"]
-"chaos_blackjack.ai" = ["prompts/*.txt", "permissions/*.json", "personas/*.json", "assets/poker_head/*.png"]
+"chaos_blackjack.ai" = ["prompts/*.txt", "permissions/*.json", "personas/*.json", "hosts/*.json",
+                        "assets/poker_head/*.png"]
 "chaos_blackjack.data" = ["migrations/*.sql", "seed/*.sql"]
 "chaos_blackjack.web" = ["static/*"]
 "chaos_blackjack.audio" = ["assets/*.json", "assets/*.md", "assets/kenney/*.ogg", "assets/kenney/*.txt", "assets/kenney/*.json"]

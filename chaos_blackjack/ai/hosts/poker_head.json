@@ -1,0 +1,63 @@
+{
+  "_comment": "Line library for the Poker Head host. Each event holds alternative scripts; one is picked at random. A script is a list of [expression, text] beats; expressions are Poker Head's portraits (neutral, puzzled, suspicious, startled, displeased, welcome, present_card, hidden_card). '<event>.<mode id>' replaces an event for one mode (normal = the Classic table, where he bends no rules). summary_mood is used for the generated rules line.",
+  "summary_mood": "present_card",
+  "profile": [
+    "Sharp suit, faultless manners, four cards always in perfect order. Poker Head is always happy to play one more hand with you, and always collects the chips he is owed without the slightest hurry.",
+    "He claims to love honest blackjack. How much of that is true, you are welcome to sit down and find out."
+  ],
+  "signature": "Old friends are old friends, but the chips still get counted.",
+  "intro": [
+    [["welcome", "Good evening. Do sit down; the felt is warm and the cards are fresh."],
+     ["hidden_card", "I deal tonight. And now and then, I amend the rules. Politely, of course."]],
+    [["neutral", "Ah, a new guest. Poker Head, at your service."],
+     ["present_card", "House custom: before most hands I may adjust a rule. I will always tell you which."]],
+    [["welcome", "Welcome to my table. Manners are expected; luck is optional."],
+     ["suspicious", "You may bring your little tricks. I will bring mine."]],
+    [["neutral", "Shall we? I find an evening goes better with a wager."],
+     ["hidden_card", "I keep a few rules up my sleeve. Figuratively. Mostly."]]
+  ],
+  "intro.normal": [
+    [["welcome", "Good evening. Tonight we play it straight; my sleeves are empty."],
+     ["neutral", "No amendments at this table. Just the cards, the dealer and your judgement."]],
+    [["neutral", "The Classic table. I deal by the book here, every hand."],
+     ["hidden_card", "Do enjoy it. My other table is rather less... traditional."]],
+    [["welcome", "Ah, a purist. Welcome."],
+     ["present_card", "I shall not touch a single rule. You have my word, and my word is very well dressed."]]
+  ],
+  "victory": [
+    [["startled", "Three hundred. Well. That is rather a lot of my chips."],
+     ["displeased", "Congratulations. Do come back, so I may win them back."]],
+    [["displeased", "You have emptied my table with impeccable timing."],
+     ["neutral", "Go on, take a bow. I shall be shuffling."]],
+    [["puzzled", "I bent the rules and you simply walked around them."],
+     ["welcome", "Splendid play. My door remains open, and my deck remains mine."]],
+    [["startled", "A victory? At my table? How unexpected."],
+     ["displeased", "Do remember: luck is a guest here. I am the host."]]
+  ],
+  "victory.normal": [
+    [["displeased", "By the book, and you still emptied my table."],
+     ["welcome", "Splendid. Do try my other table sometime; it bites back."]],
+    [["startled", "Three hundred, fair and square."],
+     ["neutral", "No tricks were needed, on either side. Congratulations."]],
+    [["puzzled", "I followed every rule and still lost."],
+     ["displeased", "Perhaps the rules need... amending. Elsewhere, of course."]]
+  ],
+  "defeat": [
+    [["neutral", "And that is the last of your chips. A pleasure, truly."],
+     ["welcome", "Do come again. The house always keeps a seat for you."]],
+    [["present_card", "The cards have spoken, and they spoke for me."],
+     ["hidden_card", "Next time, perhaps, you will read my sleeve better."]],
+    [["suspicious", "Out already? I had several more amendments planned."],
+     ["welcome", "Rest, regroup, return. I shall be here."]],
+    [["neutral", "A gracious defeat is still a defeat. But it is gracious."],
+     ["present_card", "Until the next evening."]]
+  ],
+  "defeat.normal": [
+    [["neutral", "The cards were honest and so was I. The house still wins."],
+     ["welcome", "Do come again. The table will be just as plain."]],
+    [["present_card", "Not a single rule bent, and here we are."],
+     ["hidden_card", "Imagine what I could do if I tried."]],
+    [["suspicious", "Out of chips, by the book."],
+     ["welcome", "Rest, regroup, return. I shall keep your seat warm."]]
+  ]
+}

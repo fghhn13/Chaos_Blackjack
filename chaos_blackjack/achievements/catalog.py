@@ -20,7 +20,7 @@ def _rules_seen(ctx: AchievementContext) -> tuple[int, int]:
 
 for _order, _a in enumerate((
     Achievement("first_win", "First Win", "Win a run.", stat="victories"),
-    Achievement("chaos_conqueror", "Chaos Conqueror", "Win a run with the Chaos dealer.", stat="victories_chaos"),
+    Achievement("chaos_conqueror", "Poker Face", "Win a run against Poker Head.", stat="victories_chaos"),
     Achievement("bare_hands", "Bare Hands", "Win a run without using an item.", stat="item_free_victories"),
     Achievement("regular", "Regular", "Finish 10 runs.", stat="runs", goal=10),
     Achievement("marathon", "Marathon", "Play 250 rounds.", stat="rounds", goal=250),

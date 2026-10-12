@@ -59,6 +59,7 @@ class UpgradeOffer:
     next_cost: int | None             # None when maxed
     can_buy: bool
     reason: str = ""                  # why not, when can_buy is False
+    mode: str | None = None           # only in this game mode; None = every mode
 
 
 @dataclass(frozen=True)
@@ -88,7 +89,7 @@ class Unlock:
     achievement_id: str
     name: str
     tokens: int
-    cosmetic_id: str | None = None
+    cosmetic_ids: tuple[str, ...] = ()     # newly owned looks (already owned ones left out)
 
 
 @dataclass(frozen=True)
@@ -119,7 +120,7 @@ class AchievementState:
     progress: int
     goal: int
     reward_tokens: int = 0
-    reward_cosmetic: str | None = None
+    reward_cosmetics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

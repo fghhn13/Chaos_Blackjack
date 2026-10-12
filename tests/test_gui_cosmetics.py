@@ -70,7 +70,7 @@ def test_a_skin_file_wins_over_its_placeholder(tmp_path) -> None:
 def test_choosing_a_player_applies_their_loadout(app) -> None:
     ace = meta.list_slots()[0].player  # the fake equips Crimson Lattice and Chaos Velvet
     choose_player(app, ace.id)
-    assert app.assets.aliases == {"card_back": "card_back_crimson", "table_background": "table_chaos"}
+    assert app.assets.aliases == {"card_back": "card_back_crimson", "table_background": "table_poker_head"}
     rookie = meta.list_slots()[1].player
     choose_player(app, rookie.id)
     assert app.assets.aliases == {}
@@ -128,35 +128,45 @@ def test_badge_opens_profile_with_avatar_and_record(app) -> None:
     assert profile.all_looks >= 4 and profile.totals["runs"] == 3
 
 
-def test_wardrobe_equips_buys_and_applies_the_look(app) -> None:
+def test_looks_are_bought_in_the_shop_and_switched_in_the_wardrobe(app) -> None:
     rookie = meta.list_slots()[1].player
     choose_player(app, rookie.id)
-    profile = _screen(app, "profile", player_id=rookie.id, tab="wardrobe", slot="card_back")
-    row = profile.rows["card_back_crimson"]
+    shop = _screen(app, "meta_shop", player_id=rookie.id, area="cosmetics", series="core")
+    row = shop.rows["card_back_crimson"]
     assert not row.enabled and row.offer.reason == "Needs 40 tokens"   # Rookie has no tokens
-    assert not profile.rows["card_back_standard"].enabled              # already equipped
+    assert not shop.rows["card_back_royal"].enabled                     # an achievement reward: locked
+    assert not shop.rows["card_back_standard"].enabled                  # owned and equipped
     meta.service().grant_tokens(rookie.id, 45)
-    profile.refresh()
-    _click(app, profile.rows["card_back_crimson"])
-    assert meta.get_player(rookie.id).tokens == 5
-    assert meta.loadout(rookie.id)["card_back"] == "card_back_crimson"
+    shop.refresh()
+    _click(app, shop.rows["card_back_crimson"])
+    assert meta.get_player(rookie.id).tokens == 5 and "purchased" in shop.message
+    assert meta.loadout(rookie.id)["deck"] == "card_back_standard"     # buying does not equip
+    _click(app, shop.rows["card_back_crimson"])                         # a second click equips it
     assert app.assets.resolve("card_back") == "card_back_crimson"
-    assert profile.rows["card_back_crimson"].offer.equipped and "equipped" in profile.message
+    # The Wardrobe only lists owned looks and only switches between them.
+    profile = _screen(app, "profile", player_id=rookie.id, tab="wardrobe", slot="deck")
+    assert set(profile.rows) == {"card_back_standard", "card_back_crimson"}
+    assert profile.collection["deck"] == (2, 4)
     _click(app, profile.rows["card_back_standard"])
-    assert app.assets.aliases == {}
-    _click(app, profile.slot_tabs["avatar"])
-    assert profile.slot == "avatar" and "avatar_spade" in profile.rows
+    assert app.assets.aliases == {} and "equipped" in profile.message
+    assert meta.get_player(rookie.id).tokens == 5                       # no tokens spent here
+    _click(app, profile.shop_button)
+    assert type(app.scenes.top).__name__ == "MetaShopScene" and app.scenes.top.area == "cosmetics"
 
 
 def test_preview_follows_the_hovered_look(app) -> None:
     ace = meta.list_slots()[0].player
     profile = _screen(app, "profile", player_id=ace.id, tab="wardrobe", slot="table")
     looks, shown = profile.preview_looks()
-    assert shown.id == "table_chaos" and looks["card_back"].id == "card_back_crimson"
-    row = profile.rows["table_midnight"]
+    assert shown.id == "table_poker_head" and looks["deck"].id == "card_back_crimson"
+    assert "table_midnight" not in profile.rows  # not owned: only in the Shop
+    shop = _screen(app, "meta_shop", player_id=ace.id, area="cosmetics", series="core")
+    row = shop.rows["table_midnight"]
+    shop.list.scroll_into_view(row)
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=row.rect.center, rel=(0, 0), buttons=(0, 0, 0)))
-    looks, shown = profile.preview_looks()
+    looks, shown = shop.preview_looks()
     assert shown.id == "table_midnight" and looks["table"].id == "table_midnight"
+    app._render()  # noqa: SLF001
 
 
 def test_achievements_tab_lists_every_achievement_unlocked_first(app) -> None:
@@ -195,7 +205,7 @@ def test_run_result_shows_unlocks_and_equips_a_rewarded_look(app) -> None:
     result = _screen(app, "run_result", run_id=run.run_id, player_id=rookie.id, controller=c)
     ids = {u.achievement_id for u in result.reward.unlocked}
     assert {"first_win", "white_flag"} <= ids
-    equip = result.equip_buttons["avatar_joker"]
+    equip = result.equip_buttons["white_flag"]
     _click(app, equip)
     assert equip.text == "Equipped" and not equip.enabled
     assert meta.get_player(rookie.id).avatar == "avatar_joker"

@@ -112,13 +112,45 @@ def _card_shape(size) -> tuple[pygame.Surface, pygame.Rect, int]:
     return surf, rect, radius
 
 
-def card_front_blank(size, fonts: FontGetter) -> pygame.Surface:
-    surf, rect, radius = _card_shape(size)
-    pygame.draw.rect(surf, theme.IVORY, rect, border_radius=radius)
-    inner = rect.inflate(-size[0] // 10, -size[0] // 10)
-    pygame.draw.rect(surf, (0xD8, 0xCC, 0xB4), inner, max(1, size[0] // 128), border_radius=radius // 2)
-    pygame.draw.rect(surf, (0x9E, 0x93, 0x7E), rect, max(1, size[0] // 96), border_radius=radius)
-    return surf
+def framed_front(face: Color, frame: Color, edge: Color) -> Callable[..., pygame.Surface]:
+    """A blank card face in any colours (the default face and deck cosmetics)."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        surf, rect, radius = _card_shape(size)
+        pygame.draw.rect(surf, face, rect, border_radius=radius)
+        inner = rect.inflate(-size[0] // 10, -size[0] // 10)
+        pygame.draw.rect(surf, frame, inner, max(1, size[0] // 128), border_radius=radius // 2)
+        pygame.draw.rect(surf, edge, rect, max(1, size[0] // 96), border_radius=radius)
+        return surf
+
+    return draw
+
+
+card_front_blank = framed_front(theme.IVORY, (0xD8, 0xCC, 0xB4), (0x9E, 0x93, 0x7E))
+
+
+def flower_back(base: Color, petals: Color, dots: Color, edge: Color) -> Callable[..., pygame.Surface]:
+    """A card back with a repeated four-petal pattern (deck cosmetics)."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        surf, rect, radius = _card_shape(size)
+        w, h = size
+        pygame.draw.rect(surf, petals, rect, border_radius=radius)
+        inner = rect.inflate(-w // 10, -w // 10)
+        pygame.draw.rect(surf, base, inner, border_radius=radius // 2)
+        step = max(8, w // 5)
+        r = max(2, step // 6)
+        for row, y in enumerate(range(inner.y + step // 2, inner.bottom, step)):
+            for x in range(inner.x + step // 2, inner.right, step):
+                for dx, dy in ((r, 0), (-r, 0), (0, r), (0, -r)):
+                    pygame.draw.circle(surf, petals, (x + dx, y + dy), r)
+                if y + step // 2 < inner.bottom - r and x + step // 2 < inner.right - r:
+                    pygame.draw.circle(surf, dots, (x + step // 2, y + step // 2), max(1, r // 2))
+        pygame.draw.rect(surf, edge, inner, max(1, w // 128), border_radius=radius // 2)
+        pygame.draw.rect(surf, edge, rect, max(1, w // 64), border_radius=radius)
+        return surf
+
+    return draw
 
 
 def lattice_back(base: Color, lattice: Color, trim: Color, edge: Color) -> Callable[..., pygame.Surface]:
@@ -167,6 +199,26 @@ def chip(color: Color, spots: Color | None = None) -> Callable[..., pygame.Surfa
             pygame.draw.circle(surf, spots, p, max(2, w // 18))
         pygame.draw.circle(surf, _lerp(color, theme.IVORY, 0.35), c, int(r * 0.62))
         pygame.draw.circle(surf, _lerp(color, (0, 0, 0), 0.25), c, int(r * 0.62), max(1, w // 64))
+        return surf
+
+    return draw
+
+
+# ------------------------------------------------------------- image based
+
+def fitted_image(path) -> Callable[..., pygame.Surface]:
+    """An existing image (e.g. a bundled portrait) fitted into the target size."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        surf = pygame.Surface(size, pygame.SRCALPHA)
+        try:
+            img = pygame.image.load(str(path))
+        except (pygame.error, OSError):
+            return missing(size, fonts)
+        k = min(size[0] / img.get_width(), size[1] / img.get_height())
+        img = pygame.transform.smoothscale(img, (max(1, round(img.get_width() * k)),
+                                                 max(1, round(img.get_height() * k))))
+        surf.blit(img, img.get_rect(center=(size[0] // 2, size[1] // 2)))
         return surf
 
     return draw

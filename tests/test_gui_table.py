@@ -560,6 +560,11 @@ def test_run_end_opens_ending(app: App) -> None:
     t._deal(10)  # noqa: SLF001
     _key(app, pygame.K_s)
     _tick(app, 1.0, times=4)
+    t = app.scenes.top
+    assert type(t).__name__ == "TableScene" and t.outro is not None  # the host speaks first
+    while t.intro_open():
+        _key(app, pygame.K_RETURN)
+    _tick(app, 0.1)
     assert type(app.scenes.top).__name__ == "EndingScene"
     assert app.scenes.top.kind == "victory"
     _key(app, pygame.K_RETURN)  # play again

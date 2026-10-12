@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 import pygame
 
-from chaos_blackjack.cosmetics import get_cosmetic
+from chaos_blackjack.content.builtin_persona import default_persona
+from chaos_blackjack.cosmetics import cosmetics
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import placeholders as ph
 
@@ -73,6 +74,9 @@ for _spec in (
     # Codex mode icons; final mode_normal.png / mode_chaos.png override these.
     AssetSpec("mode_normal", "mode", ICON, ph.icon("CL", theme.GOLD), "Classic"),
     AssetSpec("mode_chaos", "mode", ICON, ph.icon("CH", theme.CHAOS_MAGENTA), "Chaos"),
+    # Poker Head mode: his own portrait until a dedicated icon ships.
+    AssetSpec("mode_poker_head", "mode", ICON, ph.fitted_image(default_persona().portraits["neutral"]),
+              "Poker Head"),
     # Chaos rules — ids equal registry rule names
     AssetSpec("fragile_bust", "rule", ICON, ph.icon("FB", theme.CHAOS_MAGENTA), "Fragile Bust"),
     AssetSpec("great_crash", "rule", ICON, ph.icon("GC", theme.CHAOS_MAGENTA), "Great Crash"),
@@ -100,6 +104,11 @@ _SKINS: dict[str, tuple[str, tuple[int, int], Placeholder]] = {
                                                       theme.GOLD)),
     "table_midnight": ("background", BG, ph.felt_table((0x16, 0x22, 0x38), (0x22, 0x32, 0x50), (0x6E, 0x7E, 0xA0))),
     "table_chaos": ("background", BG, ph.felt_table((0x2E, 0x18, 0x3C), (0x44, 0x26, 0x56), theme.CHAOS_MAGENTA)),
+    # Poker Head's deck and table (placeholders for his final art)
+    "card_back_poker_head": ("card", CARD, ph.flower_back((0xA8, 0x36, 0x5A), (0xF4, 0xE4, 0xC8), theme.FELT,
+                                                          theme.INK)),
+    "card_front_poker_head": ("card", CARD, ph.framed_front((0xF6, 0xEA, 0xD0), (0xA8, 0x36, 0x5A), theme.INK)),
+    "table_poker_head": ("background", BG, ph.felt_table((0x2E, 0x46, 0x3A), (0x3A, 0x54, 0x46), (0xB0, 0x96, 0x5A))),
     **{f"chips_neon_{v}": ("chip", ICON, ph.chip(c, theme.DARK)) for v, c in _NEON.items()},
     **{f"chips_gold_{v}": ("chip", ICON, ph.chip(c, (0x6E, 0x50, 0x1E))) for v, c in _GOLD_CHIPS.items()},
     "avatar_spade": ("avatar", AVATAR, ph.avatar("spade", theme.DARK, theme.GOLD)),
@@ -108,8 +117,8 @@ _SKINS: dict[str, tuple[str, tuple[int, int], Placeholder]] = {
 
 
 def _skin_name(asset_id: str) -> str:
-    cosmetic = get_cosmetic(asset_id) or get_cosmetic(asset_id.rsplit("_", 1)[0])
-    return cosmetic.name if cosmetic else asset_id
+    """The name of the cosmetic that draws `asset_id` (for asset reports)."""
+    return next((c.name for c in cosmetics() if asset_id in c.asset_map().values()), asset_id)
 
 
 for _id, (_category, _size, _draw) in _SKINS.items():

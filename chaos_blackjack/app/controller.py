@@ -637,7 +637,10 @@ class GameController:
         if pipeline is None:
             return
         pipeline.rule_params = {k: dict(v) for k, v in self.config.chaos_rule_params.items()}
-        pipeline.disabled_rules = frozenset(self.config.disabled_rules)
+        disabled = set(self.config.disabled_rules)
+        if self.config.rule_pool is not None:  # the mode's pool: every other rule is off
+            disabled |= set(self.registry.rule_ids()) - set(self.config.rule_pool)
+        pipeline.disabled_rules = frozenset(disabled)
         pipeline.item_params = {k: dict(v) for k, v in self.config.item_params.items()}
         if isinstance(pipeline.llm, OfflineChaosStub):
             pipeline.llm.choices = tuple(self.config.chaos_stub)

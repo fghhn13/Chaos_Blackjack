@@ -68,7 +68,7 @@ for _s in (
     Stat("runs", "Runs finished", lambda r: 1),
     Stat("victories", "Runs won", lambda r: int(_won(r))),
     Stat("victories_normal", "Classic runs won", lambda r: int(_won(r) and r.mode == "normal")),
-    Stat("victories_chaos", "Chaos runs won", lambda r: int(_won(r) and r.mode == "chaos")),
+    Stat("victories_chaos", "Poker Head runs won", lambda r: int(_won(r) and r.mode == "chaos")),
     Stat("item_free_victories", "Runs won without using an item",
          lambda r: int(_won(r) and r.count("items_used") == 0)),
     Stat("rounds", "Rounds played", lambda r: r.rounds),

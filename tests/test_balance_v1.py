@@ -117,4 +117,4 @@ def test_chaos_victory_pays_the_bonus(svc) -> None:
     run_lines = {k: v for k, v in reward.breakdown if not k.startswith("Achievement: ")}
     assert run_lines == {"Victory": 10, "Chaos bonus": 4}
     assert reward.tokens == 14 + sum(u.tokens for u in reward.unlocked)
-    assert any(u.cosmetic_id == "table_chaos" for u in reward.unlocked)
+    assert any(set(u.cosmetic_ids) == {"deck_poker_head", "table_poker_head"} for u in reward.unlocked)

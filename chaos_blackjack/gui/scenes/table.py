@@ -28,6 +28,8 @@ from chaos_blackjack.gui.components.bet_panel import BetPanel, draw_bet_stack
 from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, layout_hand
 from chaos_blackjack.gui.components.chaos_panel import ChaosPanel
 from chaos_blackjack.gui.components.hud import EventFeed, draw_status_bar
+from chaos_blackjack.content.host_script import host_script
+from chaos_blackjack.gui.components.intro import HostDialog
 from chaos_blackjack.gui.components.item_panel import ItemPanel
 from chaos_blackjack.gui.components.table_fx import TableFx
 from chaos_blackjack.gui.scene import Scene, register_scene
@@ -35,6 +37,7 @@ from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD, notice_line, outcome_banner
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
 from chaos_blackjack.gui.worker import start_worker
+from chaos_blackjack.modes import get_mode, intro_script
 
 W, H = LOGICAL_SIZE
 
@@ -81,16 +84,29 @@ def _resolve_chaos(controller: GameController, result: Future[None]) -> None:
 
 @register_scene("table")
 class TableScene(Scene):
-    def on_enter(self, controller: GameController | None = None, **params) -> None:
+    def on_enter(self, controller: GameController | None = None, intro: bool = False, **params) -> None:
         a = self.app.assets
         self.controller = controller or GameController(
             replace(self.app.run_config, enable_chaos=self.app.prefs.enable_chaos)
         )
         self.cards = CardRenderer(a)
         profile = self.controller.registry.resolve_ai(self.controller.config.ai_id)
-        from chaos_blackjack.content.builtin_persona import default_persona
-        persona = default_persona() if self.controller.config.ai_id == "default" else getattr(profile, "persona", None)
+        from chaos_blackjack.content.builtin_persona import host_persona
+        config = self.controller.config
+        persona = host_persona(config.host) if config.ai_id == "default" else getattr(profile, "persona", None)
         self.chaos_panel = ChaosPanel(a, LEFT_PANEL, self._poke, persona=persona)
+        # The mode's host introduces a new run and comments on its end (AI_MODES.md §3);
+        # resumed runs skip the introduction.
+        self.persona = persona
+        self.intro: HostDialog | None = None
+        self.outro: HostDialog | None = None
+        if intro and config.mode:
+            try:
+                beats = intro_script(get_mode(config.mode), config)
+            except KeyError:
+                beats = []
+            if beats:
+                self.intro = HostDialog(a, beats, persona)
         self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
         log = self.chaos_panel.log_area
         self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
@@ -229,8 +245,32 @@ class TableScene(Scene):
 
     # ------------------------------------------------------------- frame
 
+    def intro_open(self) -> bool:
+        return self.dialog() is not None
+
+    def dialog(self) -> HostDialog | None:
+        """The host dialog that currently takes input, if any."""
+        for d in (self.intro, self.outro):
+            if d is not None and not d.done:
+                return d
+        return None
+
+    def outro_finished(self) -> bool:
+        """At the end of a run the host says a few lines first; True once they are
+        done (or the host has nothing to say). Call only when the run is over."""
+        if self.outro is None:
+            v = self.view
+            event = "victory" if v.run_end is not None and v.run_end.kind == "victory" else "defeat"
+            config = self.controller.config
+            host = config.host if config.ai_id == "default" else None
+            beats = host_script(host, event, mode=config.mode) if config.ai_id == "default" else []
+            self.outro = HostDialog(self.app.assets, beats, self.persona, finish="Enter for results")
+        return self.outro.done
     def handle_event(self, event: pygame.event.Event) -> None:
         if self._closed or self._poke_pending:
+            return
+        if self.intro_open():
+            self.dialog().handle_event(event)
             return
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_i
                 and self.view.can(Action.USE_ITEM) and self.view.items):
@@ -283,7 +323,8 @@ class TableScene(Scene):
             start_worker(_resolve_chaos, (self.controller, result), name="chaos-ai")
         elif phase == TablePhase.DEALER_TURN and self._timer >= DEALER_STEP_DELAY:
             self._command("dealer_step")()
-        elif phase == TablePhase.RUN_OVER and not self._ending_opened and self._timer >= RUN_END_DELAY:
+        elif (phase == TablePhase.RUN_OVER and not self._ending_opened and self._timer >= RUN_END_DELAY
+              and self.outro_finished()):
             self._ending_opened = True
             v = self.view
             self.app.scenes.replace(
@@ -342,6 +383,8 @@ class TableScene(Scene):
         self.fx.apply_glitch(surface)
         self.chaos_panel.draw_overlay(surface)
         self.item_panel.draw_overlay(surface)
+        if self.intro_open():
+            self.dialog().draw(surface)
 
     def _draw_deck(self, surface: pygame.Surface, v: GameView) -> None:
         rect = self.item_panel.deck_rect

@@ -65,6 +65,12 @@ class RunConfig:
     chaos_memory_enabled: bool = _DEFAULTS.chaos_memory_enabled
     chaos_memory_limit: int = _DEFAULTS.chaos_memory_limit
     balance_profile: str = _DEFAULTS.profile  # where the numbers came from (for saves / reports)
+    # Mode (docs/design/AI_MODES.md): the mode id, who hosts the table (a bundled
+    # host id; None = runs from before hosts, shown as Poker Head) and the
+    # allowed Chaos rules (None = all).
+    mode: str = ""
+    host: str | None = None
+    rule_pool: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if not 0 <= self.chaos_guidance_probability <= 1:
@@ -126,6 +132,8 @@ class RunConfig:
         for key in ("content_packs", "starting_items", "shop_bankroll_pct"):
             if key in values:
                 values[key] = tuple(values[key])
+        if values.get("rule_pool") is not None:
+            values["rule_pool"] = tuple(values["rule_pool"])
         if "chaos_stub" in values:
             values["chaos_stub"] = tuple((str(r), dict(p), float(w)) for r, p, w in values["chaos_stub"])
         values.update(overrides)

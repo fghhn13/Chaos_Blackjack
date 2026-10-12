@@ -4,9 +4,9 @@ Keys address one value of a profile:
   <setting key>              run.start_money, bet.max_fraction, shop.slots, ...
   item.<item_id>.<field>     price, enabled, weight, params (JSON), price_mode
   rule.<rule_id>.<field>     enabled, params (JSON), stub_weight, stub_params (JSON)
-  upgrade.<upgrade_id>.<field>  cost, cost_step, max_level, enabled, params (JSON), requires
+  upgrade.<upgrade_id>.<field>  cost, cost_step, max_level, enabled, params (JSON), requires, mode
   cosmetic.<cosmetic_id>.<field>   cost, enabled
-  reward.<achievement_id>.<field>  tokens, cosmetic_id
+  reward.<achievement_id>.<field>  tokens, cosmetic_ids (comma-separated)
 
 Every edit is validated by loading the profile inside the same transaction;
 an invalid value is rolled back. Locked (seeded) profiles cannot be edited:
@@ -19,13 +19,13 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
-from chaos_blackjack.data.balance import PRICE_MODES, BalanceError, load_balance
+from chaos_blackjack.data.balance import PRICE_MODES, BalanceError, load_balance, split_ids
 
 ITEM_FIELDS = ("price", "enabled", "weight", "params", "price_mode")
 RULE_FIELDS = ("enabled", "params", "stub_weight", "stub_params")
-UPGRADE_FIELDS = ("cost", "cost_step", "max_level", "enabled", "params", "requires")
+UPGRADE_FIELDS = ("cost", "cost_step", "max_level", "enabled", "params", "requires", "mode")
 COSMETIC_FIELDS = ("cost", "enabled")
-REWARD_FIELDS = ("tokens", "cosmetic_id")
+REWARD_FIELDS = ("tokens", "cosmetic_ids")
 # key prefix -> (table, id column, editable fields)
 _TABLES = {
     "item": ("shop_item", "item_id", ITEM_FIELDS),
@@ -108,8 +108,10 @@ def _value(field: str, raw: str) -> object:
         if mode not in PRICE_MODES:
             raise BalanceError(f"price_mode: use one of {', '.join(PRICE_MODES)}")
         return mode
-    if field in ("requires", "cosmetic_id"):
+    if field in ("requires", "mode"):
         return raw.strip() or None
+    if field == "cosmetic_ids":
+        return ",".join(split_ids(raw)) or None
     try:
         number = float(raw)
         return int(number) if number.is_integer() else number
@@ -194,11 +196,11 @@ def export_seed(conn: sqlite3.Connection, name: str) -> str:
     rows = conn.execute("SELECT * FROM meta_upgrade WHERE profile_id = ? ORDER BY upgrade_id", (pid,)).fetchall()
     if rows:
         out += ["", "INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, "
-                    "max_level, enabled, requires) VALUES"]
+                    "max_level, enabled, requires, mode) VALUES"]
         out.append(",\n".join(
             f"    (:profile, {_sql(r['upgrade_id'])}, {_sql(r['kind'])}, {_sql(r['effect'])}, {_sql(r['params'])}, "
             f"{_sql(r['cost'])}, {_sql(r['cost_step'])}, {_sql(r['max_level'])}, {_sql(r['enabled'])}, "
-            f"{_sql(r['requires'])})" for r in rows) + ";")
+            f"{_sql(r['requires'])}, {_sql(r['mode'])})" for r in rows) + ";")
     rows = conn.execute("SELECT * FROM cosmetic_price WHERE profile_id = ? ORDER BY cosmetic_id", (pid,)).fetchall()
     if rows:
         out += ["", "INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost, enabled) VALUES"]
@@ -207,8 +209,8 @@ def export_seed(conn: sqlite3.Connection, name: str) -> str:
     rows = conn.execute("SELECT * FROM achievement_reward WHERE profile_id = ? ORDER BY achievement_id",
                         (pid,)).fetchall()
     if rows:
-        out += ["", "INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_id) VALUES"]
+        out += ["", "INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_ids) VALUES"]
         out.append(",\n".join(
-            f"    (:profile, {_sql(r['achievement_id'])}, {_sql(r['tokens'])}, {_sql(r['cosmetic_id'])})"
+            f"    (:profile, {_sql(r['achievement_id'])}, {_sql(r['tokens'])}, {_sql(r['cosmetic_ids'])})"
             for r in rows) + ";")
     return "\n".join(out) + "\n"

@@ -138,10 +138,10 @@ def evaluate(db: sqlite3.Connection, player_id: int, balance: Balance, run: RunF
                    (player_id, a.id, run_id))
         reward = rewards.get(a.id)
         tokens = reward.tokens if reward else 0
-        cosmetic = reward.cosmetic_id if reward else None
         if tokens:
             db.execute("UPDATE player SET tokens = tokens + ? WHERE id = ?", (tokens, player_id))
-        if cosmetic and not add_cosmetic(db, player_id, cosmetic, f"achievement:{a.id}"):
-            cosmetic = None  # unknown or already owned: nothing new to show
-        out.append(Unlock(a.id, a.name, tokens, cosmetic))
+        # Unknown or already owned looks are left out: nothing new to show.
+        new = tuple(c for c in (reward.cosmetic_ids if reward else ())
+                    if add_cosmetic(db, player_id, c, f"achievement:{a.id}"))
+        out.append(Unlock(a.id, a.name, tokens, new))
     return out

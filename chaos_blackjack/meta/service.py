@@ -66,15 +66,16 @@ def build_run_config(
 ) -> tuple[RunConfig, dict[str, int]]:
     """A run's config: profile + mode + every owned permanent upgrade + one copy
     of each listed consumable. Pure (no database); returns (config, applied).
-    `owned` holds levels / copies; owned upgrades the profile no longer sells
-    are skipped. Raises MetaError for consumables that cannot be brought."""
+    `owned` holds levels / copies; owned upgrades the profile no longer sells,
+    and permanent upgrades of another mode, are skipped. Raises MetaError for
+    consumables that cannot be brought (including those of another mode)."""
     catalog = {u.upgrade_id: u for u in balance.meta_upgrades}
     config = mode.apply(RunConfig.from_balance(balance, seed=seed))
     applied: dict[str, int] = {}
     for upgrade_id, level in sorted(owned.items()):
         u = catalog.get(upgrade_id)
-        if u is None or u.kind != "permanent" or level < 1:
-            continue  # no longer sold in this profile, or a consumable
+        if u is None or u.kind != "permanent" or level < 1 or (u.mode and u.mode != mode.id):
+            continue  # no longer sold in this profile, a consumable, or for another mode
         applied[upgrade_id] = min(level, u.max_level)
         config = _apply_upgrade(u, config, applied[upgrade_id])
     bring = list(consumables)
@@ -85,11 +86,25 @@ def build_run_config(
         u = catalog.get(upgrade_id)
         if u is None or u.kind != "consumable":
             raise MetaError(f"{upgrade_id!r} is not a consumable you can bring")
+        if u.mode and u.mode != mode.id:
+            raise MetaError(f"{upgrade_id!r} can only be brought to {_mode_name(u.mode)}")
         if owned.get(upgrade_id, 0) < bring.count(upgrade_id):
             raise MetaError(f"You do not have enough {upgrade_id!r}")
         applied[upgrade_id] = applied.get(upgrade_id, 0) + 1
         config = _apply_upgrade(u, config, 1)
     return config, applied
+
+
+def _mode_name(mode_id: str) -> str:
+    try:
+        return get_mode(mode_id).name
+    except KeyError:
+        return mode_id
+
+
+def usable_in(u: MetaUpgradeBalance, mode_id: str) -> bool:
+    """Whether an upgrade applies (permanent) or can be brought (consumable) in a mode."""
+    return not u.mode or u.mode == mode_id
 
 
 def reward_tokens(balance: Balance, result: str, rounds: int, start: int, peak: int, *,
@@ -209,7 +224,7 @@ class MetaService:
             name, description = effect.title(params), effect.describe(params, 1)
         except KeyError:
             return UpgradeOffer(u.upgrade_id, u.upgrade_id, "", u.kind, owned, u.max_level, None, False,
-                                "Not available in this version")
+                                "Not available in this version", u.mode)
         maxed = owned >= u.max_level
         cost = None if maxed else u.cost_of_level(owned + 1)
         if maxed:
@@ -220,7 +235,8 @@ class MetaService:
             reason = f"Needs {cost} tokens"
         else:
             reason = ""
-        return UpgradeOffer(u.upgrade_id, name, description, u.kind, owned, u.max_level, cost, not reason, reason)
+        return UpgradeOffer(u.upgrade_id, name, description, u.kind, owned, u.max_level, cost, not reason, reason,
+                            u.mode)
 
     # ------------------------------------------------------------------- runs
 
@@ -391,8 +407,8 @@ class MetaService:
         rewarded_by: dict[str, list[str]] = {}
         for r in balance.achievement_rewards:
             a = get_achievement(r.achievement_id)
-            if r.cosmetic_id and a is not None:
-                rewarded_by.setdefault(r.cosmetic_id, []).append("???" if a.hidden else a.name)
+            for cosmetic_id in r.cosmetic_ids if a is not None else ():
+                rewarded_by.setdefault(cosmetic_id, []).append("???" if a.hidden else a.name)
         offers = []
         for c in cosmetics(slot):
             have = c.default or c.id in owned
@@ -487,7 +503,7 @@ class MetaService:
             progress, goal = a.progress(ctx)
             r = rewards.get(a.id)
             out.append(AchievementState(a, a.id in done, done.get(a.id), goal if a.id in done else progress, goal,
-                                        r.tokens if r else 0, r.cosmetic_id if r else None))
+                                        r.tokens if r else 0, r.cosmetic_ids if r else ()))
         return out
 
     def player_stats(self, player_id: int, *, best: bool = False) -> dict[str, int]:
