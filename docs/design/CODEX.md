@@ -154,7 +154,31 @@ uses `card-joker`. Both are 256 by 256 RGBA and pass asset validation.
 Attribution is appended to `assets/CREDITS.md`. Procedural fallbacks remain
 available when art is not installed. No existing source art was changed.
 
-`tests/test_codex_gui.py` verifies gallery/detail navigation, paging, pause,
+## Sections by series
+
+The gallery is grouped by series (docs/design/AI_MODES.md): the **Core
+series** (labelled "Classic Table"), then a **Dealers** group with one tab per expansion (currently
+Poker Head). `codex_sections(config) -> list[CodexSection]` returns:
+
+- **Classic Table**: its tables, the items sold at every table (or at
+  none), Chaos rules no expansion uses, and guest Chaos AIs from content packs;
+- one section per dealer: the character's portrait, name, profile and
+  signature line (`profile` and `signature` in the host's line library;
+  system details stay on detail pages), its table (the mode entry, behind
+  "About this table"), then **Chaos rules** (the union of its tables' rule pools) and
+  **Table items** (items only its tables sell; Classic never sells Shield, so
+  Shield belongs to Poker Head).
+
+`CodexSection(id, label, groups, expansion, host, mode, portrait, summary, quote,
+entries)` and `CodexGroup(id, label, entries, empty)` are headless. Every
+rule, item and mode appears in some section, so nothing is hidden; a new
+expansion gets its own tab automatically. The GUI lays the core out as a
+grid and an expansion as a host panel (with "About this table") beside its
+groups; long sections scroll with the wheel or Page Up/Page Down, and Tab
+cycles sections. `codex_kinds` and `codex_entries` remain available for tools
+and tests.
+
+`tests/test_codex_gui.py` verifies gallery/detail navigation, sections, scrolling, pause,
 single stepping, replay, the final-frame stop, live numbers in text and
 frames, scroll boundaries, icon fallbacks, text-only entries, content-pack
 isolation, and rendering of every built-in frame. The art pipeline's missing

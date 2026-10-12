@@ -16,8 +16,10 @@ contract below.
 | Agents / simulator | The agent CLI stays without meta progression (fair, reproducible). The simulator gets upgrade and token-economy experiments (M5). |
 | Numbers | All prices, rewards and upgrade values live in the balance profile (seed/default.sql), so `chaos_blackjack.data set/diff/export` and `bjsim --profile` work on them. Values below are placeholders. |
 
-Cosmetics (card backs, tables, chip sets, avatars), lifetime stats and
+Cosmetics (decks, tables, chip sets, avatars), lifetime stats and
 achievements extend this design: see `docs/design/COSMETICS_ACHIEVEMENTS.md`.
+Modes hosted by a Chaos AI, with their own rule and item pools, a table
+introduction and mode-specific upgrades: see `docs/design/AI_MODES.md`.
 
 Naming: a **player** is a meta save (slot). A **balance profile** is a set of
 numbers. Never call a player a "profile".
@@ -187,13 +189,13 @@ and the text. The GUI only plays frames.
 
 | Screen | Owner | Content |
 |---|---|---|
-| Home | B | start scene: current player badge; Continue run (with summary) / New run / Start game; Upgrades, Collection, Run history; Settings, Quit |
+| Home | B | start scene: current player badge; Continue run (with summary) / New run / Start game; Shop, Collection, Run history; Settings, Quit |
 | Players | B | 3 slots: play / create / rename / delete (confirm) |
 | Run setup | B | mode list + rules showcase, permanent upgrades in effect, consumables to bring, Start run |
-| Upgrades | B | one tab per offer kind: permanent upgrades (level pips, next cost) and consumables (owned count) |
+| Shop (formerly Upgrades) | B | areas (Upgrades, Cosmetics, Starter items), then series tabs (Classic Table, Dealers): permanent upgrades (level pips, next cost) and consumables (owned count) |
 | Run result | B | victory / defeat, token breakdown, back to home (replaces the ending scene when a player is active) |
 | History | B | list of runs, detail with summary |
-| Collection (codex) | C | tabs per kind, grid of icon + name; detail: animated demo + text with live numbers |
+| Collection (codex) | C | tabs: Classic Table + one per dealer (character profile, its rules and table items); detail: animated demo + text with live numbers |
 
 The game starts on Home (see `docs/META_GUI.md`). There is no quick play and no in-game asset gallery.
 
