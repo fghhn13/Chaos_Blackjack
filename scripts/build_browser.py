@@ -145,6 +145,7 @@ window.addEventListener('unhandledrejection', () => {
 });
 </script><style>
 html,body{background:#111016!important;overflow:hidden}#pyconsole,#crt,#system{display:none!important}
+#canvas{touch-action:none;overscroll-behavior:none}
 #stdout{display:none!important}#infobox{position:fixed;inset:0;display:flex;flex-direction:column;gap:20px;align-items:center;justify-content:center;background:#111016;color:#e5d8b8;font:18px system-ui;z-index:10;cursor:pointer;touch-action:manipulation}
 #infobox button{min-height:48px;padding:12px 28px;border:1px solid #d9b968;border-radius:8px;background:#d9b968;color:#111016;font:600 18px system-ui;cursor:pointer}
 </style>'''

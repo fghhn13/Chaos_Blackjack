@@ -8,6 +8,9 @@ from chaos_blackjack.gui.components.lobby import back_button, mode_name
 from chaos_blackjack.gui.components.meta_screen import MetaScreen, panel, text, paragraph
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, wrap_text
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
+
+DETAIL_RECT = pygame.Rect(614, 315, 566, 222)
 
 
 @register_scene("history")
@@ -21,6 +24,7 @@ class HistoryScene(MetaScreen):
         self.records = self.action(lambda: meta.history(player_id)) or []
         self.page = 0
         self.detail_scroll = 0
+        self._touch_pixels = 0
         self.selected = self.records[0] if self.records else None
         self.subtitle = "Choose a run to revisit its result, upgrades and discoveries."
         self.build_widgets()
@@ -44,12 +48,14 @@ class HistoryScene(MetaScreen):
     def select(self, record):
         self.selected = record
         self.detail_scroll = 0
+        self._touch_pixels = 0
         self.build_widgets()
 
     def turn_page(self, delta):
         self.page = max(0, min(self.page + delta, max(0, (len(self.records) - 1) // 7)))
         self.selected = self.records[self.page * 7] if self.records else None
         self.detail_scroll = 0
+        self._touch_pixels = 0
         self.build_widgets()
 
     def detail_lines(self):
@@ -69,7 +75,12 @@ class HistoryScene(MetaScreen):
 
     def handle_event(self, event):
         delta = 0
-        if event.type == pygame.MOUSEWHEEL:
+        if event.type == TOUCH_SCROLL and DETAIL_RECT.collidepoint(event.pos):
+            height = self.app.assets.font(16).get_linesize()
+            pixels = getattr(self, "_touch_pixels", 0) + event.dy
+            delta = int(pixels / height)
+            self._touch_pixels = pixels - delta * height
+        elif event.type == pygame.MOUSEWHEEL:
             delta = -event.y * 3
         elif event.type == pygame.KEYDOWN and event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
             delta = -3 if event.key == pygame.K_PAGEUP else 3
@@ -100,5 +111,5 @@ class HistoryScene(MetaScreen):
             for i, line in enumerate(lines[self.detail_scroll:self.detail_scroll + capacity]):
                 text(surface, a, line, (614, 315 + i * line_height), size=16, color=theme.TEXT_MUTED)
             if len(lines) > capacity:
-                text(surface, a, "Wheel / Page Up / Page Down to scroll details", (614, 547), size=14, color=theme.GOLD)
+                text(surface, a, "Swipe / Wheel / Page Up / Page Down to scroll details", (614, 547), size=14, color=theme.GOLD)
         self.ui.draw(surface)

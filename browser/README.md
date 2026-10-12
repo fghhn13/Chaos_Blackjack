@@ -19,6 +19,9 @@ to unlock browser audio. The original menu, three player slots, Classic/Chaos,
 upgrades, Collection, history, settings and animations are used directly.
 Keyboard and mouse work on desktop. Phones can use touch controls; landscape and
 the Fullscreen button offer more room for the fixed 1280x720 layout.
+Swipe up or down inside a list or reference text panel to scroll its content.
+Short taps select buttons; a drag does not select a row when released. Game
+canvas gestures stay inside the game, while the surrounding page can scroll.
 On touch devices, creating or renaming a player opens a native HTML name field.
 Tap that field to open the system keyboard, then use Save or the keyboard's Done
 action. Composition input is supported; validation and persistence still use the

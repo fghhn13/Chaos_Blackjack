@@ -25,6 +25,7 @@ from chaos_blackjack.data.balance import load_balance
 from chaos_blackjack.data.prefs import get_pref, set_pref
 from chaos_blackjack.gui.settings import LOGICAL_SIZE, GuiSettings
 from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.gui.touch import FINGER_EVENTS, TouchInput
 
 _MOUSE_EVENTS = (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
 
@@ -73,6 +74,7 @@ class App:
         self.running = False
         self._viewport = pygame.Rect((0, 0), LOGICAL_SIZE)
         self._update_viewport()
+        self.touch = TouchInput()
 
     # ------------------------------------------------------------- lifecycle
 
@@ -132,6 +134,14 @@ class App:
     # ---------------------------------------------------------------- events
 
     def _dispatch(self, event: pygame.event.Event) -> None:
+        if event.type in FINGER_EVENTS:
+            for translated in self.touch.translate(event, self.window.get_size(), self.to_canvas, self.scenes.top):
+                self.scenes.handle_event(translated)
+            return
+        if event.type in _MOUSE_EVENTS and getattr(event, "touch", False):
+            return  # The finger stream supplies one tap or drag, without SDL duplicates.
+        if event.type in (pygame.WINDOWFOCUSLOST, pygame.VIDEORESIZE):
+            self.touch.reset()
         if event.type == pygame.QUIT:
             self.quit()
             return

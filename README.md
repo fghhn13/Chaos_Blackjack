@@ -255,7 +255,9 @@ Cosmetics only change art, never rules or numbers.
 The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. A **Classic Table** tab holds the classic table and the items every table sells; under **Dealers**, each dealer (Poker Head) has a tab introducing the character (portrait, profile and signature line) beside the Chaos rules and the items only their table sells. Every entry appears somewhere. Detail pages use the selected profile's numbers;
 card demonstrations run on a real controller with fixed deals and an offline
 backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
-**Page Up/Page Down** scrolls descriptions. Selected content packs appear in
+**Page Up/Page Down** scrolls descriptions. Touchscreens can swipe vertically
+inside lists and description panels; releasing a swipe does not select a row.
+Selected content packs appear in
 the collection. Browsing and demonstrations never spend tokens or call a paid model.
 
 The agent CLI stays independent of player upgrades. Development
