@@ -86,7 +86,7 @@ const loadingTimer = setInterval(() => {
   const running = Boolean(window.chaosState);
   const box = document.getElementById('infobox');
   const ready = Boolean(box?.textContent.includes('click/touch'));
-  window.parent.chaosLoading({stage: running ? 'running' : ready ? 'ready' : 'loading',
+  window.parent.chaosLoading?.({stage: running ? 'running' : ready ? 'ready' : 'loading',
     elapsed: Math.floor((Date.now() - loadingStarted) / 1000)});
   if (running) clearInterval(loadingTimer);
 }, 500);
