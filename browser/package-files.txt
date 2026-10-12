@@ -268,6 +268,7 @@ chaos_blackjack/ui/formatting.py
 chaos_blackjack/ui/session.py
 
 chaos_blackjack/data/migrations/0005_balance_v1_settings.sql
+chaos_blackjack/ai/hosts/poker_head.json
 chaos_blackjack/ai/personas/poker_head.json
 chaos_blackjack/ai/assets/poker_head/neutral.png
 chaos_blackjack/ai/assets/poker_head/puzzled.png
