@@ -101,12 +101,35 @@ window.chaosTouchInput = matchMedia('(pointer: coarse)').matches || navigator.ma
 window.chaosInputId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 window.chaosNameInput = state => window.parent.chaosNameInput?.(state);
 window.chaosNameNext = () => bridgeASCII(window.parent.chaosNameNext?.() || '');
+let starting = false;
+function startGame(event) {
+  const box = document.getElementById('infobox');
+  if (!event.isTrusted || starting || !window.MM || !box?.contains(event.target)
+      || !(box.dataset.chaosReady || box.textContent.includes('click/touch'))) return;
+  // Safari need not synthesize a bubbling click for a tap on a plain overlay.
+  // Release the Python startup wait inside the actual user gesture instead.
+  starting = true;
+  window.MM.UME = 1;
+  box.textContent = 'Starting game…';
+  window.parent.chaosLoading?.({stage: 'starting'});
+}
+document.addEventListener('touchend', startGame, {capture: true, passive: true});
+document.addEventListener('click', startGame, true);
 const loadingStarted = Date.now();
 const loadingTimer = setInterval(() => {
   const running = Boolean(window.chaosState);
   const box = document.getElementById('infobox');
-  const ready = Boolean(box?.textContent.includes('click/touch'));
-  window.parent.chaosLoading?.({stage: running ? 'running' : ready ? 'ready' : 'loading',
+  const ready = !starting && Boolean(box?.dataset.chaosReady || box?.textContent.includes('click/touch'));
+  if (ready && !box.querySelector('button')) {
+    const prompt = document.createElement('div');
+    prompt.textContent = 'Ready to start. Tap Start game.';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Start game';
+    box.dataset.chaosReady = '1';
+    box.replaceChildren(prompt, button);
+  }
+  window.parent.chaosLoading?.({stage: running ? 'running' : starting ? 'starting' : ready ? 'ready' : 'loading',
     elapsed: Math.floor((Date.now() - loadingStarted) / 1000)});
   if (running) clearInterval(loadingTimer);
 }, 500);
@@ -122,7 +145,8 @@ window.addEventListener('unhandledrejection', () => {
 });
 </script><style>
 html,body{background:#111016!important;overflow:hidden}#pyconsole,#crt,#system{display:none!important}
-#stdout{display:none!important}#infobox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#111016;color:#e5d8b8;font:18px system-ui;z-index:10}
+#stdout{display:none!important}#infobox{position:fixed;inset:0;display:flex;flex-direction:column;gap:20px;align-items:center;justify-content:center;background:#111016;color:#e5d8b8;font:18px system-ui;z-index:10;cursor:pointer;touch-action:manipulation}
+#infobox button{min-height:48px;padding:12px 28px;border:1px solid #d9b968;border-radius:8px;background:#d9b968;color:#111016;font:600 18px system-ui;cursor:pointer}
 </style>'''
     page = page.replace('</head>', bridge + '</head>')
     (web / "index.html").write_text(page, encoding="utf-8")

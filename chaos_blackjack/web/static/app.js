@@ -78,7 +78,8 @@ window.chaosClosed=()=>{closeNameInput();flushSave();$('launch').textContent='Pl
 window.chaosLoading=info=>{
  if(!user||$('pygame').hidden)return;
  if(info.stage==='running'){if(pendingSave===null&&!saving)$('save-status').textContent='Game ready. Saves sync to your account.';}
- else if(info.stage==='ready')$('save-status').textContent='Download complete. Click inside the game to start.';
+ else if(info.stage==='ready')$('save-status').textContent='Download complete. Tap Start game to continue.';
+ else if(info.stage==='starting')$('save-status').textContent='Starting game…';
  else $('save-status').textContent=`Loading game files… ${info.elapsed}s elapsed. First load can take a few minutes on a slow connection.`;
 };
 window.chaosFailed=()=>{closeNameInput();$('save-status').textContent='Game startup failed.';$('game-error').textContent='The game could not load or continue. Check your connection and retry, or reload your latest account save.';$('launch').textContent='Retry';$('launch').hidden=false;};

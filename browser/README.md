@@ -14,7 +14,7 @@ python scripts/build_browser.py
 python -m chaos_blackjack.web
 ```
 
-Open http://127.0.0.1:8000, register, click Play, then click the game when prompted
+Open http://127.0.0.1:8000, register, click Play, then tap Start game when prompted
 to unlock browser audio. The original menu, three player slots, Classic/Chaos,
 upgrades, Collection, history, settings and animations are used directly.
 Keyboard and mouse work on desktop. Phones can use touch controls; landscape and
@@ -24,6 +24,10 @@ Tap that field to open the system keyboard, then use Save or the keyboard's Done
 action. Composition input is supported; validation and persistence still use the
 original Pygame name dialog. Cancel leaves the existing player unchanged. The
 HTML editor is inside the fullscreen container. Desktop text entry is unchanged.
+The startup button handles trusted touch events directly, including when iOS
+Safari does not generate a compatibility click. Downloads and startup have
+separate status messages. A browser that permits audio automatically may enter
+the game without the extra prompt.
 
 `package-files.txt` explicitly selects shipped assets and package resources.
 The builder adds Python source under `chaos_blackjack` except the server package,
@@ -40,7 +44,7 @@ same host. The uncompressed bundle is approximately 24 MB; production Nginx
 compresses runtime downloads. Game assets use private caches with ETag
 revalidation after authentication, so reloads avoid transferring unchanged
 files. Account responses and the game HTML retain `no-store`. The loading
-message shows elapsed time and tells players when to click the game to unlock
+message shows elapsed time and tells players when to tap Start game to unlock
 audio. A slow first download may take a few minutes; no third-party CDN is needed
 by players. Builds download upstream files to an operator-configurable cache.
 The game frame needs inline scripts and JavaScript/WASM evaluation for Emscripten;
