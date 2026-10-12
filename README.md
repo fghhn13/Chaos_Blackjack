@@ -81,7 +81,7 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
 - **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, minimum 1 chip), and you may **reroll** the stock once per restock for 3 chips. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
-- **Chaos mode**: before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos on earns 4 extra tokens.
+- **Chaos rules** (Poker Head's Table in the GUI, `--chaos` for agents and the CLI): before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos rules on earns 4 extra tokens.
 
 These are the default profile's values; a balance profile, game mode or player
 upgrade can change them. Natural blackjack, double down, surrender and the shop
@@ -181,7 +181,7 @@ fullscreen and window events remain responsive. Returning to the menu discards t
 old table's result without waiting for an in-flight request. No additional art is
 needed for the procedural indicator.
 
-In Chaos Mode, click the Chaos portrait while betting, choosing a player action,
+At Poker Head's Table, click his portrait while betting, choosing a player action,
 or reviewing a round result to ask for a suggestion. The portrait also works while
 the shop is open. A modal banner animates while the reply is generated and blocks
 repeated clicks and gameplay; click **Continue** or press Enter after the reply.

@@ -149,9 +149,9 @@ the selected settings falls back to readable text and disables playback.
 
 Mode icon specs live in the manifest. The final transparent PNGs were fetched
 through `scripts/fetch_icons.py` and exported with `scripts/asset_tools.py`:
-`mode_normal.png` uses game-icons' `card-ace-spades`, and `mode_chaos.png`
+`mode_normal.png` (Classic Table) uses game-icons' `card-ace-spades`, and `mode_chaos.png`
 uses `card-joker`. Both are 256 by 256 RGBA and pass asset validation.
-Attribution is appended to `assets/CREDITS.md`. Procedural fallbacks remain
+Attribution is appended to `assets/CREDITS.md`. Poker Head's Table now uses `mode_poker_head` (his portrait until a dedicated icon ships), so `mode_chaos.png` is no longer shown. Procedural fallbacks remain
 available when art is not installed. No existing source art was changed.
 
 ## Sections by series
