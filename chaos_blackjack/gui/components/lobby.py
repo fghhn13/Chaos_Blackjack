@@ -51,15 +51,28 @@ def current_player(app) -> meta.Player | None:
     if chosen is None:
         chosen = max(players, key=lambda p: (p.last_played_at or "", -p.slot))
     app.session["player_id"] = chosen.id
+    apply_loadout(app, chosen.id)
     return chosen
 
 
 def choose_player(app, player_id: int | None) -> None:
     app.session["player_id"] = player_id
+    apply_loadout(app, player_id)
     try:
         set_pref(PLAYER_PREF, player_id)
     except (sqlite3.Error, OSError):
         pass  # the choice still holds for this session
+
+
+def apply_loadout(app, player_id: int | None) -> None:
+    """Draw the player's equipped cosmetics everywhere (none: the default looks)."""
+    aliases: dict[str, str] = {}
+    if player_id is not None:
+        try:
+            aliases = meta.asset_aliases(player_id)
+        except (ValueError, sqlite3.Error, OSError):
+            pass  # a missing or unreadable player shows the default looks
+    app.assets.set_aliases(aliases)
 
 
 def mode_name(mode_id: str) -> str:
@@ -238,30 +251,32 @@ class MenuItem(Button):
 
 
 class PlayerBadge(Button):
-    """Top-right chip: current player name and tokens; opens the saves."""
+    """Top-right chip: the player's avatar, name and tokens; opens the profile."""
 
     def __init__(self, assets, player: meta.Player, on_click, *, right: int = W - MARGIN, top: int = 30) -> None:
         name_font = assets.font(theme.FONT_BODY, bold=True)
         name = fit_text(name_font, player.name, 230)
         tokens = f"{player.tokens} tokens"
-        width = name_font.size(name)[0] + assets.font(theme.FONT_SMALL).size(tokens)[0] + 90
+        width = name_font.size(name)[0] + assets.font(theme.FONT_SMALL).size(tokens)[0] + 100
         super().__init__(assets, (right - width, top, width, 46), name, on_click, key_hint="")
         self.tokens = tokens
+        self.avatar = player.avatar
 
     def draw(self, surface: pygame.Surface) -> None:
         a, r = self.assets, self.rect
         fill = (0x2B, 0x31, 0x2E) if self.hovered else (0x1E, 0x25, 0x23)
         pygame.draw.rect(surface, fill, r, border_radius=23)
         pygame.draw.rect(surface, theme.GOLD if self.hovered else theme.GOLD_DIM, r, 1, border_radius=23)
-        pygame.draw.circle(surface, theme.GOLD, (r.x + 22, r.centery), 7, 2)
+        avatar = a.image(self.avatar, (36, 36))
+        surface.blit(avatar, avatar.get_rect(center=(r.x + 24, r.centery)))
         name = a.font(theme.FONT_BODY, bold=True).render(self.text, True, theme.IVORY)
-        surface.blit(name, name.get_rect(midleft=(r.x + 40, r.centery)))
+        surface.blit(name, name.get_rect(midleft=(r.x + 50, r.centery)))
         tokens = a.font(theme.FONT_SMALL).render(self.tokens, True, theme.GOLD)
         surface.blit(tokens, tokens.get_rect(midright=(r.right - 20, r.centery)))
         if self.focused:
             draw_focus_ring(surface, r, radius=27)
         if self.hovered:
-            tip = a.font(theme.FONT_TINY).render("Switch player", True, theme.TEXT_MUTED)
+            tip = a.font(theme.FONT_TINY).render("Profile", True, theme.TEXT_MUTED)
             surface.blit(tip, tip.get_rect(midtop=(r.centerx, r.bottom + 6)))
 
 
@@ -384,6 +399,6 @@ def back_button(assets, on_click: Callable[[], None], text: str = "Back") -> But
 
 __all__ = [
     "DealerScene", "EmptyBadge", "MARGIN", "MenuItem", "OptionRow", "PLAYER_PREF", "PlayerBadge", "TextButton", "back_button",
-    "choose_player", "current_player", "draw_backdrop", "draw_glow", "draw_header", "draw_left_fade",
+    "apply_loadout", "choose_player", "current_player", "draw_backdrop", "draw_glow", "draw_header", "draw_left_fade",
     "draw_paragraph", "draw_section", "mode_name", "run_summary",
 ]

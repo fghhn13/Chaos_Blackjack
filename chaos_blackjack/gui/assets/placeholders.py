@@ -47,20 +47,28 @@ def _label(surf: pygame.Surface, text: str, font: pygame.font.Font, color: Color
 
 # ---------------------------------------------------------------- backgrounds
 
-def table_background(size, fonts: FontGetter) -> pygame.Surface:
-    w, h = size
-    surf = pygame.Surface(size)
-    surf.fill(theme.DARK)
-    cx, cy = w / 2, h / 2
-    max_r = math.hypot(cx, cy)
-    for r in range(int(max_r), 0, -6):
-        t = r / max_r
-        pygame.draw.circle(surf, _lerp(theme.FELT_LIGHT, theme.FELT, min(1.0, t * 1.3)), (cx, cy), r)
-    rail = pygame.Rect(0, 0, int(w * 0.86), int(h * 0.78))
-    rail.center = (int(cx), int(cy))
-    pygame.draw.ellipse(surf, theme.GOLD_DIM, rail, max(2, w // 400))
-    _vignette(surf)
-    return surf
+def felt_table(felt: Color, felt_light: Color, rail: Color) -> Callable[..., pygame.Surface]:
+    """A felt table in any colours (the default table and table cosmetics)."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        w, h = size
+        surf = pygame.Surface(size)
+        surf.fill(theme.DARK)
+        cx, cy = w / 2, h / 2
+        max_r = math.hypot(cx, cy)
+        for r in range(int(max_r), 0, -6):
+            t = r / max_r
+            pygame.draw.circle(surf, _lerp(felt_light, felt, min(1.0, t * 1.3)), (cx, cy), r)
+        edge = pygame.Rect(0, 0, int(w * 0.86), int(h * 0.78))
+        edge.center = (int(cx), int(cy))
+        pygame.draw.ellipse(surf, rail, edge, max(2, w // 400))
+        _vignette(surf)
+        return surf
+
+    return draw
+
+
+table_background = felt_table(theme.FELT, theme.FELT_LIGHT, theme.GOLD_DIM)
 
 
 def menu_background(size, fonts: FontGetter) -> pygame.Surface:
@@ -113,27 +121,39 @@ def card_front_blank(size, fonts: FontGetter) -> pygame.Surface:
     return surf
 
 
-def card_back(size, fonts: FontGetter) -> pygame.Surface:
-    surf, rect, radius = _card_shape(size)
-    w, h = size
-    pygame.draw.rect(surf, (0x2A, 0x12, 0x3A), rect, border_radius=radius)
-    inner = rect.inflate(-w // 8, -w // 8)
-    step = max(6, w // 8)
-    clip = surf.subsurface(inner)
-    for x in range(-h, w + h, step):
-        pygame.draw.line(clip, (*theme.CHAOS_PURPLE,), (x, 0), (x + h, h), max(1, w // 128))
-        pygame.draw.line(clip, (*theme.CHAOS_PURPLE,), (x + h, 0), (x, h), max(1, w // 128))
-    pygame.draw.rect(surf, theme.GOLD, inner, max(1, w // 64), border_radius=radius // 2)
-    c = rect.center
-    d = w // 6
-    pygame.draw.polygon(surf, theme.GOLD, [(c[0], c[1] - d), (c[0] + d, c[1]), (c[0], c[1] + d), (c[0] - d, c[1])])
-    pygame.draw.rect(surf, theme.GOLD_DIM, rect, max(1, w // 96), border_radius=radius)
-    return surf
+def lattice_back(base: Color, lattice: Color, trim: Color, edge: Color) -> Callable[..., pygame.Surface]:
+    """A lattice card back in any colours (the default back and card back cosmetics)."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        surf, rect, radius = _card_shape(size)
+        w, h = size
+        pygame.draw.rect(surf, base, rect, border_radius=radius)
+        inner = rect.inflate(-w // 8, -w // 8)
+        step = max(6, w // 8)
+        clip = surf.subsurface(inner)
+        for x in range(-h, w + h, step):
+            pygame.draw.line(clip, lattice, (x, 0), (x + h, h), max(1, w // 128))
+            pygame.draw.line(clip, lattice, (x + h, 0), (x, h), max(1, w // 128))
+        pygame.draw.rect(surf, trim, inner, max(1, w // 64), border_radius=radius // 2)
+        c = rect.center
+        d = w // 6
+        pygame.draw.polygon(surf, trim, [(c[0], c[1] - d), (c[0] + d, c[1]), (c[0], c[1] + d), (c[0] - d, c[1])])
+        pygame.draw.rect(surf, edge, rect, max(1, w // 96), border_radius=radius)
+        return surf
+
+    return draw
+
+
+card_back = lattice_back((0x2A, 0x12, 0x3A), theme.CHAOS_PURPLE, theme.GOLD, theme.GOLD_DIM)
 
 
 # ---------------------------------------------------------------------- chips
 
-def chip(color: Color) -> Callable[..., pygame.Surface]:
+def chip(color: Color, spots: Color | None = None) -> Callable[..., pygame.Surface]:
+    """A chip in `color`; edge spots are ivory (red on the white chip) unless given."""
+    if spots is None:
+        spots = theme.IVORY if color != theme.CHIP_COLORS[1] else theme.SUIT_RED
+
     def draw(size, fonts: FontGetter) -> pygame.Surface:
         surf = pygame.Surface(size, pygame.SRCALPHA)
         w = min(size)
@@ -144,9 +164,49 @@ def chip(color: Color) -> Callable[..., pygame.Surface]:
         for i in range(8):
             a = i * math.pi / 4
             p = (c[0] + math.cos(a) * r * 0.85, c[1] + math.sin(a) * r * 0.85)
-            pygame.draw.circle(surf, theme.IVORY if color != theme.CHIP_COLORS[1] else theme.SUIT_RED, p, max(2, w // 18))
+            pygame.draw.circle(surf, spots, p, max(2, w // 18))
         pygame.draw.circle(surf, _lerp(color, theme.IVORY, 0.35), c, int(r * 0.62))
         pygame.draw.circle(surf, _lerp(color, (0, 0, 0), 0.25), c, int(r * 0.62), max(1, w // 64))
+        return surf
+
+    return draw
+
+
+# -------------------------------------------------------------------- avatars
+
+def avatar(emblem: str, background: Color, ring: Color, ink: Color = theme.IVORY) -> Callable[..., pygame.Surface]:
+    """A round player portrait with an emblem: "bust", "spade" or "flag" (shapes, so
+    no font needs the glyph)."""
+
+    def draw(size, fonts: FontGetter) -> pygame.Surface:
+        surf = pygame.Surface(size, pygame.SRCALPHA)
+        w = min(size)
+        cx, cy = size[0] // 2, size[1] // 2
+        r = int(w * 0.47)
+        pygame.draw.circle(surf, background, (cx, cy), r)
+        if emblem == "spade":
+            d = r * 0.42
+            pygame.draw.circle(surf, ink, (int(cx - d * 0.5), int(cy + d * 0.05)), int(d * 0.55))
+            pygame.draw.circle(surf, ink, (int(cx + d * 0.5), int(cy + d * 0.05)), int(d * 0.55))
+            pygame.draw.polygon(surf, ink, [(cx, cy - d * 1.25), (cx + d * 1.02, cy - d * 0.05),
+                                            (cx - d * 1.02, cy - d * 0.05)])
+            pygame.draw.polygon(surf, ink, [(cx, cy + d * 0.2), (cx + d * 0.42, cy + d * 1.15),
+                                            (cx - d * 0.42, cy + d * 1.15)])
+        elif emblem == "flag":
+            pole = max(2, w // 40)
+            pygame.draw.line(surf, ink, (cx - r * 0.3, cy - r * 0.55), (cx - r * 0.3, cy + r * 0.6), pole)
+            pygame.draw.polygon(surf, ink, [(cx - r * 0.3, cy - r * 0.55), (cx + r * 0.42, cy - r * 0.38),
+                                            (cx + r * 0.3, cy - r * 0.12), (cx + r * 0.45, cy + r * 0.08),
+                                            (cx - r * 0.3, cy + r * 0.02)])
+        else:
+            pygame.draw.circle(surf, ink, (cx, cy - int(r * 0.22)), int(r * 0.3))
+            body = pygame.Rect(0, 0, int(r * 1.2), int(r * 0.9))
+            body.midtop = (cx, cy + int(r * 0.15))
+            pygame.draw.ellipse(surf, ink, body)
+            mask = pygame.Surface(size, pygame.SRCALPHA)
+            pygame.draw.circle(mask, (255, 255, 255, 255), (cx, cy), r)
+            surf.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        pygame.draw.circle(surf, ring, (cx, cy), r, max(2, w // 24))
         return surf
 
     return draw
