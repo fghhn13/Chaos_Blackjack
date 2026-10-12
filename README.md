@@ -17,6 +17,7 @@
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
 - **Player progression**: three named slots, Classic/Chaos modes, token rewards, permanent upgrades, starting consumables, checkpoints and run history.
 - **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
+- **Cosmetics and achievements**: card backs, tables, chip sets and avatars, bought with tokens or earned through achievements; a player Profile with a wardrobe and live preview. Looks never change the rules.
 - **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
 - **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
 
@@ -99,6 +100,8 @@ elsewhere).
 | `shop_item` | price, on sale or not, item tuning (`params`, e.g. Fate Oracle `{"cards": 3}`) |
 | `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
 | `meta_upgrade` | permanent and consumable upgrade effects, prices, cost increases, level limits and prerequisites |
+| `cosmetic_price` | token price of each cosmetic sold in the wardrobe (no row: not sold) |
+| `achievement_reward` | tokens and an optional cosmetic paid by each achievement |
 
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
@@ -115,8 +118,9 @@ elsewhere).
   python -m chaos_blackjack.data export tune-a -o chaos_blackjack/data/seed/default.sql   # ship it
   ```
 
-  Keys: settings (`run.start_money`, `bet.max_fraction`, ...), `item.<id>.<field>`
-  and `rule.<id>.<field>`; `python -m chaos_blackjack.data --help` lists them.
+  Keys: settings (`run.start_money`, `bet.max_fraction`, ...), `item.<id>.<field>`,
+  `rule.<id>.<field>`, `upgrade.<id>.<field>`, `cosmetic.<id>.<field>` and
+  `reward.<achievement id>.<field>`; `python -m chaos_blackjack.data --help` lists them.
   Compare profiles in the balance simulator with `python -m bjsim --profile tune-a ...`.
 - Pick a profile with `--profile NAME` (GUI and agent `new`) or `CHAOS_PROFILE`.
   A run keeps the numbers it started with.
@@ -137,14 +141,17 @@ once with `python -m chaos_blackjack.data import-saves`; `python -m
 chaos_blackjack.data saves` lists what is stored.
 
 Player slots, owned upgrades, completed/abandoned runs and encountered codex
-entries live in `player`, `player_upgrade`, `run_history` and `codex_seen`.
+entries live in `player`, `player_upgrade`, `run_history` and `codex_seen`;
+owned and equipped cosmetics, lifetime stats and unlocked achievements in
+`player_cosmetic`, `player_loadout`, `player_stat` and `player_achievement`.
 The profile's `meta.*` settings determine victory and consolation rewards.
 
 **Meta progression** (player slots, tokens, upgrades, run history) also lives
 there; see [docs/design/META_PROGRESSION.md](docs/design/META_PROGRESSION.md).
 Upgrade costs, rewards and the catalog are part of the balance profile
 (`meta.*` settings, `upgrade.<id>.<field>` keys). `python -m chaos_blackjack.data
-players` and `history SLOT` show the players.
+players` and `history SLOT` show the players. Cosmetics and achievements:
+[docs/design/COSMETICS_ACHIEVEMENTS.md](docs/design/COSMETICS_ACHIEVEMENTS.md).
 
 Game logic never reads the database: front-ends load a `Balance` and build a
 `RunConfig` from it (`RunConfig.from_balance`). Tests use an in-memory database.
@@ -209,11 +216,11 @@ The standalone casino audio library and offline validator remain available: `pyt
 
 #### Player progression and collection
 
-The home screen shows the current player (top right; click to switch) and the
-next step: **Continue run** with its mode, round and chips when a run is
+The home screen shows the current player (top right: avatar, name and tokens;
+click for the Profile) and the next step: **Continue run** with its mode, round and chips when a run is
 unfinished, otherwise **New run**, plus **Upgrades**, **Collection** and **Run
-history**. **Players** holds three named slots with play, create, rename and
-confirmed delete actions. **New run** selects **Classic** or **Chaos**, shows the
+history**. **Players** (Profile, then **Switch player**) holds three named slots
+with play, create, rename and confirmed delete actions. **New run** selects **Classic** or **Chaos**, shows the
 permanent upgrades in effect and lets you bring one copy of each checked
 consumable; nothing is spent until the run starts. Tokens persist between runs; bankroll belongs to the current run.
 
@@ -229,6 +236,16 @@ last checkpoint for **Continue run**; confirming a return to the main menu
 abandons the run. Replacing an unfinished run also asks for confirmation.
 History shows outcomes, bankroll, tokens, applied upgrades and encounter counts.
 
+The **Profile** (scene id `profile`) has three tabs. **Overview** shows the
+avatar, tokens and lifetime record. **Wardrobe** lists card backs, tables, chip
+sets and avatars: equip an owned look, buy one with tokens (cosmetics are sold
+only here) or see which achievement unlocks it; a small table previews the
+hovered look with the rest of the loadout, and an equipped look is drawn
+everywhere at once. **Achievements** shows progress and rewards; most pay
+tokens, a few give a cosmetic. Runs are evaluated when they settle, and the
+result screen lists new unlocks with an **Equip** button for rewarded looks.
+Cosmetics only change art, never rules or numbers.
+
 The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. Its rule, item, mode
 and AI tabs show every entry. Detail pages use the selected profile's numbers;
 card demonstrations run on a real controller with fixed deals and an offline
@@ -237,12 +254,14 @@ backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
 the collection. Browsing and demonstrations never spend tokens or call a paid model.
 
 The agent CLI stays independent of player upgrades. Development
-tools include `python -m chaos_blackjack.data players`, `history SLOT` and
-`grant SLOT TOKENS`. See [Player GUI guide](docs/META_GUI.md),
-[Meta API contract](docs/design/META_PROGRESSION.md) and
+tools include `python -m chaos_blackjack.data players`, `history SLOT`,
+`grant SLOT TOKENS`, `achievements SLOT`, `cosmetics SLOT` and
+`grant-cosmetic SLOT ID`. See [Player GUI guide](docs/META_GUI.md),
+[Meta API contract](docs/design/META_PROGRESSION.md),
+[Cosmetics and achievements](docs/design/COSMETICS_ACHIEVEMENTS.md) and
 [Codex API and replay guide](docs/design/CODEX.md).
 
-**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; `python scripts/validate_assets.py` reports which are still placeholders and `python scripts/preview_assets.py` renders matte sheets on dark / felt / white backdrops to check alpha edges. A font in `assets/fonts/` overrides the UI font.
+**Art is optional**: every asset has a procedural placeholder. Drop `<asset id>.png` into `assets/` (subfolders allowed), `black-jack-assets/exports/`, or any directory listed in `CHAOS_ASSETS_DIR`, then press F5. The ids are in `chaos_blackjack/gui/assets/manifest.py`; `python scripts/validate_assets.py` reports which are still placeholders and `python scripts/preview_assets.py` renders matte sheets on dark / felt / white backdrops to check alpha edges. A font in `assets/fonts/` overrides the UI font. Cosmetic looks are ordinary asset ids too (`card_back_crimson.png`, `table_midnight.png`, `chips_neon_1.png` ... `chips_neon_25.png`, `avatar_spade.png`); the equipped look replaces the base id through `AssetManager.set_aliases`, and a look without art falls back to the base image.
 
 ### Text CLI
 
@@ -328,8 +347,9 @@ Notes:
 | `data/` | SQLite storage: migrations, seeded balance profiles, `Balance` loader, saves, preferences |
 | `meta/`, `modes/` | Player slots, upgrade effects, rewards, tracked runs/history, selectable game modes |
 | `codex/` | Registered reference providers and deterministic controller demonstrations; no GUI dependency |
+| `cosmetics/`, `achievements/` | Cosmetic catalog (slots, looks, asset ids), stats and achievement registries; no GUI or database dependency |
 | `content/`, `audio/` | Scoped content packs and the licensed casino sound catalog |
-| `meta/` | Meta progression: players, upgrades, upgrade effects, run tracking and rewards |
+| `meta/` | Meta progression: players, upgrades, upgrade effects, run tracking, rewards, wardrobe and achievement evaluation |
 | `modes/` | Game mode registry (`normal`, `chaos`) |
 | `agent/` | `AgentSession`, JSON observations, agent CLI |
 | `gui/` | Pygame app, scene stack, widgets, asset manager + placeholders, scenes |
@@ -350,6 +370,7 @@ Black_jack/
 │   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── meta/  modes/          # players, upgrades, run tracking, rewards and mode registry
 │   ├── codex/                 # providers, live descriptions and controller demos
+│   ├── cosmetics/  achievements/  # look catalog; stats and achievement registries
 │   ├── content/  audio/       # content packs and casino sound catalog
 │   ├── agent/                # agent-player interface
 │   ├── gui/                  # Pygame client (assets/, components/, scenes/)
@@ -375,7 +396,7 @@ Black_jack/
 pip install -e ".[dev,gui,art]"
 python -m pytest                   # GUI tests run headless (SDL dummy driver)
 python scripts/debug_smoke.py      # registry + stub pipeline, no API key
-python scripts/ci_smoke.py --gui   # integrated meta, codex, resources and headless GUI
+python scripts/ci_smoke.py --gui   # integrated meta, cosmetics, achievements, codex and headless GUI
 python -m chaos_blackjack.content validate example
 python -m chaos_blackjack.audio validate
 python scripts/export_sounds.py --verify
@@ -389,7 +410,8 @@ to `main` and manual dispatch: the full suite on Ubuntu (Python 3.10, 3.12) and
 Windows (3.12), application/GUI and CLI smoke checks, content-pack validation
 and sound verification. A separate job builds the source distribution and wheel,
 installs the wheel, then checks its migrations, seeded values, prompts, sounds,
-meta lifecycle and real home-to-collection navigation from outside the checkout.
+meta lifecycle (including achievements, buying and equipping a cosmetic), the
+Profile tabs and real home-to-collection navigation from outside the checkout.
 Distribution files are uploaded as a workflow artifact. All runtime checks
 disable billed calls and need no API secrets.
 
@@ -433,7 +455,8 @@ Pack items are sold only when their plugin is loaded; win streaks grant no items
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.
 4. **Prompt / difficulty**: add files under `ai/prompts/` or `ai/permissions/`, then `ChaosPipeline.from_profile_name("easy", "chaotic", your_llm)`.
 5. **LLM provider**: implement `LLMBackend.complete(system, user) -> str` returning JSON, or reuse `GptsApiLLM` for any OpenAI-compatible relay.
-6. **GUI scene**: subclass `Scene`, decorate with `@register_scene("name")`, import it in `gui/scenes/__init__.py`, open it with `app.scenes.push("name")`.
+6. **Cosmetic / achievement**: register a look in `cosmetics/catalog.py` (plus `<asset id>.png` art or a placeholder in `_SKINS` in `gui/assets/manifest.py`), or an achievement in `achievements/catalog.py` (usually one line: a stat, a goal and a scope); add its `cosmetic_price` / `achievement_reward` row in `data/seed/default.sql`. Tests check that every entry is consistent and every look obtainable. See [the guide](docs/design/COSMETICS_ACHIEVEMENTS.md).
+7. **GUI scene**: subclass `Scene`, decorate with `@register_scene("name")`, import it in `gui/scenes/__init__.py`, open it with `app.scenes.push("name")`.
 
 ---
 

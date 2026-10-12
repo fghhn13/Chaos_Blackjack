@@ -16,6 +16,9 @@ contract below.
 | Agents / simulator | The agent CLI stays without meta progression (fair, reproducible). The simulator gets upgrade and token-economy experiments (M5). |
 | Numbers | All prices, rewards and upgrade values live in the balance profile (seed/default.sql), so `chaos_blackjack.data set/diff/export` and `bjsim --profile` work on them. Values below are placeholders. |
 
+Cosmetics (card backs, tables, chip sets, avatars), lifetime stats and
+achievements extend this design: see `docs/design/COSMETICS_ACHIEVEMENTS.md`.
+
 Naming: a **player** is a meta save (slot). A **balance profile** is a set of
 numbers. Never call a player a "profile".
 
@@ -158,7 +161,7 @@ meta layer uses it to build the run summary.
 ```json
 {"rules_seen": {"great_crash": 2}, "items_used": {"peek": 3}, "items_bought": {"swap": 1},
  "rounds": 23, "peak_money": 260, "blackjacks": 2, "doubles": 4, "surrenders": 1,
- "chaos_ai": "default"}
+ "hands_won": 12, "five_card_hands": 1, "win_streak": 3, "chaos_ai": "default"}
 ```
 
 ### 5.4 Codex (owner C; `chaos_blackjack/codex/`)

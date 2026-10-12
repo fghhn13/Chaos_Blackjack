@@ -12,7 +12,8 @@ Home ──┬─ Continue run ────────────────�
        ├─ Upgrades        (Permanent / Consumables / any new kind)
        ├─ Collection      (rules, modes, items, Chaos AI)
        ├─ Run history
-       ├─ player badge ─► Players (play / create / rename / delete)
+       ├─ player badge ─► Profile (Overview / Wardrobe / Achievements) ─► Switch player ─► Players
+       │                                                                   (play / create / rename / delete)
        └─ Settings · Quit
 ```
 
@@ -32,7 +33,7 @@ Home ──┬─ Continue run ────────────────�
 
   Upgrades, Collection and Run history follow; Settings and Quit are small text
   actions at the bottom (Esc asks before quitting). The badge at the top right shows
-  the current player's name and tokens and opens Players. If a saved run cannot be
+  the current player's avatar, name and tokens and opens Profile. If a saved run cannot be
   restored, Home says so, hides Continue for that run and promotes New run.
 - **Players** (`player_select`): three compact slot rows. **Play** makes a slot the
   current player and returns home; empty slots offer **Create player**. Rename and
@@ -60,6 +61,23 @@ Home ──┬─ Continue run ────────────────�
   breakdown and the updated balance. Settlement happens once; API errors keep the
   screen and offer a retry. **Continue** returns home.
 - **Settings** (`meta_settings`): mute, master volume and fullscreen.
+- **Profile** (`profile`): opened from the player badge, which shows the equipped
+  avatar. The title is the player's name. Tabs:
+  - **Overview**: avatar, slot, tokens, achievements and looks owned, a record
+    panel (runs, victories, rounds, hands won, blackjacks, best win streak, best
+    bankroll), **Rename** and **Change avatar** (opens Wardrobe on Avatars);
+  - **Wardrobe**: one sub-tab per cosmetic slot (Card backs, Tables, Chips,
+    Avatars) and a scrolling list. Each row is its button: **Equip** an owned
+    look, or **Buy · N tokens** to buy and equip it; locked rows say how to get
+    them (price and/or achievement). Hidden looks appear once owned. The live
+    preview on the right shows the hovered (or focused) look on a small table
+    with the rest of the loadout. Equipping applies the look everywhere at once;
+  - **Achievements**: unlocked first, then by progress; each row shows the
+    reward, a progress bar for counted goals, and "???" for hidden ones.
+  **Switch player** opens Players; choosing another player (or deleting this
+  one) returns to Home. Cosmetics are bought only here, never in Upgrades.
+- **Run result** also lists the achievements the run unlocked (up to five
+  cards, the rest are in Profile) with an **Equip** button for a rewarded look.
 
 ## Current player
 
@@ -67,6 +85,9 @@ Home ──┬─ Continue run ────────────────�
 `app.session` and the `gui.player_id` preference) while that player exists,
 otherwise the most recently played save, otherwise the lowest slot. Switching
 players refreshes Home's run summary, tokens and every screen opened from it.
+Choosing a player also applies their equipped cosmetics
+(`apply_loadout` → `AssetManager.set_aliases`), so the table, cards, chips and
+Home's vignette draw the player's looks.
 
 ## Interaction
 
@@ -90,6 +111,8 @@ players refreshes Home's run summary, tokens and every screen opened from it.
 - New permanent upgrades and consumables: `meta_upgrade` rows → they appear in
   Upgrades (a new `kind` gets its own tab) and, when owned, in Run setup.
 - New rules, items and Chaos AI: registries / content packs → Collection.
+- New cosmetics and achievements: catalog entries plus seed rows → Wardrobe,
+  Achievements and Run result (docs/design/COSMETICS_ACHIEVEMENTS.md §2).
 - A future dealer choice belongs in Run setup, beside the mode.
 
 ## API

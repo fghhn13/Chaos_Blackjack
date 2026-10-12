@@ -1,6 +1,8 @@
 """AssetManager — resolve asset ids to Surfaces / Fonts, with caching.
 
-Lookup order for `image(id)`:
+`image(id)` first follows an alias, if one is set and its target exists
+(file or manifest entry): the equipped cosmetics map base ids such as
+`card_back` to their own art (`set_aliases`). Then, for the resolved id:
   1. a file named `<id>.png|.jpg|.jpeg|.webp` anywhere under the asset dirs
      (first dir wins; subfolders allowed),
   2. a portrait contributed by a content pack's AI persona,
@@ -41,6 +43,7 @@ class AssetManager:
         self._files: dict[str, Path] = {}
         self._font_files: dict[str, Path] = {}  # role (or "any") -> file
         self._images: dict[tuple[str, tuple[int, int] | None], pygame.Surface] = {}
+        self._aliases: dict[str, str] = {}
         self._fonts: dict[tuple[int, bool, str], pygame.font.Font] = {}
         self.refresh()
 
@@ -79,10 +82,33 @@ class AssetManager:
     def path(self, asset_id: str) -> Path | None:
         return self._files.get(asset_id) or persona_image(asset_id)
 
+    # --------------------------------------------------------------- aliases
+
+    def set_aliases(self, aliases: dict[str, str]) -> None:
+        """Draw `aliases[id]` wherever `id` is asked for (equipped cosmetics).
+        Replaces the previous aliases; the image cache is keyed by the drawn id,
+        so switching looks needs no reload."""
+        self._aliases = {k: v for k, v in aliases.items() if k != v}
+
+    @property
+    def aliases(self) -> dict[str, str]:
+        return dict(self._aliases)
+
+    def resolve(self, asset_id: str) -> str:
+        """The id actually drawn for `asset_id`. An alias without a file or
+        manifest placeholder is ignored, so missing skin art shows the base look."""
+        target = self._aliases.get(asset_id)
+        if target is not None and (self.has_file(target) or target in self.manifest):
+            return target
+        return asset_id
+
     # ---------------------------------------------------------------- images
 
-    def image(self, asset_id: str, size: tuple[int, int] | None = None) -> pygame.Surface:
-        """Surface for `asset_id`, scaled exactly to `size` if given."""
+    def image(self, asset_id: str, size: tuple[int, int] | None = None, *, alias: bool = True) -> pygame.Surface:
+        """Surface for `asset_id` (after aliases unless `alias` is False, e.g. for
+        wardrobe previews of a specific look), scaled exactly to `size` if given."""
+        if alias:
+            asset_id = self.resolve(asset_id)
         key = (asset_id, size)
         cached = self._images.get(key)
         if cached is not None:
@@ -95,11 +121,11 @@ class AssetManager:
         self._images[key] = surf
         return surf
 
-    def image_fit(self, asset_id: str, box: tuple[int, int]) -> pygame.Surface:
+    def image_fit(self, asset_id: str, box: tuple[int, int], *, alias: bool = True) -> pygame.Surface:
         """Scale to fit inside `box`, keeping aspect ratio."""
-        w, h = self.image(asset_id).get_size()
+        w, h = self.image(asset_id, alias=alias).get_size()
         k = min(box[0] / w, box[1] / h)
-        return self.image(asset_id, (max(1, round(w * k)), max(1, round(h * k))))
+        return self.image(asset_id, (max(1, round(w * k)), max(1, round(h * k))), alias=alias)
 
     def _load_base(self, asset_id: str) -> pygame.Surface:
         path = self.path(asset_id)

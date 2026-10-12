@@ -84,6 +84,23 @@ class MetaUpgradeBalance:
 
 
 @dataclass(frozen=True)
+class CosmeticPriceBalance:
+    """A cosmetic sold in the wardrobe (catalog: chaos_blackjack/cosmetics)."""
+
+    cosmetic_id: str
+    cost: int
+
+
+@dataclass(frozen=True)
+class AchievementRewardBalance:
+    """What unlocking an achievement pays (catalog: chaos_blackjack/achievements)."""
+
+    achievement_id: str
+    tokens: int = 0
+    cosmetic_id: str | None = None
+
+
+@dataclass(frozen=True)
 class Balance:
     profile: str
     start_money: int
@@ -113,6 +130,8 @@ class Balance:
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
     meta_upgrades: tuple[MetaUpgradeBalance, ...] = field(default=())  # enabled ones only
+    cosmetic_prices: tuple[CosmeticPriceBalance, ...] = field(default=())  # enabled ones only
+    achievement_rewards: tuple[AchievementRewardBalance, ...] = field(default=())
 
     @property
     def shop_prices(self) -> dict[str, int]:
@@ -293,15 +312,30 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
         if u.requires and u.requires not in known_upgrades:
             raise BalanceError(f"Profile {name!r}: upgrade {u.upgrade_id} requires unknown upgrade {u.requires!r}")
 
+    prices = tuple(
+        CosmeticPriceBalance(cosmetic_id, int(cost))
+        for cosmetic_id, cost in conn.execute(
+            "SELECT cosmetic_id, cost FROM cosmetic_price WHERE profile_id = ? AND enabled = 1 ORDER BY cosmetic_id",
+            (pid,))
+    )
+    rewards = tuple(
+        AchievementRewardBalance(achievement_id, int(tokens), cosmetic_id or None)
+        for achievement_id, tokens, cosmetic_id in conn.execute(
+            "SELECT achievement_id, tokens, cosmetic_id FROM achievement_reward WHERE profile_id = ? "
+            "ORDER BY achievement_id", (pid,))
+    )
+
     if values["target_money"] <= values["start_money"]:
         raise BalanceError(f"Profile {name!r}: run.target_money must be above run.start_money")
     num, den = values.pop("_bj_num"), values.pop("_bj_den")
     return Balance(profile=name, blackjack_pays=(num, den), shop_items=tuple(items),
-                   item_tuning=tuning, chaos_rules=rules, meta_upgrades=upgrades, **values)
+                   item_tuning=tuning, chaos_rules=rules, meta_upgrades=upgrades, cosmetic_prices=prices,
+                   achievement_rewards=rewards, **values)
 
 
 def clone_profile(conn: sqlite3.Connection, source: str, name: str, description: str = "") -> int:
-    """Copy a profile (settings, shop items, chaos rules, meta upgrades) to a new, editable one."""
+    """Copy a profile (settings, shop items, chaos rules, meta upgrades, cosmetic prices,
+    achievement rewards) to a new, editable one."""
     src = conn.execute("SELECT id FROM balance_profile WHERE name = ?", (source,)).fetchone()
     if src is None:
         raise BalanceError(f"Unknown balance profile {source!r}")
@@ -328,6 +362,13 @@ def clone_profile(conn: sqlite3.Connection, source: str, name: str, description:
             "INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, cost_step, max_level, "
             "enabled, requires) SELECT ?, upgrade_id, kind, effect, params, cost, cost_step, max_level, enabled, "
             "requires FROM meta_upgrade WHERE profile_id = ?", (pid, src[0]))
+        conn.execute(
+            "INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost, enabled) "
+            "SELECT ?, cosmetic_id, cost, enabled FROM cosmetic_price WHERE profile_id = ?", (pid, src[0]))
+        conn.execute(
+            "INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_id) "
+            "SELECT ?, achievement_id, tokens, cosmetic_id FROM achievement_reward WHERE profile_id = ?",
+            (pid, src[0]))
     return int(pid)
 
 

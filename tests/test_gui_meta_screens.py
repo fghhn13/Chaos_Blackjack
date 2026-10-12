@@ -59,8 +59,11 @@ def player_id():
 
 
 def open_saves(app):
+    """Home -> player badge (Profile) -> Switch player."""
     home = open_screen(app, "home")
     click(app, home.badge)
+    assert type(app.scenes.top).__name__ == "ProfileScene"
+    click(app, app.scenes.top.switch_button)
     return app.scenes.top
 
 
@@ -76,6 +79,7 @@ def test_slot_create_name_entry_and_play(app):
     assert type(home).__name__ == "HomeScene" and home.player.name == "Jia"
     assert meta.list_slots()[2].player.name == "Jia"
     click(app, home.badge)
+    click(app, app.scenes.top.switch_button)
     click(app, app.scenes.top.buttons[(1, "continue")])
     assert app.scenes.top is home and home.player.name == "Ace"
 
@@ -367,6 +371,7 @@ def test_home_remembers_choice_and_switching_player_updates_run_info(app):
     home = open_screen(app, "home")
     assert "continue" in home.entries
     click(app, home.badge)
+    click(app, app.scenes.top.switch_button)
     click(app, app.scenes.top.buttons[(2, "continue")])
     assert home.player.id == rookie and "continue" not in home.entries
     assert app.session["player_id"] == rookie

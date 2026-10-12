@@ -61,6 +61,10 @@ get answers** to:
   1672×941 against a 1920×1080 target; the game shows them at 1280×720),
 - chip colour variants: offline recolour of the `chip_1` master (below), keep
   placeholders, or a code change (needs approval),
+- whether a card back, table, chip set or avatar replaces the default look
+  (`card_back`, `table_background`, `chip_*`, `avatar`) or ships as a cosmetic
+  (its own id from `chaos_blackjack/cosmetics/catalog.py`, e.g.
+  `card_back_crimson`; a new look also needs a catalog entry and a seed row),
 - anything that looks off (painted checkerboard, visible text in art, wrong subject).
 
 ### 2. Write an export plan

@@ -204,7 +204,8 @@ def zoom_cards(app: App) -> pygame.Surface:
 
 
 def zoom_chips(app: App) -> pygame.Surface:
-    values = sorted(int(spec.id.split("_")[1]) for spec in MANIFEST.values() if spec.category == "chip")
+    values = sorted(int(spec.id.split("_")[1]) for spec in MANIFEST.values()
+                    if spec.category == "chip" and spec.id.startswith("chip_"))  # not chip set cosmetics
     gap = 16
     w, h = CHIP_SIZE
     strip = pygame.Surface((len(values) * (w + gap) + gap, h + gap * 2))

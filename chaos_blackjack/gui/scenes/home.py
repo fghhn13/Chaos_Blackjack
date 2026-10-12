@@ -98,7 +98,7 @@ class HomeScene(Scene):
         self.ui.add(self.settings)
         self.ui.add(self.quit)
         if self.player is not None:
-            self.badge = PlayerBadge(a, self.player, lambda: self.open("player_select"))
+            self.badge = PlayerBadge(a, self.player, lambda: self.open("profile", player_id=self.player.id))
         else:
             self.badge = EmptyBadge(a, self.need_player)
         self.ui.add(self.badge)

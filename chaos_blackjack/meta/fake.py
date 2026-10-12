@@ -25,7 +25,8 @@ def install_fake(*, demo: bool = True) -> MetaService:
 
 
 def seed_demo(svc: MetaService) -> None:
-    """Slot 1: a veteran with tokens, upgrades and history. Slot 2: a new player. Slot 3: empty."""
+    """Slot 1: a veteran with tokens, upgrades, history, cosmetics and achievements.
+    Slot 2: a new player. Slot 3: empty."""
     ace = svc.create_player(1, "Ace")
     svc.grant_tokens(ace.id, 200)
     for upgrade in ("start_money", "start_money", "bag_space", "start_peek", "start_peek", "start_shield"):
@@ -48,3 +49,7 @@ def seed_demo(svc: MetaService) -> None:
                 (ace.id, mode, result, rounds, final, peak, tokens, json.dumps({"start_money": 2}),
                  json.dumps(summary)),
             )
+    svc.achievements(ace.id)  # stats and achievements from the history above
+    svc.grant_cosmetic(ace.id, "card_back_crimson")
+    for cosmetic in ("card_back_crimson", "table_chaos"):
+        svc.equip(ace.id, cosmetic)

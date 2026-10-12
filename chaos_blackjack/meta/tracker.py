@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING, Any
 
+from chaos_blackjack.app.economy import WIN_OUTCOMES
 from chaos_blackjack.app.notices import Notice, NoticeKind
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ class RunTracker:
         self.items_used: Counter[str] = Counter()
         self.items_bought: Counter[str] = Counter()
         self.blackjacks = self.doubles = self.surrenders = 0
+        self.hands_won = self.five_card_hands = self.win_streak = 0
         self.peak_money = controller.run.money
         controller.add_listener(self.on_notice)
 
@@ -44,6 +46,12 @@ class RunTracker:
             money = getattr(result, "money_after", None)
             if money is not None:
                 self.peak_money = max(self.peak_money, int(money))
+            if getattr(result, "outcome", None) in WIN_OUTCOMES:
+                self.hands_won += 1
+                state = self.controller.state
+                if state is not None and len(state.player_hand) >= 5:
+                    self.five_card_hands += 1
+            self.win_streak = max(self.win_streak, self.controller.run.win_streak)
 
     def detach(self) -> None:
         self.controller.remove_listener(self.on_notice)
@@ -60,5 +68,8 @@ class RunTracker:
             "blackjacks": self.blackjacks,
             "doubles": self.doubles,
             "surrenders": self.surrenders,
+            "hands_won": self.hands_won,
+            "five_card_hands": self.five_card_hands,
+            "win_streak": self.win_streak,
             "chaos_ai": "default" if c.config.enable_chaos else None,
         }

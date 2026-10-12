@@ -75,3 +75,28 @@ INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, co
     (:profile, 'start_hole_card_hacker', 'consumable', 'run.starting_item',   '{"item": "hole_card_hacker"}',  8,  0, 3),
     (:profile, 'start_fate_oracle',      'consumable', 'run.starting_item',   '{"item": "fate_oracle"}',      15,  0, 3),
     (:profile, 'start_shield',           'consumable', 'run.starting_item',   '{"item": "shield"}',            8,  0, 3);
+
+-- Cosmetics sold for tokens in the wardrobe (catalog: chaos_blackjack/cosmetics/catalog.py).
+-- A cosmetic without a row is not sold. Placeholder prices.
+INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost) VALUES
+    (:profile, 'card_back_crimson', 40),
+    (:profile, 'table_midnight',    60),
+    (:profile, 'chips_neon',        50),
+    (:profile, 'avatar_spade',      30);
+
+-- Achievement rewards (catalog: chaos_blackjack/achievements/catalog.py): tokens
+-- and an optional cosmetic. An achievement without a row pays nothing. Placeholder values.
+INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_id) VALUES
+    (:profile, 'first_win',           10, NULL),
+    (:profile, 'chaos_conqueror',     10, 'table_chaos'),
+    (:profile, 'regular',              8, NULL),
+    (:profile, 'marathon',            15, NULL),
+    (:profile, 'natural_talent',       8, NULL),
+    (:profile, 'blackjack_collector', 10, 'card_back_royal'),
+    (:profile, 'double_trouble',      10, NULL),
+    (:profile, 'five_card_trick',      8, NULL),
+    (:profile, 'hot_streak',          10, NULL),
+    (:profile, 'hundred_hands',       10, 'chips_gold'),
+    (:profile, 'bare_hands',          12, NULL),
+    (:profile, 'rule_scholar',        10, NULL),
+    (:profile, 'white_flag',           5, 'avatar_joker');

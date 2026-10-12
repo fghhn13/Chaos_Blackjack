@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import pygame
 
+from chaos_blackjack.cosmetics import get_cosmetic
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import placeholders as ph
 
@@ -82,3 +83,34 @@ for _spec in (
     AssetSpec("tiebreaker_shift", "rule", ICON, ph.icon("TB", theme.CHAOS_MAGENTA), "Tiebreaker Shift"),
 ):
     register(_spec)
+
+
+# Cosmetics (docs/design/COSMETICS_ACHIEVEMENTS.md). Skin art uses the base
+# asset's category and size; a cosmetic asset with neither a file nor an entry
+# here draws the base look (AssetManager.resolve).
+AVATAR = (256, 256)
+register(AssetSpec("avatar", "avatar", AVATAR, ph.avatar("bust", theme.FELT, theme.GOLD_DIM), "Player avatar"))
+
+_NEON = {1: (0xE8, 0xF4, 0xF2), 5: (0xF2, 0x4F, 0x9A), 10: (0x2F, 0xC4, 0xE6), 25: (0xB6, 0xF0, 0x4A)}
+_GOLD_CHIPS = {1: (0xF0, 0xE2, 0xB8), 5: (0xC8, 0x8A, 0x3A), 10: (0x9A, 0x84, 0x4C), 25: (0xE2, 0xB8, 0x4A)}
+_SKINS: dict[str, tuple[str, tuple[int, int], Placeholder]] = {
+    "card_back_crimson": ("card", CARD, ph.lattice_back((0x4A, 0x10, 0x16), (0x8E, 0x2A, 0x30), theme.GOLD,
+                                                        theme.GOLD_DIM)),
+    "card_back_royal": ("card", CARD, ph.lattice_back((0x16, 0x1C, 0x3C), (0x3E, 0x4C, 0x86), (0xE8, 0xC8, 0x6A),
+                                                      theme.GOLD)),
+    "table_midnight": ("background", BG, ph.felt_table((0x16, 0x22, 0x38), (0x22, 0x32, 0x50), (0x6E, 0x7E, 0xA0))),
+    "table_chaos": ("background", BG, ph.felt_table((0x2E, 0x18, 0x3C), (0x44, 0x26, 0x56), theme.CHAOS_MAGENTA)),
+    **{f"chips_neon_{v}": ("chip", ICON, ph.chip(c, theme.DARK)) for v, c in _NEON.items()},
+    **{f"chips_gold_{v}": ("chip", ICON, ph.chip(c, (0x6E, 0x50, 0x1E))) for v, c in _GOLD_CHIPS.items()},
+    "avatar_spade": ("avatar", AVATAR, ph.avatar("spade", theme.DARK, theme.GOLD)),
+    "avatar_joker": ("avatar", AVATAR, ph.avatar("flag", (0x3A, 0x2A, 0x44), theme.CHAOS_MAGENTA)),
+}
+
+
+def _skin_name(asset_id: str) -> str:
+    cosmetic = get_cosmetic(asset_id) or get_cosmetic(asset_id.rsplit("_", 1)[0])
+    return cosmetic.name if cosmetic else asset_id
+
+
+for _id, (_category, _size, _draw) in _SKINS.items():
+    register(AssetSpec(_id, _category, _size, _draw, _skin_name(_id)))

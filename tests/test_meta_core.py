@@ -180,8 +180,11 @@ def test_victory_pays_and_records(svc) -> None:
     c.finish_dealer()
     assert c.run_end is not None and c.run_end.kind == "victory"
     reward = meta.finish_run(run.run_id, c)
-    assert reward.result == "victory" and reward.tokens == 10 and reward.breakdown == (("Victory", 10),)
-    assert reward.player.tokens == 10 and reward.player.stats.victories == 1
+    # A first victory without items also unlocks First Win and Bare Hands (their tokens follow the run's).
+    assert reward.result == "victory" and reward.breakdown == (
+        ("Victory", 10), ("Achievement: First Win", 10), ("Achievement: Bare Hands", 12))
+    assert reward.tokens == 32 and {u.achievement_id for u in reward.unlocked} == {"first_win", "bare_hands"}
+    assert reward.player.tokens == 32 and reward.player.stats.victories == 1
     rec = meta.history(p.id)[0]
     assert (rec.result, rec.final_money, rec.peak_money) == ("victory", 450, 450)
 
@@ -195,8 +198,9 @@ def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
         pytest.skip("seed won")
     reward = meta.finish_run(run.run_id, run.controller)
     rec = meta.history(p.id)[0]
-    assert rec.result == "defeat" and rec.mode == "chaos" and rec.tokens_earned == reward.tokens
-    assert 0 <= reward.tokens <= 5 and reward.player.tokens == reward.tokens
+    run_tokens = reward.tokens - sum(u.tokens for u in reward.unlocked)  # achievements pay on top
+    assert rec.result == "defeat" and rec.mode == "chaos" and rec.tokens_earned == run_tokens
+    assert 0 <= run_tokens <= 5 and reward.player.tokens == reward.tokens
     assert sum(t for _, t in reward.breakdown) == reward.tokens
     assert rec.summary["rounds"] == rec.rounds and rec.summary["rules_seen"]
     assert rec.summary["items_bought"]
@@ -204,7 +208,7 @@ def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
     assert ("mode", "chaos") in seen and ("ai", "default") in seen
     assert any(k == "rule" for k, _ in seen) and any(k == "item" for k, _ in seen)
     stats = meta.get_player(p.id).stats
-    assert (stats.runs, stats.defeats, stats.tokens_earned) == (1, 1, reward.tokens)
+    assert (stats.runs, stats.defeats, stats.tokens_earned) == (1, 1, run_tokens)
     with pytest.raises(MetaError, match="already been settled"):
         meta.finish_run(run.run_id, run.controller)
 
