@@ -30,6 +30,13 @@ Tooling (see `.claude/skills/art-asset-pipeline/SKILL.md`):
 - `python scripts/preview_assets.py`: headless screenshots and check sheets
 - `python scripts/fetch_icons.py sheet|export`: stand-in icons from game-icons.net
 
+## Poker Head build icons
+
+The approved 41-icon set is in [poker_head/](poker_head/README.md), named by
+`ph_*` catalog ID. Its [art specification](../docs/design/POKER_HEAD_ART.md)
+describes every subject and selection; [manifest](poker_head/manifest.json)
+records sources, chosen SVG variants and hashes.
+
 ## Sounds
 
 Final audio lives in `sounds/<sound id>.ogg` or `.wav`; numbered variants use

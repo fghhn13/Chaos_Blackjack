@@ -1,0 +1,512 @@
+{
+  "status": "Historical candidate review; approved selections are in assets/poker_head/manifest.json",
+  "date": "2026-10-13",
+  "design_source": "docs/design/POKER_HEAD_EFFECTS.zh-CN.md",
+  "provider": "game-icons",
+  "license": "CC-BY-3.0",
+  "color": "#B7A477",
+  "preview_sizes": [
+    96,
+    32
+  ],
+  "entries": [
+    {
+      "key": "headroom_clause",
+      "name": "Headroom Clause",
+      "category": "core",
+      "build": "multi-card",
+      "icons": [
+        "expand",
+        "arrows-shield"
+      ],
+      "reason": "Outward space suggests a higher bust ceiling; avoid suggesting complete bust immunity.",
+      "recommended": "expand"
+    },
+    {
+      "key": "capital_preservation",
+      "name": "Capital Preservation Clause",
+      "category": "core",
+      "build": "surrender",
+      "icons": [
+        "wallet",
+        "checked-shield"
+      ],
+      "reason": "A wallet emphasizes preserving chips when surrendering, rather than winning or complete immunity.",
+      "recommended": "wallet"
+    },
+    {
+      "key": "near_perfect",
+      "name": "Near Perfect",
+      "category": "core",
+      "build": "precision",
+      "icons": [
+        "on-target",
+        "convergence-target"
+      ],
+      "reason": "A target suggests bringing nearby totals to 21; precise numeric behavior belongs in the description.",
+      "recommended": "on-target"
+    },
+    {
+      "key": "high_stakes_privilege",
+      "name": "High Stakes Privilege",
+      "category": "core",
+      "build": "double",
+      "icons": [
+        "crown-coin",
+        "two-coins"
+      ],
+      "reason": "A crowned coin communicates a privileged payout for doubled wins.",
+      "recommended": "crown-coin"
+    },
+    {
+      "key": "vip_account",
+      "name": "VIP Account",
+      "category": "core",
+      "build": "finance",
+      "icons": [
+        "bank",
+        "id-card"
+      ],
+      "reason": "The bank communicates access to financial products; VIP status and the extra shop slot use text.",
+      "recommended": "bank"
+    },
+    {
+      "key": "long_hand_dividend",
+      "name": "Long Hand Dividend",
+      "category": "permanent",
+      "build": "multi-card",
+      "icons": [
+        "card-draw",
+        "card-pickup"
+      ],
+      "reason": "Drawing more cards distinguishes a four-card reward from the five-card hand icon.",
+      "recommended": "card-draw"
+    },
+    {
+      "key": "face_card_discount",
+      "name": "Face Card Discount",
+      "category": "permanent",
+      "build": "multi-card",
+      "icons": [
+        "card-king-hearts",
+        "queen-crown"
+      ],
+      "reason": "A face card identifies the affected J/Q/K family; the fixed value of five requires text.",
+      "recommended": "card-king-hearts"
+    },
+    {
+      "key": "five_card_feast",
+      "name": "Five Card Feast",
+      "category": "permanent",
+      "build": "multi-card",
+      "icons": [
+        "poker-hand",
+        "card-play"
+      ],
+      "reason": "A fan of cards reads as a large hand; avoid food imagery that hides the card-count trigger.",
+      "recommended": "poker-hand"
+    },
+    {
+      "key": "sleeve_mark",
+      "name": "Sleeve Mark",
+      "category": "permanent",
+      "build": "multi-card",
+      "icons": [
+        "semi-closed-eye",
+        "secret-book"
+      ],
+      "reason": "A discreet eye suggests automatic hidden information; the magnifier is reserved for the active peek item.",
+      "recommended": "semi-closed-eye"
+    },
+    {
+      "key": "delayed_exit",
+      "name": "Delayed Exit",
+      "category": "permanent",
+      "build": "surrender",
+      "icons": [
+        "exit-door",
+        "hourglass"
+      ],
+      "reason": "An exit door makes the extended surrender option recognizable.",
+      "recommended": "exit-door"
+    },
+    {
+      "key": "exit_privilege",
+      "name": "Exit Privilege",
+      "category": "permanent",
+      "build": "surrender",
+      "icons": [
+        "shaking-hands",
+        "thumb-up"
+      ],
+      "reason": "A negotiated concession differs visually from the wallet core and a free-exit ticket.",
+      "recommended": "shaking-hands"
+    },
+    {
+      "key": "compensation_receipt",
+      "name": "Compensation Receipt",
+      "category": "permanent",
+      "build": "surrender",
+      "icons": [
+        "receive-money",
+        "scroll-quill"
+      ],
+      "reason": "Money received communicates later compensation; the scroll alternative favors the receipt metaphor.",
+      "recommended": "receive-money"
+    },
+    {
+      "key": "ace_after_defeat",
+      "name": "Ace After Defeat",
+      "category": "permanent",
+      "build": "surrender",
+      "icons": [
+        "card-ace-hearts",
+        "ace"
+      ],
+      "reason": "An ace identifies the guaranteed next opening card; the heart suit has no mechanical significance.",
+      "recommended": "card-ace-hearts"
+    },
+    {
+      "key": "perfect_total_jackpot",
+      "name": "Perfect Total Jackpot",
+      "category": "permanent",
+      "build": "precision",
+      "icons": [
+        "coins-pile",
+        "open-treasure-chest"
+      ],
+      "reason": "A large coin pile identifies the exceptional payout; the 21 requirement needs a label.",
+      "recommended": "coins-pile"
+    },
+    {
+      "key": "backup_sleeve_card",
+      "name": "Backup Sleeve Card",
+      "category": "permanent",
+      "build": "precision",
+      "icons": [
+        "card-exchange",
+        "card-pickup"
+      ],
+      "reason": "Exchange arrows correctly express replacement. Share this action silhouette with Swap Cufflink; permanent versus consumable category labels must distinguish them. A pickup icon is weaker because it implies drawing rather than replacement.",
+      "recommended": "card-exchange"
+    },
+    {
+      "key": "borrowed_blossom",
+      "name": "Borrowed Blossom",
+      "category": "permanent",
+      "build": "precision",
+      "icons": [
+        "card-pick",
+        "flower-emblem"
+      ],
+      "reason": "Taking a card suggests appropriating the dealer's natural win; the flower alternative echoes the name only. Neither depicts the exact victory-transfer rule.",
+      "recommended": null,
+      "blank_reason": "Neither grabbing a card nor a flower reliably represents transferring the dealer natural-win outcome."
+    },
+    {
+      "key": "additional_bet_right",
+      "name": "Additional Bet Right",
+      "category": "permanent",
+      "build": "double",
+      "icons": [
+        "buy-card",
+        "pay-money"
+      ],
+      "reason": "Money plus cards suggests committing more chips during a hand.",
+      "recommended": "buy-card"
+    },
+    {
+      "key": "risk_sharing",
+      "name": "Risk Sharing",
+      "category": "permanent",
+      "build": "double",
+      "icons": [
+        "shield-opposition",
+        "split-arrows"
+      ],
+      "reason": "Divided protection suggests sharing a doubled loss; avoid implying complete protection.",
+      "recommended": null,
+      "blank_reason": "Available shields and split arrows imply immunity, combat or split-hand play rather than a partial doubled-loss reduction."
+    },
+    {
+      "key": "face_up_audit",
+      "name": "Face Up Audit",
+      "category": "permanent",
+      "build": "double",
+      "icons": [
+        "eye-target",
+        "up-card"
+      ],
+      "reason": "A focused eye suggests conditional inspection; it differs from the active cyber-eye hole-card probe.",
+      "recommended": "eye-target"
+    },
+    {
+      "key": "purchase_discount",
+      "name": "Purchase Discount",
+      "category": "permanent",
+      "build": "finance",
+      "icons": [
+        "price-tag",
+        "shopping-bag"
+      ],
+      "reason": "A price tag communicates a shop purchase discount.",
+      "recommended": "price-tag"
+    },
+    {
+      "key": "profit_bonus",
+      "name": "Profit Bonus",
+      "category": "permanent",
+      "build": "finance",
+      "icons": [
+        "profit",
+        "growth"
+      ],
+      "reason": "Incoming arrows and a money bag suggest additional investment proceeds, distinct from the stock price chart.",
+      "recommended": "profit"
+    },
+    {
+      "key": "priority_exchange",
+      "name": "Priority Exchange",
+      "category": "permanent",
+      "build": "finance",
+      "icons": [
+        "anticlockwise-rotation",
+        "recycle"
+      ],
+      "reason": "A circular arrow communicates another shop refresh rather than a card swap.",
+      "recommended": "anticlockwise-rotation"
+    },
+    {
+      "key": "dealer_welcome_gift",
+      "name": "Dealer's Welcome Gift",
+      "category": "management",
+      "build": "general",
+      "icons": [
+        "present",
+        "gift-of-knowledge"
+      ],
+      "reason": "A present matches the free opening choice without suggesting a random loot roll.",
+      "recommended": "present"
+    },
+    {
+      "key": "amendment_letter",
+      "name": "Amendment Letter",
+      "category": "management",
+      "build": "general",
+      "icons": [
+        "envelope",
+        "scroll-quill"
+      ],
+      "reason": "An envelope matches an amendment letter and differs from the loan contract.",
+      "recommended": "envelope"
+    },
+    {
+      "key": "peek_lens",
+      "name": "Peek Lens",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "magnifying-glass",
+        "semi-closed-eye"
+      ],
+      "reason": "A magnifier matches the item's object and distinguishes an active peek from the passive sleeve mark.",
+      "recommended": "magnifying-glass"
+    },
+    {
+      "key": "swap_cufflink",
+      "name": "Swap Cufflink",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "card-exchange",
+        "belt-buckles"
+      ],
+      "reason": "Exchanging cards conveys the action more clearly than a clothing accessory.",
+      "recommended": "card-exchange"
+    },
+    {
+      "key": "hole_card_probe",
+      "name": "Hole Card Probe",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "cyber-eye",
+        "spyglass"
+      ],
+      "reason": "Retain the existing hole_card_hacker silhouette for the active dealer-card reveal.",
+      "recommended": "cyber-eye"
+    },
+    {
+      "key": "danger_pointer",
+      "name": "Danger Pointer",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "radar-sweep",
+        "speedometer"
+      ],
+      "reason": "Retain the existing danger_radar silhouette for the next-hit bust check.",
+      "recommended": "radar-sweep"
+    },
+    {
+      "key": "fate_prophecy",
+      "name": "Fate Prophecy",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "crystal-ball",
+        "crystal-eye"
+      ],
+      "reason": "Retain the existing fate_oracle crystal ball for a pre-bet future-card preview.",
+      "recommended": "crystal-ball"
+    },
+    {
+      "key": "tear_up_clause",
+      "name": "Tear Up Clause",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "scissors",
+        "tearing"
+      ],
+      "reason": "Scissors make removing a selected clause clear at 32 pixels; the tearing silhouette is ambiguous when reduced.",
+      "recommended": "scissors"
+    },
+    {
+      "key": "silence_seal",
+      "name": "Silence Seal",
+      "category": "consumable",
+      "build": "general",
+      "icons": [
+        "wax-seal",
+        "pause-button"
+      ],
+      "reason": "The seal matches the named object; pause is the clearest functional alternative for temporary suppression.",
+      "recommended": "wax-seal"
+    },
+    {
+      "key": "grace_approval",
+      "name": "Grace Approval",
+      "category": "consumable",
+      "build": "multi-card",
+      "icons": [
+        "scroll-unfurled",
+        "expand"
+      ],
+      "reason": "An approval scroll matches a temporary permission; the core's expand icon is only an alternative.",
+      "recommended": null,
+      "blank_reason": "A generic scroll does not distinguish a temporary +2 bust ceiling from other permissions."
+    },
+    {
+      "key": "lossless_exit_ticket",
+      "name": "Lossless Exit Ticket",
+      "category": "consumable",
+      "build": "surrender",
+      "icons": [
+        "ticket",
+        "peace-dove"
+      ],
+      "reason": "An exit ticket distinguishes one free surrender from the permanent exit-door ability.",
+      "recommended": "ticket"
+    },
+    {
+      "key": "aces_to_top",
+      "name": "Aces to Top",
+      "category": "consumable",
+      "build": "precision",
+      "icons": [
+        "card-ace-spades",
+        "up-card"
+      ],
+      "reason": "An ace card identifies the affected rank; up-card shows movement but not the ace. Suit alone cannot distinguish this from Ace After Defeat; a proposed UP marker is recommended.",
+      "recommended": null,
+      "blank_reason": "An ace silhouette does not express moving all remaining aces to the deck top; suit changes are insufficient distinction."
+    },
+    {
+      "key": "card_withdrawal",
+      "name": "Card Withdrawal Approval",
+      "category": "consumable",
+      "build": "precision",
+      "icons": [
+        "card-discard",
+        "card-burn"
+      ],
+      "reason": "Discarding a card accurately suggests removing the last card; burning carries a stronger destructive metaphor.",
+      "recommended": "card-discard"
+    },
+    {
+      "key": "quadruple_bet_ticket",
+      "name": "Quadruple Bet Ticket",
+      "category": "consumable",
+      "build": "double",
+      "icons": [
+        "money-stack",
+        "cash"
+      ],
+      "reason": "A substantial stake avoids dice imagery that would falsely imply randomness; a proposed x4 marker is recommended.",
+      "recommended": null,
+      "blank_reason": "A money pile does not identify preparation for a fourfold stake; do not substitute a four-pip die."
+    },
+    {
+      "key": "original_price_buyback",
+      "name": "Original Price Buyback Ticket",
+      "category": "consumable",
+      "build": "double",
+      "icons": [
+        "return-arrow",
+        "sell-card"
+      ],
+      "reason": "A returning arrow communicates reversing a purchase; sell-card is more literal but may suggest selling playing cards.",
+      "recommended": "return-arrow"
+    },
+    {
+      "key": "fixed_interest_deposit",
+      "name": "Fixed Interest Deposit",
+      "category": "financial",
+      "build": "finance",
+      "icons": [
+        "locked-chest",
+        "piggy-bank"
+      ],
+      "reason": "A locked chest emphasizes temporarily inaccessible principal, unlike the financial-access bank core.",
+      "recommended": "locked-chest"
+    },
+    {
+      "key": "win_bond",
+      "name": "Win Bond",
+      "category": "financial",
+      "build": "finance",
+      "icons": [
+        "trophy",
+        "diploma"
+      ],
+      "reason": "A trophy communicates the required wins; a diploma emphasizes the security document but hides the condition.",
+      "recommended": "trophy"
+    },
+    {
+      "key": "volatile_stock",
+      "name": "Volatile Stock",
+      "category": "financial",
+      "build": "finance",
+      "icons": [
+        "chart",
+        "histogram"
+      ],
+      "reason": "A market chart communicates uncertain investment performance; avoid portraying it as guaranteed profit.",
+      "recommended": "chart"
+    },
+    {
+      "key": "short_term_loan",
+      "name": "Short Term Loan Contract",
+      "category": "financial",
+      "build": "finance",
+      "icons": [
+        "scroll-quill",
+        "pay-money"
+      ],
+      "reason": "A scroll and quill suggest agreeing to written repayment terms. The game-icons icon named contract depicts contraction arrows, not a legal contract, and is excluded.",
+      "recommended": "scroll-quill"
+    }
+  ],
+  "approved_selection_record": "assets/poker_head/manifest.json"
+}
