@@ -1,6 +1,7 @@
 @echo off
 setlocal
 title Chaos Blackjack
+rem Usage: start_game.bat [version] [game options]   (versions: launch_versions.json)
 
 rem Always run from the checkout, including when launched by double-click.
 pushd "%~dp0"
@@ -56,8 +57,9 @@ if errorlevel 1 (
 )
 
 :launch
-echo Starting Chaos Blackjack...
-"%GAME_PYTHON%" %GAME_PYTHON_ARGS% -m chaos_blackjack.gui %*
+rem Pick a code version (launch_versions.json): a menu without arguments, or
+rem   start_game.bat j54 [game options]      start_game.bat --list
+"%GAME_PYTHON%" %GAME_PYTHON_ARGS% scripts\launch.py %*
 set "GAME_EXIT_CODE=%ERRORLEVEL%"
 if "%GAME_EXIT_CODE%"=="0" goto finish
 echo [ERROR] The game exited with code %GAME_EXIT_CODE%. Check the output above.

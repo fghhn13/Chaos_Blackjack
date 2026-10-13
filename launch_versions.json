@@ -1,0 +1,9 @@
+{
+  "_comment": "Code versions start_game.bat can launch (scripts/launch.py). ref: a git branch, tag or commit, run from its own worktree under .launch/<name>; null runs this checkout as it is. Each worktree keeps its own data/game.db (players, saves).",
+  "default": "current",
+  "versions": {
+    "current": {"ref": null, "description": "This checkout as it is"},
+    "main": {"ref": "main", "description": "Stable game (main branch)"},
+    "j54": {"ref": "feat/j54-demo", "description": "J-54's deck table demo"}
+  }
+}

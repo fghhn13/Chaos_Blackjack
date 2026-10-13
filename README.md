@@ -38,6 +38,16 @@ GUI options from a terminal: `start_game.bat --fullscreen` or
 `.\start_game.bat --mute` in PowerShell. The launcher uses the game's
 existing `.env` settings.
 
+`start_game.bat` can also start another code version, registered in
+`launch_versions.json` (`current` = this checkout, `main`, `j54` = the J-54
+demo branch). Without arguments it shows a menu (Enter = the default); from a
+terminal, put the version first: `start_game.bat j54 --fullscreen`, or
+`start_game.bat --list`. A version with a git ref runs from its own worktree
+under `.launch/<name>` (git-ignored), moved to that ref's latest local commit
+on every start; your checkout is never switched. Each worktree has its own
+`data/game.db` (players and saves) and no `.env`. To register a version, add
+an entry with a branch, tag or commit as `ref`.
+
 The game opens on the home screen. The first time, **Start game** creates your
 player; after that, **Continue run** or **New run** (pick the **Classic Table** or **Poker Head's Table**,
 check your upgrades, choose items to bring) takes you to the table, where the
