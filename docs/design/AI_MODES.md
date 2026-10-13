@@ -71,6 +71,15 @@ Built-in modes:
 |---|---|---|---|---|---|---|
 | `normal` | Classic | `core` | `poker_head` | none (Chaos off) | all | profile (100 → 300) |
 | `chaos` | Poker Head | `poker_head` | `poker_head` | all | all | profile (100 → 300) |
+| `j54` | J-54's Table (demo) | `j54` | `j54` | J-54's 4 deck rules (exclusive) | J-54's 5 contracts (exclusive) | a random protocol (`J54_TABLE.md`) |
+
+`GameMode.exclusive`: the rules and items of an exclusive mode's pools are
+removed from modes whose pool is "all" (their stub and shop; the rules are
+also disabled), so Poker Head never applies J-54's rules or sells its
+contracts. Balance settings `mode.<id>.config.<field>` override a RunConfig
+field at that mode only (J-54 restocks every round). A mode's own mechanics
+(deck, fee, goal, own shop offers) plug into the controller through
+`app/table_mechanics.py` (`register_table(mode_id, factory)`).
 
 Poker Head's mode icon is `mode_poker_head` (his portrait until a dedicated icon
 ships); New run's showcase shows the host's welcome portrait.
