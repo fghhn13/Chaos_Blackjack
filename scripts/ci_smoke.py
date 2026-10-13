@@ -95,9 +95,13 @@ def main() -> None:
         states = meta.achievements(player.id)
         assert states and meta.player_stats(player.id)["runs"] == 1
         assert {u.achievement_id for u in reward.unlocked} <= {s.achievement.id for s in states if s.unlocked}
-        offer = next(o for o in meta.wardrobe(player.id) if o.price is not None and not o.owned)
-        service.grant_tokens(player.id, offer.price)
-        meta.buy_cosmetic(player.id, offer.cosmetic.id)
+        wardrobe = meta.wardrobe(player.id)
+        offer = next(o for o in wardrobe if o.price is not None and not o.cosmetic.default)
+        if all(o.owned for o in wardrobe):  # the shipped profile unlocks every look (meta.unlock_all_cosmetics)
+            assert offer.reason == "Owned" or offer.reason == "Unlocked"
+        else:
+            service.grant_tokens(player.id, offer.price)
+            meta.buy_cosmetic(player.id, offer.cosmetic.id)
         assert meta.equip(player.id, offer.cosmetic.id)[offer.cosmetic.slot] == offer.cosmetic.id
         assert meta.asset_aliases(player.id)
         config = RunConfig(use_llm=False)
