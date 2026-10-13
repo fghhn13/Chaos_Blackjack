@@ -150,7 +150,7 @@ def test_looks_are_bought_in_the_shop_and_switched_in_the_wardrobe(app) -> None:
     # The Wardrobe only lists owned looks and only switches between them.
     profile = _screen(app, "profile", player_id=rookie.id, tab="wardrobe", slot="deck")
     assert set(profile.rows) == {"card_back_standard", "card_back_crimson"}
-    assert profile.collection["deck"] == (2, 6)
+    assert profile.collection["deck"] == (2, 7)
     _click(app, profile.rows["card_back_standard"])
     assert app.assets.aliases == {} and "equipped" in profile.message
     assert meta.get_player(rookie.id).tokens == 5                       # no tokens spent here

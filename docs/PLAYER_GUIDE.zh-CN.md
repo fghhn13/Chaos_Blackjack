@@ -221,7 +221,7 @@ python -m chaos_blackjack.gui
 每个模式由一位混沌 AI 主持，有自己的混沌规则池、道具池和胜利目标。点 **Start run** 进入牌桌后，
 主持 AI 会先说几句：随机的开场白、胜利目标、可能改哪些规则；一局结束时（赢或输）它也会随机说几句再进入结算。
 每句话都会换一个表情。Enter / 点击翻页，Esc 跳过；**Continue run** 继续旧局时不会再说开场白。
-第一次在 Poker Head 模式赢下一局（成就 **Poker Face**），会得到扑克头的牌组和牌桌。
+第一次在 Poker Head 模式赢下一局（成就 **Poker Face**），会得到扑克头的整套外观：他的牌组和牌桌、金格纹牌组（Gilded Lattice）、经典条纹筹码（House Collection）和金色 J 头像（Gold J）。
 
 **Shop**（商店）是唯一花代币的地方，分三个区域：**Upgrades**（角色强化，永久升级）、**Cosmetics**（装饰）和 **Starter items**（开局携带的物品）。
 每个区域下面再分 **Classic Table**（经典牌桌）和 Dealers（荷官，目前是 **Poker Head**），某位荷官在该区域没有东西时不显示。

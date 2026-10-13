@@ -291,7 +291,8 @@ def test_shop_areas_then_series(svc, monkeypatch) -> None:
         shop.pick_area("cosmetics")
         shop.pick_series("poker_head")
         offers = {o.cosmetic.id: o for o in shop.visible_offers}
-        assert set(offers) == {"deck_poker_head", "table_poker_head"}
+        assert set(offers) == {
+            "deck_poker_head", "table_poker_head", "deck_poker_head_gold", "chips_poker_head", "avatar_poker_head_j"}
         assert not offers["deck_poker_head"].can_buy and "Poker Face" in offers["deck_poker_head"].unlock_hint
         assert app.session["shop_area"] == "cosmetics" and app.session["shop_series"] == "poker_head"
         app._render()  # noqa: SLF001

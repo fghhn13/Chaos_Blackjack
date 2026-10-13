@@ -3,6 +3,8 @@
 Seventeen original PNGs for the ten existing unlockable wardrobe looks.
 Generated with scripts/generate_cosmetic_assets.py, using the drawing and PNG
 encoding helpers in scripts/generate_casino_assets.py. No third-party images.
+`table_poker_head.png` was later redrawn by scripts/generate_poker_head_theme.py
+(see ../poker_head/README.md).
 
 Card silhouettes match the current default card face. Tables keep their rails
 inside the visible centre column; chip centres reserve space for runtime values.

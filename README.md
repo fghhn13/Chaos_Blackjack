@@ -492,4 +492,4 @@ Pack items are sold only when their plugin is loaded; win streaks grant no items
 
 Made with controlled chaos.
 
-Poker Head hosts both tables with eight bundled expressions and event dialogue: the Poker Head expansion (mode id `chaos`), where he bends rules, and the core Classic table, where he plays it straight. Default Chaos rule weights are unchanged; the optional Poker Head pack also provides its own AI behaviour. Winning against Poker Head for the first time (achievement Poker Face) unlocks his deck and table.
+Poker Head hosts both tables with eight bundled expressions and event dialogue: the Poker Head expansion (mode id `chaos`), where he bends rules, and the core Classic table, where he plays it straight. Default Chaos rule weights are unchanged; the optional Poker Head pack also provides its own AI behaviour. Winning against Poker Head for the first time (achievement Poker Face) unlocks his House Collection: his deck and table, the Gilded Lattice deck, House Collection chips and the Gold J avatar.
