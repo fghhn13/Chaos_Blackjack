@@ -19,6 +19,9 @@ to unlock browser audio. The original menu, three player slots, Classic/Chaos,
 upgrades, Collection, history, settings and animations are used directly.
 Keyboard and mouse work on desktop. Phones can use touch controls; landscape and
 the Fullscreen button offer more room for the fixed 1280x720 layout.
+Swipe up or down inside a list or reference text panel to scroll its content.
+Short taps select buttons; a drag does not select a row when released. Game
+canvas gestures stay inside the game, while the surrounding page can scroll.
 On touch devices, creating or renaming a player opens a native HTML name field.
 Tap that field to open the system keyboard, then use Save or the keyboard's Done
 action. Composition input is supported; validation and persistence still use the
@@ -38,6 +41,10 @@ No .env, credentials, databases, raw artwork or local scratch are packaged.
 New non-Python resources must be added to that manifest. The two untracked local
 card-back PNG files are intentionally excluded. The smaller WASM standard library
 needs the pure Python `sqlite3.dump` helper, which is bundled from the build Python.
+The builder patches the pinned VM's timezone-name parser to use structured
+`Intl.DateTimeFormat` parts. Splitting localized clock text on spaces can return
+an undefined timezone in Chinese Edge and stop Python initialization. A changed
+upstream parser fails the build so the compatibility patch must be reviewed.
 
 All runtime files and the Pygame wheel are served from `/play/runtime/` on the
 same host. The uncompressed bundle is approximately 24 MB; production Nginx

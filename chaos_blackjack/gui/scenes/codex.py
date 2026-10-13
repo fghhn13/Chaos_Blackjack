@@ -15,6 +15,7 @@ from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
 from chaos_blackjack.modes import EXPANSIONS_LABEL
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
 
 W, H = LOGICAL_SIZE
 NOTE_H = 40
@@ -235,6 +236,10 @@ class CodexScene(Scene):
         elif event.type == pygame.MOUSEWHEEL:
             if PREVIEW_PANEL.collidepoint(self.app.mouse_pos()): self._scroll_detail(-event.y * 48)
             else: self._scroll_by(-event.y * 60)
+        elif event.type == TOUCH_SCROLL and PREVIEW_PANEL.collidepoint(event.pos):
+            self._scroll_detail(event.dy)
+        elif event.type == TOUCH_SCROLL and self._area().collidepoint(event.pos):
+            self._scroll_by(event.dy)
         elif event.type == pygame.KEYDOWN and event.key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
             entries = self.filtered_entries
             if entries:
@@ -400,6 +405,8 @@ class CodexDetailScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.MOUSEWHEEL:
             self._scroll_text(-event.y * 48)
+        elif event.type == TOUCH_SCROLL and self.text_rect.collidepoint(event.pos):
+            self._scroll_text(event.dy)
         elif event.type == pygame.KEYDOWN and event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
             self._scroll_text(-240 if event.key == pygame.K_PAGEUP else 240)
         else:
@@ -419,7 +426,7 @@ class CodexDetailScene(Scene):
         panel = self.text_panel
         pygame.draw.rect(surface, theme.PANEL, panel, border_radius=10)
         draw_text(surface, self.detail, a.font(theme.FONT_BODY), self.text_rect, offset=self.text_offset)
-        draw_text(surface, "Scroll or PgUp/PgDn for more", a.font(14), (panel.x, 624, panel.w, 22), theme.TEXT_MUTED)
+        draw_text(surface, "Swipe, scroll or PgUp/PgDn for more", a.font(14), (panel.x, 624, panel.w, 22), theme.TEXT_MUTED)
         if self.demo.frames:
             self.demo.draw(surface, DEMO_RECT)
             draw_text(surface, f"{self.demo.index + 1} / {len(self.demo.frames)}", a.font(16), (668, 652, 120, 28), theme.TEXT_MUTED)

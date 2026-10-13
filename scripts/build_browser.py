@@ -40,6 +40,16 @@ def package_files():
     return sorted(name for name in set(files) if name and not name.startswith("chaos_blackjack/web/"))
 
 
+def patch_vm_timezone(source):
+    """Fix the pinned Emscripten runtime's locale-dependent timezone split."""
+    old = 'var extractZone=date=>date.toLocaleTimeString(undefined,{hour12:false,timeZoneName:"short"}).split(" ")[1];'
+    new = ('var extractZone=date=>new Intl.DateTimeFormat("en-US",{timeZoneName:"short"})'
+           '.formatToParts(date).find(part=>part.type==="timeZoneName")?.value||"UTC";')
+    if source.count(old) != 1:
+        raise RuntimeError("Pinned VM timezone function changed; review the compatibility patch")
+    return source.replace(old, new)
+
+
 def main():
     STAGE.mkdir(parents=True, exist_ok=True)
     # An allowlist excludes .env, databases, raw art and user scratch files.
@@ -70,6 +80,8 @@ def main():
             target = web / "runtime" / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(cache, target)
+    vm_script = web / "runtime/0.9.3/cpython312/main.js"
+    vm_script.write_text(patch_vm_timezone(vm_script.read_text(encoding="utf-8")), encoding="utf-8")
     # Only Pygame is available to the game. All VM and wheel requests stay local.
     index = json.loads((web / "runtime/index-0.9.3-cp312.json").read_text())
     index = {"-CDN-": "/play/runtime/", "pygame": index["pygame"]}
@@ -134,7 +146,7 @@ const loadingTimer = setInterval(() => {
   if (running) clearInterval(loadingTimer);
 }, 500);
 window.addEventListener('error', event => {
-  if (event.error || event.target?.tagName === 'SCRIPT') {
+  if (event instanceof ErrorEvent || event.error || event.target?.tagName === 'SCRIPT') {
     clearInterval(loadingTimer);
     window.chaosFailed();
   }
@@ -145,6 +157,7 @@ window.addEventListener('unhandledrejection', () => {
 });
 </script><style>
 html,body{background:#111016!important;overflow:hidden}#pyconsole,#crt,#system{display:none!important}
+#canvas{touch-action:none;overscroll-behavior:none}
 #stdout{display:none!important}#infobox{position:fixed;inset:0;display:flex;flex-direction:column;gap:20px;align-items:center;justify-content:center;background:#111016;color:#e5d8b8;font:18px system-ui;z-index:10;cursor:pointer;touch-action:manipulation}
 #infobox button{min-height:48px;padding:12px 28px;border:1px solid #d9b968;border-radius:8px;background:#d9b968;color:#111016;font:600 18px system-ui;cursor:pointer}
 </style>'''

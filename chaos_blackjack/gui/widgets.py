@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from chaos_blackjack.gui import theme
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
 
 if TYPE_CHECKING:
     from chaos_blackjack.gui.assets import AssetManager
@@ -350,6 +351,11 @@ class ScrollColumn(Widget):
         return [c for c in self.children if c.enabled and c.focusable]
 
     def handle_event(self, event: pygame.event.Event) -> bool:
+        if event.type == TOUCH_SCROLL:
+            if self.rect.collidepoint(event.pos) and self.max_scroll:
+                self.scroll_by(event.dy)
+                return True
+            return False
         if event.type == pygame.MOUSEMOTION:
             self._mouse = event.pos
             inside = self.rect.collidepoint(event.pos)

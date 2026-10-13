@@ -30,6 +30,16 @@ class BrowserStore:
         self.name_input(top)
         # Visible state only: useful for diagnosing startup without inspecting a deck.
         state = {"scene": type(top).__name__, "running": app.running}
+        for name in ("scroll", "text_offset", "detail_scroll"):
+            value = getattr(top, name, None)
+            if isinstance(value, (int, float)):
+                state[name] = value
+        # Positions and offsets are visible UI state, not hidden game data.
+        from chaos_blackjack.gui.widgets import ScrollColumn
+        state["scroll_regions"] = [
+            {"rect": list(widget.rect), "offset": widget.scroll, "max": widget.max_scroll}
+            for widget in getattr(getattr(top, "ui", None), "widgets", ())
+            if isinstance(widget, ScrollColumn)]
         if type(top).__name__ == "NameDialog":
             state.update(text=top.value, message=top.message)
         view = getattr(top, "view", None)
