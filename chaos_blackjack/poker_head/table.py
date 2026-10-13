@@ -271,7 +271,8 @@ class PokerHeadTable(TableMechanics):
         return price if factor == 1 else max(1, math.ceil(price * factor))
 
     def offer_note(self, item_id):
-        return ", ".join(f"{'+' if f > 1 else '−'}{abs(f - 1) * 100:g}% {name}"
+        # float(): Fraction supports format specs only from Python 3.12.
+        return ", ".join(f"{'+' if f > 1 else '−'}{float(abs(f - 1) * 100):g}% {name}"
                          for f, name in self._price_factors(item_id))
 
     def offer_usability(self, offer):
