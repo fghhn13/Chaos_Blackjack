@@ -38,6 +38,16 @@ GUI options from a terminal: `start_game.bat --fullscreen` or
 `.\start_game.bat --mute` in PowerShell. The launcher uses the game's
 existing `.env` settings.
 
+`start_game.bat` can also start another code version, registered in
+`launch_versions.json` (`current` = this checkout, `main`, `j54` = the J-54
+demo branch). Without arguments it shows a menu (Enter = the default); from a
+terminal, put the version first: `start_game.bat j54 --fullscreen`, or
+`start_game.bat --list`. A version with a git ref runs from its own worktree
+under `.launch/<name>` (git-ignored), moved to that ref's latest local commit
+on every start; your checkout is never switched. Each worktree has its own
+`data/game.db` (players and saves) and no `.env`. To register a version, add
+an entry with a branch, tag or commit as `ref`.
+
 The game opens on the home screen. The first time, **Start game** creates your
 player; after that, **Continue run** or **New run** (pick the **Classic Table** or **Poker Head's Table**,
 check your upgrades, choose items to bring) takes you to the table, where the
@@ -173,7 +183,10 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene codex, --prof
 | Round over | Next Round | Enter |
 | Anywhere | — | Esc (back to the main menu, asks first), F11 fullscreen, F5 reload assets |
 
-The window scales a fixed 1280×720 canvas with letterboxing. Choose **Poker Head's Table** in New run's table list for Chaos rules.
+The window scales a fixed 1280×720 canvas with letterboxing. At the table,
+**Tab** opens the run panel (Bag, Rules, Log, Run, plus a table's own tabs such
+as J-54's Deck and Contracts), **L** opens its log, **I** its bag, and **1–9** use
+an item from the quick slots on your turn. The run log is saved with the run. Choose **Poker Head's Table** in New run's table list for Chaos rules.
 
 Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
 indicator appears while the table waits; gameplay controls stay disabled, and Esc,
@@ -376,6 +389,7 @@ Black_jack/
 │   ├── app/                  # GameController, views, notices, config
 │   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── meta/  modes/          # players, upgrades, run tracking, rewards and mode registry
+│   ├── j54/                  # J-54's deck table (demo): persistent deck, protocols, contracts
 │   ├── codex/                 # providers, live descriptions and controller demos
 │   ├── cosmetics/  achievements/  # look catalog; stats and achievement registries
 │   ├── content/  audio/       # content packs and casino sound catalog
@@ -457,6 +471,7 @@ streaming play. Packs load into a registry scoped to the run; their item help,
 starting inventory, balance-profile shop prices and selected AI are wired automatically.
 Pack items are sold only when their plugin is loaded; win streaks grant no items.
 
+0. **Table information on screen**: side columns and the run panel are built from parts and a per-mode layout; a new mechanic registers parts and names them in its mode's layout, with no GUI code. See [docs/design/TABLE_UI.md](docs/design/TABLE_UI.md).
 1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
 2. **Item**: preferably add it through a content pack. Implement `ItemProtocol` and return `ItemResult.effects` for state changes. Players and Chaos AI use the same executor. Built-in items can still self-register under `items/`; expose a `description` for shared help.
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.

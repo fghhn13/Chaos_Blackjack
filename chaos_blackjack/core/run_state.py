@@ -103,6 +103,12 @@ class RunSaveData:
     # RunConfig.to_dict() of the run: loading restores these numbers even if
     # the balance profile changed since. Absent in older saves.
     config: dict[str, Any] | None = None
+    # State of the mode's own mechanics (e.g. J-54's persistent deck); None on plain tables.
+    table: dict[str, Any] | None = None
+    # The run log (app/run_log.py): lines and summary counters.
+    log: dict[str, Any] | None = None
+    # A question waiting for the player's answer (app/choice.py Choice.to_dict()).
+    choice: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -126,6 +132,12 @@ class RunSaveData:
         }
         if self.chaos_memory is not None:
             data["chaos_memory"] = self.chaos_memory
+        if self.table is not None:
+            data["table"] = self.table
+        if self.log is not None:
+            data["log"] = self.log
+        if self.choice is not None:
+            data["choice"] = self.choice
         return data
 
     @staticmethod
@@ -152,6 +164,9 @@ class RunSaveData:
             hole_revealed=bool(d.get("hole_revealed", False)),
             chaos_memory=d.get("chaos_memory"),
             config=d.get("config"),
+            table=d.get("table"),
+            log=d.get("log"),
+            choice=d.get("choice"),
         )
 
 

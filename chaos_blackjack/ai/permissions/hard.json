@@ -6,7 +6,11 @@
     "odd_even_chaos",
     "suit_power",
     "fragile_bust",
-    "tiebreaker_shift"
+    "tiebreaker_shift",
+    "j54_burn",
+    "j54_sample_injection",
+    "j54_redundancy_purge",
+    "j54_ace_injection", "j54_layered_sort", "j54_data_backflow"
   ],
   "allowed_items": [],
   "attempt_limits": {

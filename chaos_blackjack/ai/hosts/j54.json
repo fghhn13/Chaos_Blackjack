@@ -1,0 +1,33 @@
+{
+  "_comment": "Line library for the J-54 host. Each event holds alternative scripts; one is picked at random. A script is a list of [expression, text] beats; expressions are J-54's portraits (resting_mania, grand_welcome, card_reveal, secretive_trick, obsessive_lecture, paranoid_analysis, guarded, irritated, glitching_frenzy). summary_mood is used for the protocol line the table generates.",
+  "summary_mood": "obsessive_lecture",
+  "profile": [
+    "J-54 is a calculating machine built as a circus clown. It performs every gesture as if for a full tent, then reports the result in the voice of a compiler.",
+    "It never bends the rules of blackjack. It rewrites the cards: copies them, deletes them, shuffles the discards back in. The deck you finish with is never the deck you started with."
+  ],
+  "signature": "Fifty-four cards. Infinite configurations. One correct one.",
+  "intro": [
+    [["grand_welcome", "Welcome, welcome! Step into the ring. Session initialised."],
+     ["card_reveal", "Here the deck persists. Every change I make, you keep. Every change you make, I remember."]],
+    [["grand_welcome", "Ladies, gentlemen, test subjects. J-54, at your service."],
+     ["secretive_trick", "The rules are standard. The cards are not. Not for long."]],
+    [["resting_mania", "New operator detected. Loading the standard fifty-two."],
+     ["glitching_frenzy", "Standard. For now. Ha. Ha. Ha."]]
+  ],
+  "victory": [
+    [["irritated", "Protocol complete. That was not the projected outcome."],
+     ["glitching_frenzy", "Recalculating. Recalculating. Re-cal-cu-lat-ing."]],
+    [["guarded", "You rebuilt my deck better than I did."],
+     ["irritated", "Logging this as an anomaly. Come back so I can correct it."]],
+    [["paranoid_analysis", "Sample secured by the subject. Unexpected."],
+     ["grand_welcome", "Bravo! Applause routine executed. Sincerely."]]
+  ],
+  "defeat": [
+    [["resting_mania", "Funds exhausted. The experiment ends here."],
+     ["obsessive_lecture", "For your next run: the deck only gets worse while you wait."]],
+    [["card_reveal", "Your bankroll reached zero before the deck reached you."],
+     ["secretive_trick", "The Joker was right there. Statistically."]],
+    [["glitching_frenzy", "Ha! Ha! Insufficient chips!"],
+     ["resting_mania", "Resetting the deck to fifty-two. Same time again?"]]
+  ]
+}

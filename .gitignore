@@ -40,6 +40,7 @@ Thumbs.db
 .ipynb_checkpoints/
 
 # Local scratch
+.pytest_work/
 *.log
 scratch/
 
@@ -61,3 +62,6 @@ data/*.db-shm
 
 # Balance simulator (separate git repository)
 black-jack-sim/
+
+# start_game.bat version worktrees (scripts/launch.py)
+.launch/

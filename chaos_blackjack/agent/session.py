@@ -46,10 +46,13 @@ _ACT_METHODS = {
 
 COMMANDS = {
     "observe": "Return the current observation (no state change).",
-    "buy": "Buy a shop item while betting: {\"cmd\":\"buy\",\"item\":\"peek\"}",
+    "buy": "Buy a shop item while betting: {\"cmd\":\"buy\",\"item\":\"peek\"} (\"replace\": an equipped permanent when every slot is full)",
+    "choose": "Answer obs.choice: {\"cmd\":\"choose\",\"option\":\"ph_margin\"}",
+    "cancel": "Drop obs.choice when it is cancellable: {\"cmd\":\"cancel\"}",
+    "perform": "Run one of obs.table_actions: {\"cmd\":\"perform\",\"action\":\"ph_sleeve\",\"arg\":\"\"}",
     "reroll": "Roll the shop's stock again while betting (once per stock): {\"cmd\":\"reroll\"}",
     "bet": "Place a bet: {\"cmd\":\"bet\",\"amount\":20}",
-    "act": "Act in your turn: {\"cmd\":\"act\",\"action\":\"hit|stand|double|surrender|use_item\",\"item\":\"peek\"}",
+    "act": "Act: {\"cmd\":\"act\",\"action\":\"hit|stand|double|surrender|use_item\",\"item\":\"peek\",\"target\":\"...\"}",
     "help": "List commands.",
 }
 
@@ -87,13 +90,19 @@ class AgentSession:
         use_llm: bool = False,
         max_steps: int = DEFAULT_MAX_STEPS,
         profile: str | None = None,
+        mode: str | None = None,
         **config: Any,
     ) -> "AgentSession":
         """`profile` names a balance profile (default: $CHAOS_PROFILE or "default");
-        `config` overrides any RunConfig field (start_money, target_money, ...)."""
+        `mode` a game mode (e.g. "j54"; it sets chaos itself); `config` overrides
+        any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
         cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, use_llm=use_llm, **config)
+        if mode:
+            from chaos_blackjack.modes import get_mode
+
+            cfg = get_mode(mode).apply(cfg)
         try:
             ctrl = GameController(cfg, save_fn=lambda d, n: n)
         except ValueError as exc:
@@ -111,7 +120,7 @@ class AgentSession:
             return self._reply()
         if cmd == "help":
             return self._reply(extra={"commands": COMMANDS})
-        if cmd not in ("bet", "buy", "reroll", "act"):
+        if cmd not in ("bet", "buy", "reroll", "act", "perform", "choose", "cancel"):
             return self._error("unknown_command", f"Unknown cmd {cmd!r}. Use one of: {', '.join(COMMANDS)}")
         if self.controller.phase == TablePhase.RUN_OVER:
             return self._error("run_over", "The run is over. Start a new one.")
@@ -125,6 +134,14 @@ class AgentSession:
                 self._buy(command)
             elif cmd == "reroll":
                 self.controller.reroll_shop()
+            elif cmd == "perform":
+                self.controller.perform(str(command.get("action", "")), str(command.get("arg", command.get("target", ""))))
+            elif cmd == "choose":
+                if "option" not in command:
+                    raise ValueError("choose needs an 'option' id (see obs.choice.options)")
+                self.controller.choose(str(command["option"]))
+            elif cmd == "cancel":
+                self.controller.cancel_choice()
             else:
                 self._act(command)
         except ActionError as e:
@@ -148,7 +165,7 @@ class AgentSession:
         item = str(command.get("item", "")).strip()
         if not item:
             raise ValueError("buy needs an 'item' id")
-        self.controller.buy(item)
+        self.controller.buy(item, str(command.get("replace", "")))
 
     def _act(self, command: dict[str, Any]) -> None:
         action = str(command.get("action", "")).strip().lower()
@@ -156,7 +173,7 @@ class AgentSession:
             item = str(command.get("item", "")).strip()
             if not item:
                 raise ValueError("use_item needs an 'item' id")
-            result = self.controller.use_item(item)
+            result = self.controller.use_item(item, str(command.get("target", "")))
             if not result.ok:
                 raise ActionError(result.message or f"Item {item!r} could not be used")
             return
@@ -224,6 +241,9 @@ class AgentSession:
             hole_revealed=c.hole_revealed,
             chaos_memory=c.chaos_memory.export(),
             config=c.config.to_dict(),
+            table=c.table.to_dict() if c.table is not None else None,
+            log=c.run_log.to_dict(),
+            choice=c.choice.to_dict() if c.choice is not None else None,
         )
         hidden = {
             "save": save.to_dict(),

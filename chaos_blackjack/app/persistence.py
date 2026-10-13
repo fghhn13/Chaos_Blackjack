@@ -54,6 +54,12 @@ def serialize_modifier_params(mod: object) -> dict[str, object]:
         except Exception:
             pass
 
+    op = getattr(mod, "op", None)  # J-54 deck rules: the operation and the rank it drew
+    if getattr(mod, "deck_rule", False) and op is not None:
+        params.update(when=op.when, select=op.select, op=op.op, count="all" if op.count is None else op.count)
+        if getattr(mod, "rank", None):
+            params["rank"] = mod.rank
+
     mid = getattr(mod, "id", None)
     if mid == "tiebreaker_shift" and hasattr(mod, "chaos_flags"):
         flags = getattr(mod, "chaos_flags") or frozenset()
@@ -101,6 +107,9 @@ def build_save_data(
     hole_revealed: bool = False,
     chaos_memory: list[dict] | None = None,
     config: dict | None = None,
+    table: dict | None = None,
+    log: dict | None = None,
+    choice: dict | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -125,4 +134,7 @@ def build_save_data(
         hole_revealed=bool(hole_revealed and state is not None),
         chaos_memory=chaos_memory,
         config=config,
+        table=table,
+        log=log,
+        choice=choice,
     )

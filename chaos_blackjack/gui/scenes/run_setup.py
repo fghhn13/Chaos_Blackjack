@@ -14,6 +14,7 @@ import pygame
 
 from chaos_blackjack import meta
 from chaos_blackjack.app.config import RunConfig
+from chaos_blackjack.app.table_mechanics import table_goal
 from chaos_blackjack.content.builtin_persona import HOST_NAMES, host_persona
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.lobby import (
@@ -327,7 +328,7 @@ class RunSetupScene(MetaScreen):
             rules = "Fixed for the whole run"
         host = HOST_NAMES.get(mode.host, mode.host.replace("_", " ").title())
         return [
-            ("Goal", f"Turn {cfg.start_money} chips into {cfg.target_money}"),
+            ("Goal", table_goal(cfg) or f"Turn {cfg.start_money} chips into {cfg.target_money}"),
             ("Bets", f"{cfg.min_bet} up to {cfg.max_bet_fraction * 100:g}% of your bankroll"),
             ("Rules", rules),
             ("Dealer", f"{host}, stands on {cfg.dealer_stand_on}"),

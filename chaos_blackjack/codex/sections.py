@@ -81,14 +81,23 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
     ais = [e for e in codex_entries("ai", cfg) if e.id != "default"]
     tables = [(m, m.apply(cfg)) for m in modes()]
 
-    stocked = [sold_items(c) for _, c in tables]
+    # Only items count here: a table's own offers (J-54's contracts) are not items,
+    # and a table that sells no items does not make the others' items table-specific.
+    item_ids = {e.id for e in items}
+    stocked = [s for s in (sold_items(c) & item_ids for _, c in tables) if s]
     everywhere = set.intersection(*stocked) if stocked else set()
     anywhere = set.union(*stocked) if stocked else set()
     rule_ids = [e.id for e in rules]
 
+    def own_environment(config: RunConfig) -> bool:
+        from chaos_blackjack.app.table_mechanics import table_factory
+
+        return bool(getattr(table_factory(config), "environment_rules", False))
+
     def pools(series_id: str) -> tuple[list, set[str], set[str]]:
         own = [(m, c) for m, c in tables if m.series == series_id]
-        used = {r for _, c in own for r in rule_pool(c, rule_ids)}
+        # A table with its own environment rules (Poker Head's director) uses no registry Chaos rules.
+        used = {r for _, c in own if not own_environment(c) for r in rule_pool(c, rule_ids)}
         sold = {i for _, c in own for i in sold_items(c)} - everywhere
         return own, used, sold
 
@@ -100,15 +109,29 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
         own, used, sold = pools(series.id)
         if not own:
             continue
+        sells_items = any(i in item_ids for _, c in own for i in sold_items(c))
         claimed_rules |= used
         first = own[0][0]
         host, portrait, profile, signature = _host_look(first.host)
+        environment = any(own_environment(c) for _, c in own)
         groups = [
+            CodexGroup("rules", "Environment rules", tuple(codex_entries("environment", cfg)))
+            if environment else
             CodexGroup("rules", "Chaos rules", tuple(e for e in rules if e.id in used),
                        empty=f"{host} never bends the rules here."),
             CodexGroup("items", "Table items", tuple(e for e in items if e.id in sold),
-                       empty="Only the Classic Table's items are sold here."),
+                       empty="Only the Classic Table's items are sold here." if sells_items
+                       else "No items are sold here."),
         ]
+        if series.id == "poker_head":
+            from chaos_blackjack.poker_head.catalog import PRODUCTS
+            entries = codex_entries("build", cfg)
+            build_groups = []
+            for kind, label in (("core", "Core gifts"), ("permanent", "Permanent builds"),
+                                ("item", "Build consumables"), ("finance", "Financial products")):
+                build_groups.append(CodexGroup("build_" + kind, label,
+                                              tuple(e for e in entries if PRODUCTS[e.id].kind == kind)))
+            groups = build_groups + groups
         if len(own) > 1:
             groups.insert(0, CodexGroup("tables", "Tables", tuple(mode_entries[m.id] for m, _ in own
                                                                   if m.id in mode_entries)))

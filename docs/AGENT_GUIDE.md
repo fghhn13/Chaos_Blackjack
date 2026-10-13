@@ -37,21 +37,24 @@ Global flags go **before** the subcommand:
 | Flag | Effect |
 | ---- | ------ |
 | `--state PATH` | run file to read / write |
-| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, bet_range, shop, last_round, run_end}` — recommended to save tokens |
+| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, choice, table_actions, bet_range, shop, table, last_round, run_end}` (empty `table_actions` left out) — recommended to save tokens |
 | `--compact` | single-line JSON |
 
 Subcommands:
 
 | Subcommand | Purpose |
 | ---------- | ------- |
-| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N] [--profile NAME]` | start a run; **overwrites** the state file and its log |
+| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N] [--profile NAME] [--mode ID]` | start a run; **overwrites** the state file and its log |
 | `observe` | current observation; changes nothing, not logged |
 | `help` | list game commands |
-| `buy <item_id>` | buy an item from the shop (phase `betting`, before you bet) |
+| `buy <item_id> [--replace ID]` | buy an item from the shop (phase `betting`, before you bet); `--replace` answers "which permanent to replace" at Poker Head's table |
 | `reroll` | roll the shop's current stock again, once per stock (phase `betting`; costs `obs.shop.reroll_price`) |
 | `bet <amount>` | place a bet (phase `betting`) |
 | `act hit` / `act stand` / `act double` / `act surrender` | play your hand (phase `player_turn`) |
-| `act use_item <item_id>` | use an item from your inventory (phase `player_turn`) |
+| `act use_item <item_id> [--target ID]` | use an item whose `usable` is true (most on your turn, some before betting); `--target` answers the item's question |
+| `choose <option>` | answer the pending question in `obs.choice` |
+| `cancel` | drop the pending question when `obs.choice.cancellable`; nothing is charged or spent |
+| `perform <action> [arg]` | run one of `obs.table_actions` (a table's own action, e.g. `ph_sleeve`) |
 | `play [new options]` | streaming JSON-lines mode, see §11 |
 
 `new` options:
@@ -62,6 +65,7 @@ Subcommands:
 - `--start-money N`, `--target-money N` — change the economy (defaults 100 → 300).
 - `--profile NAME` — use a balance profile from `data/game.db` (default: `$CHAOS_PROFILE` or `default`). The reply's `run.profile` names it; a resumed run keeps its numbers even if the profile changes.
 - `--max-steps N` — cap on accepted `bet` / `act` commands (default 2000).
+- `--mode ID` — play a game mode's table: `chaos` (Poker Head's build table, §8b) or `j54` (J-54's deck table, a demo; §8a). The mode turns chaos on itself. `--chaos` without a mode keeps the classic Chaos run (300 chips, classic items).
 
 Exit codes: `0` accepted, `1` rejected by the game (`ok: false`), `2` usage problem (no run file, bad state file, `--llm` without a key).
 
@@ -92,12 +96,12 @@ So a full round is usually zero or more `buy` / `reroll` → `bet` → zero or m
 ## 4. Observation reference
 
 Every reply is `{"ok", "events", "obs", "run"}` (+ `"error"` when `ok` is false).
-`obs.schema` is `2` (2 added `shop` and removed the streak reward); it will be incremented if the shape changes.
+`obs.schema` is `3` (3 added `choice`, `table_actions`, `table.public` and item / offer phases; 2 added `shop`); it will be incremented if the shape changes.
 
 | Field | Meaning |
 | ----- | ------- |
 | `phase` | `betting`, `player_turn` or `run_over` (the only phases you will see) |
-| `legal_actions` | exactly what you may send now: `["bet"]` or `["bet", "buy"]`, a subset of `hit stand double surrender use_item`, or `[]` |
+| `legal_actions` | exactly what you may send now, from the same list of moves the GUI uses: `choose` / `cancel` while a question is pending, else a subset of `bet buy reroll use_item perform` in `betting` or `hit stand double surrender use_item perform` in `player_turn`; `[]` when the run is over |
 | `hint` | the next command in plain words, e.g. `Your move: act hit \| stand` |
 | `summary` | one paragraph describing the table; enough to decide on its own |
 | `round` | round number |
@@ -107,9 +111,12 @@ Every reply is `{"ok", "events", "obs", "run"}` (+ `"error"` when `ok` is false)
 | `win_streak` | consecutive wins so far (a stat; no reward) |
 | `you` | `{"cards": [...], "total": n}` during a hand, else `null` |
 | `dealer` | `{"cards": ["K♣", "??"], "total": null}` while the hole card is hidden |
-| `items` | `[{"id", "count", "help"}]` — your inventory |
-| `shop` | in `betting`: `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n}`; else `null` |
-| `chaos` | `{"enabled", "budget", "active_rules": [{"id", "help"}]}` |
+| `items` | `[{"id", "name", "count", "help", "when", "usable", "reason"?}]` — your inventory; `when` says in which phase it works (e.g. `Before betting`), `reason` why it cannot be used now |
+| `shop` | in `betting`: `{"offers": [{"item", "price", "sold", "affordable", "help", "name"?, "kind"?, "when"?, "reason"?}], "restock_in": n, "reroll_price", "reroll_affordable"}`; else `null` |
+| `choice` | a pending question, else `null`: `{"prompt", "options": [{"id", "label", "help"}], "cancellable"}`. Only `choose` / `cancel` are legal until it is answered |
+| `table_actions` | a table's own actions: `[{"action", "arg", "label", "enabled", "reason"?}]` (send with `perform`) |
+| `table` | a mode's own table (J-54, Poker Head): `{"info": {label: value}, "fee", "deck", "public"?}`; `public` is the table's public snapshot (Poker Head: core, build, cash, invested, debt, net assets, positions, prepared effects); `null` at plain tables |
+| `chaos` | `{"enabled", "budget", "active_rules": [{"id", "help", ...}]}`; `budget` is `null` at Poker Head's build table (its director changes rules, not the Chaos AI); rule fields there: §8b |
 | `action_help` | one-line explanation of each legal action |
 | `last_round` | result of the most recent round (see below), `null` once you bet again |
 | `run_end` | `{"kind": "victory" \| "defeat", "message"}` when the run is over |
@@ -238,6 +245,41 @@ Buy them in the shop, use with `act use_item <id>` during `player_turn`. Each us
 
 If an item pushes your total over the limit (a `swap`, or a `shield` removing a rule that kept you under), you bust and the round settles at once.
 What `peek`, `fate_oracle` and `danger_radar` reveal only appears in `events`; remember it yourself.
+
+## 8a. J-54's table (`--mode j54`, demo)
+
+J-54 changes the **cards**, not the rules. Design: `docs/design/J54_TABLE.md`.
+
+- **Persistent deck.** The deck's cards last the whole run; each round shuffles all of them. `obs.table.info.Deck` is its size and `obs.table.deck` its make-up (`{"2": 4, ..., "A": 5}`, every card of the run's deck, never the order). Deleted cards are counted in `obs.table.info.Removed`.
+- **Protocol (goal).** Drawn at random per run, shown in `obs.table.info.Protocol`:
+  - *Single Capture* — draw the Joker yourself (deal, hit or double). It starts **sealed**; `buy j54_start_experiment` (always on the shelf until bought) puts it in the deck. If the dealer would get it, J-54 shuffles it back and adds a low card. `obs.target` is 0.
+  - *Capital* — reach the chip target (`obs.target`).
+- **Compute fee.** Charged before each bet (`events`: "Compute fee: n chips."); grows every few rounds. The minimum bet is at least the fee and `bet_range` already accounts for it.
+- **Entropy.** After every round J-54 adds low cards (more once the experiment started), so waiting makes the deck worse.
+- **Contracts** replace items in the shop. `buy <id>` applies them; they never appear in `obs.items`. Pending ones are listed in `obs.table.info.Contracts`.
+
+| Contract | Effect (profile numbers) |
+| --- | --- |
+| `j54_low_purge` | at once: delete low cards (2-6) |
+| `j54_streamline` | on your next win: delete random cards |
+| `j54_high_injection` | at once: add 10-value cards or aces |
+| `j54_freeze` | at once: J-54 adds no cards for a few rounds |
+| `j54_start_experiment` | at once: release the Joker (Single Capture only) |
+
+- **Chaos rules** are deck operations, described in plain English in `obs.chaos.active_rules`: `j54_burn` (after the hand, delete every card drawn), `j54_sample_injection` / `j54_ace_injection` (add cards), `j54_redundancy_purge` (delete cards of one rank), `j54_layered_sort` (high cards to the bottom of this round's deck), `j54_data_backflow` (removed cards return). All changes are announced in `events`.
+
+## 8b. Poker Head's build table (`--mode chaos`)
+
+The GUI's "Poker Head's Table". Design: `docs/design/POKER_HEAD_BUILDS.zh-CN.md`, effects in `docs/design/POKER_HEAD_EFFECTS.zh-CN.md`, architecture in `docs/design/ITEM_ARCHITECTURE.md`.
+
+- **Goal: net assets 500** = cash + money invested (at cost) − every loan repayment still owed. Unrealised profit never counts and borrowing cannot win. `obs.target` is 500; `obs.table.public.net_assets` is the progress.
+- **Opening invitation.** The run starts with `obs.choice`: two random cores, or `cash` (30 extra chips and no core for the whole run). It cannot be cancelled.
+- **Shop.** Fixed prices; consumables (`kind: consumable`, with `when`), permanents (two build slots, one copy each; buying into a full build asks which one to replace, and cancelling costs nothing; `perform ph_discard <id>` before betting drops one after a confirmation, and it may be offered again) and, with the Private Account core, financial products. Permanents appear more often in later rounds. The minimum bet rises every three rounds (`bet_range` includes it).
+- **Items** work in their phase only (`when`; some before betting). Targeted items (Clause Removal, Original Price Receipt, Amendment Letter) ask `obs.choice` unless you pass `--target`.
+- **Testing switch.** `mode.chaos.unlock_all` (off in the shipped profile): every product on the shelf at once, money products without Private Account, no reroll.
+- **Table actions.** Spare Sleeve shows up in `obs.table_actions` on your turn (`perform ph_sleeve`).
+- **Environment rules.** Before shopping each round the dealer may add or replace one rule (at most three in force, fewer early on; a growing offline director, never an LLM). Rules change card values, bust limits, ties, busts, cap a round's profit, ban items (the next consumable you use only lifts the ban), raise shop prices or deal your second card face down. Each is listed in `obs.chaos.active_rules` with `name`, `scope`, `effect`, `remaining` (rounds, or null = until removed), `removal` and `silenced`; changes are announced in `events`. Clause Removal (`ph_remove`) targets one by its `id`.
+- **Fate Forecast** shows the two cards left after the coming deal; shopping, rerolling or resuming never changes them, and card effects (Aces to the Top, Sleeve Clip, Spare Sleeve) mark them out of date.
 
 ## 9. Worked examples
 

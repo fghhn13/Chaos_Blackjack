@@ -22,7 +22,11 @@ from chaos_blackjack.meta.fake import install_fake  # noqa: E402
 
 
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
+    from chaos_blackjack.meta import MetaService
+
+    # The shop and wardrobe flows are tested with the shipped "every look unlocked" switch off.
+    monkeypatch.setattr(MetaService, "_all_looks", classmethod(lambda cls, db, profile=None: False))
     svc = install_fake()
     a = App(GuiSettings(asset_dirs=(tmp_path,)), run_config=RunConfig(use_llm=False))
     yield a
@@ -146,7 +150,7 @@ def test_looks_are_bought_in_the_shop_and_switched_in_the_wardrobe(app) -> None:
     # The Wardrobe only lists owned looks and only switches between them.
     profile = _screen(app, "profile", player_id=rookie.id, tab="wardrobe", slot="deck")
     assert set(profile.rows) == {"card_back_standard", "card_back_crimson"}
-    assert profile.collection["deck"] == (2, 4)
+    assert profile.collection["deck"] == (2, 6)
     _click(app, profile.rows["card_back_standard"])
     assert app.assets.aliases == {} and "equipped" in profile.message
     assert meta.get_player(rookie.id).tokens == 5                       # no tokens spent here

@@ -8,6 +8,10 @@ paced by a timer.
 Extending:
   * new player action  -> add a row to ACTION_BUTTONS (+ controller method)
   * react to an event  -> self.subscribe(NoticeKind.X, handler)
+  * new table information -> a part (app/parts.py) placed by the mode's layout
+    (app/layout.py); the side columns and the run panel draw it.
+
+Keys: Tab run panel, L its log, I its bag, 1-9 use an item (your turn), B shop.
 """
 
 from __future__ import annotations
@@ -27,10 +31,15 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.bet_panel import BetPanel, draw_bet_stack
 from chaos_blackjack.gui.components.cards import CARD_SIZE, CardRenderer, layout_hand
 from chaos_blackjack.gui.components.chaos_panel import ChaosPanel
-from chaos_blackjack.gui.components.hud import EventFeed, draw_status_bar
+from chaos_blackjack.gui.components.hud import draw_status_bar
 from chaos_blackjack.content.host_script import host_script
 from chaos_blackjack.gui.components.intro import HostDialog
-from chaos_blackjack.gui.components.item_panel import ItemPanel
+from chaos_blackjack.gui.components.side_column import (
+    ButtonsBlock, DeckPileBlock, FeedBlock, HostBlock, SideColumn,
+)
+from chaos_blackjack.app.layout import layout_for
+from chaos_blackjack.app.parts import PartContext
+from chaos_blackjack.app.widgets import Act
 from chaos_blackjack.gui.components.table_fx import TableFx
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
@@ -102,14 +111,23 @@ class TableScene(Scene):
         self.outro: HostDialog | None = None
         if intro and config.mode:
             try:
-                beats = intro_script(get_mode(config.mode), config)
+                table = self.controller.table
+                beats = intro_script(get_mode(config.mode), config,
+                                     summary=table.summary() if table is not None else None)
             except KeyError:
                 beats = []
             if beats:
                 self.intro = HostDialog(a, beats, persona)
-        self.item_panel = ItemPanel(a, RIGHT_PANEL, self._use_item, self._open_shop)
-        log = self.chaos_panel.log_area
-        self.feed = EventFeed(a, log.topleft, max_lines=log.h // FEED_LINE, max_width=log.w, align_top=True)
+        # Side columns: the mode's layout of parts (native blocks + widget parts).
+        self.layout = layout_for(config.mode)
+        self.deck_block = DeckPileBlock(a, self.cards, self._act, clickable=self.layout.tab("deck") is not None)
+        self.feed_block = FeedBlock(a, self._act)
+        self.buttons_block = ButtonsBlock(a, self._open_shop, self._open_panel)
+        natives = {"core.host": HostBlock(self.chaos_panel), "core.deck_pile": self.deck_block,
+                   "core.buttons": self.buttons_block, "core.feed": self.feed_block}
+        self.left = SideColumn(a, LEFT_PANEL, self.layout.left, natives, self._act)
+        self.right = SideColumn(a, RIGHT_PANEL, self.layout.right, natives, self._act)
+        self.feed = self.feed_block.feed
         self.bet_panel = BetPanel(a, (W // 2, ACTION_Y + 30), self._deal, initial=10,
                                   stack_center=STACK_CENTER)
 
@@ -167,8 +185,39 @@ class TableScene(Scene):
 
     # ---------------------------------------------------------- commands
 
-    def _open_items(self) -> None:
-        self.app.scenes.push("items", controller=self.controller)
+    @property
+    def deck_rect(self) -> pygame.Rect:
+        """Where cards are dealt from (the shoe in the layout)."""
+        return self.deck_block.pile_rect
+
+    def _busy(self) -> bool:
+        return self._closed or self._poke_pending or self._chaos_future is not None or self._chaos_failed
+
+    def _open_panel(self, tab: str = "") -> None:
+        if self._busy() or not self.layout.panel:
+            return
+        self.app.scenes.push("run_panel", controller=self.controller, layout=self.layout, tab=tab,
+                             on_change=self._after_command)
+
+    def _act(self, act: Act) -> None:
+        """A clicked widget: GUI acts here, the rest through the controller."""
+        if act.id == "gui:panel":
+            self._open_panel(act.arg)
+            return
+        if self._busy() or not act.enabled:
+            return
+        try:
+            result = self.controller.perform(act.id, act.arg)
+            if getattr(result, "ok", True) is False and getattr(result, "message", ""):
+                self.feed.push(result.message, BAD)
+        except ActionError as e:
+            self.feed.push(str(e), BAD)
+        self._after_command()
+
+    def _quick_item(self, index: int) -> None:
+        items = [i for i in self.view.items if i.count > 0]
+        if index < len(items) and items[index].usable:
+            self._use_item(items[index].id)
 
     def _command(self, method: str) -> Callable[[], None]:
         def run() -> None:
@@ -272,10 +321,16 @@ class TableScene(Scene):
         if self.intro_open():
             self.dialog().handle_event(event)
             return
-        if (event.type == pygame.KEYDOWN and event.key == pygame.K_i
-                and self.view.can(Action.USE_ITEM) and self.view.items):
-            self._open_items()
-            return
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_TAB:
+                self._open_panel()
+                return
+            if event.key in (pygame.K_l, pygame.K_i):
+                self._open_panel("log" if event.key == pygame.K_l else "bag")
+                return
+            if pygame.K_1 <= event.key <= pygame.K_9 and self.view.phase == TablePhase.PLAYER_TURN:
+                self._quick_item(event.key - pygame.K_1)
+                return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.push(
                 "confirm",
@@ -283,9 +338,7 @@ class TableScene(Scene):
                 on_confirm=lambda: self.app.scenes.reset("home"),
             )
             return
-        if self.item_panel.handle_event(event):
-            return
-        if self.chaos_panel.handle_event(event):
+        if self.right.handle_event(event) or self.left.handle_event(event):
             return
         if self.view.phase == TablePhase.BETTING:
             self.bet_panel.handle_event(event)
@@ -295,12 +348,16 @@ class TableScene(Scene):
     def update(self, dt: float) -> None:
         if self._closed or self._poke_pending:
             return
-        self.feed.update(dt)
+        self.left.update(dt)
+        self.right.update(dt)
         self.fx.update(dt)
-        self.chaos_panel.update(dt)
         if self.fx.busy:
             return  # automatic steps wait for cards to land; input is never blocked
         self._timer += dt
+        if self.view.choice is not None and self._chaos_future is None and not self.intro_open():
+            # A command asked a question (a core, a replacement, a target): answer it in the dialog.
+            self.app.scenes.push("choice", controller=self.controller, on_change=self._after_command)
+            return
         if self._chaos_future is not None:
             if self._chaos_future.done():
                 result = self._chaos_future
@@ -343,11 +400,10 @@ class TableScene(Scene):
         self.next_button.visible = v.phase == TablePhase.ROUND_OVER
         if v.phase == TablePhase.BETTING:
             self.bet_panel.set_limits(v.bet_min, v.bet_max)
-        self.chaos_panel.sync(v)
-        self.item_panel.sync(v)
-        log = self.chaos_panel.log_area
-        self.feed.anchor = log.topleft
-        self.feed.max_lines = max(2, log.h // FEED_LINE)
+            self.bet_panel.deal_button.enabled = v.can(Action.BET)
+        ctx = PartContext(self.controller, v) if not self._busy() else None
+        self.left.sync(v, ctx)
+        self.right.sync(v, ctx)
 
     # -------------------------------------------------------------- draw
 
@@ -355,14 +411,14 @@ class TableScene(Scene):
         a = self.app.assets
         v = self.view
         surface.blit(a.image("table_background", LOGICAL_SIZE), (0, 0))
-        self.chaos_panel.draw(surface)
-        self.item_panel.draw(surface)
-        self._draw_deck(surface, v)
+        self.left.draw(surface)
+        self.right.draw(surface)
         if v.dealer_cards:
             total = "?" if v.dealer_total is None else str(v.dealer_total)
             self._draw_hand(surface, v.dealer_cards, DEALER_Y, "dealer", total)
         if v.player_cards:
-            self._draw_hand(surface, v.player_cards, PLAYER_Y, "player", str(v.player_total))
+            self._draw_hand(surface, v.player_cards, PLAYER_Y, "player",
+                            "?" if v.player_total is None else str(v.player_total))
         self._draw_bet_zone(surface, v)  # after the hands: settling chips fly over the cards
 
         if v.phase == TablePhase.BETTING:
@@ -378,22 +434,12 @@ class TableScene(Scene):
             self._draw_center_text(surface, "Dealer is playing...", theme.TEXT_MUTED)
 
         self.ui.draw(surface)
-        self.feed.draw(surface)
         draw_status_bar(surface, a, v, money=self.fx.money_shown())
         self.fx.apply_glitch(surface)
-        self.chaos_panel.draw_overlay(surface)
-        self.item_panel.draw_overlay(surface)
+        self.left.draw_overlay(surface)
+        self.right.draw_overlay(surface)
         if self.intro_open():
             self.dialog().draw(surface)
-
-    def _draw_deck(self, surface: pygame.Surface, v: GameView) -> None:
-        rect = self.item_panel.deck_rect
-        back = self.cards.back(CARD_SIZE)
-        for i in range(3):
-            surface.blit(back, rect.move(-i * 2, -i * 2))
-        if v.deck_count:
-            n = self.app.assets.font(theme.FONT_SMALL).render(f"{v.deck_count} cards left", True, theme.TEXT_MUTED)
-            surface.blit(n, n.get_rect(midtop=(rect.centerx, rect.bottom + 8)))
 
     def _draw_bet_zone(self, surface: pygame.Surface, v: GameView) -> None:
         """Betting circle on the felt; shows the wager while a round is live."""
@@ -416,7 +462,7 @@ class TableScene(Scene):
 
     def _draw_hand(self, surface: pygame.Surface, cards, y: int, hand: str, total: str) -> None:
         rects = layout_hand(len(cards), (W // 2, y), max_width=HAND_MAX_WIDTH)
-        deck = self.item_panel.deck_rect
+        deck = self.deck_rect
         for i, (card, rect) in enumerate(zip(cards, rects)):
             self.fx.draw_card(surface, self.cards, card, (hand, i), rect, deck)
         # Name + total pill above the hand.

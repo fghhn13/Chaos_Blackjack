@@ -1,0 +1,80 @@
+# Poker Head icon candidate review
+
+Date: 2026-10-13. Status: historical candidate review. The user subsequently approved the recommendations and selected five original SVG variants. Final artwork descriptions and selections are in [POKER_HEAD_ART.md](POKER_HEAD_ART.md); final files and provenance are in [the delivery manifest](../../assets/poker_head/manifest.json).
+
+Scope: all 41 entries in [the effect specification](POKER_HEAD_EFFECTS.zh-CN.md).
+The [candidate manifest](POKER_HEAD_ICON_CANDIDATES.json) is the reproducible selection record. Its keys are proposal identifiers, not registered runtime asset IDs. `recommended: null` means deliberately unassigned; the two listed silhouettes for those entries are weak references, not approved picks.
+
+Source: [Game-icons.net](https://game-icons.net/), using the public [Iconify game-icons snapshot](https://github.com/iconify/icon-sets/blob/master/json/game-icons.json). Icons were verified against the downloaded catalog and original author paths. The direct Iconify endpoint returned HTTP 403; the public GitHub distribution supplied the same game-icons collection.
+
+Style: existing old-gold silhouette color (#B7A477). All candidates were rasterized and reviewed at 96 and 32 pixels. The proposal contains 36 recommendations and 5 deliberately blank selections. Category labels or frames should distinguish core, permanent, consumable and financial entries; no UI change is included here.
+
+Review artifacts (local and git-ignored):
+
+- [Filterable Chinese gallery](../../output/poker_head_icons/gallery.html)
+- [Recommended overview](../../output/poker_head_icons/overview.png)
+- [Core and management comparisons](../../output/poker_head_icons/01_core_management.png)
+- [Multi-card and surrender permanents](../../output/poker_head_icons/02_permanent_a.png)
+- [Precision, double and finance permanents](../../output/poker_head_icons/03_permanent_b.png)
+- [General consumables](../../output/poker_head_icons/04_consumables_a.png)
+- [Build consumables and financial products](../../output/poker_head_icons/05_consumables_b.png)
+- [Per-icon attribution](../../output/poker_head_icons/CREDITS.md)
+
+The raw review SVGs are retained under `black-jack-assets/source/game-icons/poker-head-candidates/`, with their own credits. Existing original art and shipped asset credits were not replaced.
+
+| No. | Design entry | Category / build | Recommendation | Alternative / weak references | Rationale |
+|---:|---|---|---|---|---|
+| 01 | Headroom Clause | core / multi-card | [expand](https://game-icons.net/1x1/delapouite/expand.html) | [arrows-shield](https://game-icons.net/1x1/lorc/arrows-shield.html) | Outward space suggests a higher bust ceiling; avoid suggesting complete bust immunity. |
+| 02 | Capital Preservation Clause | core / surrender | [wallet](https://game-icons.net/1x1/delapouite/wallet.html) | [checked-shield](https://game-icons.net/1x1/lorc/checked-shield.html) | A wallet emphasizes preserving chips when surrendering, rather than winning or complete immunity. |
+| 03 | Near Perfect | core / precision | [on-target](https://game-icons.net/1x1/lorc/on-target.html) | [convergence-target](https://game-icons.net/1x1/delapouite/convergence-target.html) | A target suggests bringing nearby totals to 21; precise numeric behavior belongs in the description. |
+| 04 | High Stakes Privilege | core / double | [crown-coin](https://game-icons.net/1x1/lorc/crown-coin.html) | [two-coins](https://game-icons.net/1x1/delapouite/two-coins.html) | A crowned coin communicates a privileged payout for doubled wins. |
+| 05 | VIP Account | core / finance | [bank](https://game-icons.net/1x1/delapouite/bank.html) | [id-card](https://game-icons.net/1x1/delapouite/id-card.html) | The bank communicates access to financial products; VIP status and the extra shop slot use text. |
+| 06 | Long Hand Dividend | permanent / multi-card | [card-draw](https://game-icons.net/1x1/faithtoken/card-draw.html) | [card-pickup](https://game-icons.net/1x1/quoting/card-pickup.html) | Drawing more cards distinguishes a four-card reward from the five-card hand icon. |
+| 07 | Face Card Discount | permanent / multi-card | [card-king-hearts](https://game-icons.net/1x1/aussiesim/card-king-hearts.html) | [queen-crown](https://game-icons.net/1x1/lorc/queen-crown.html) | A face card identifies the affected J/Q/K family; the fixed value of five requires text. |
+| 08 | Five Card Feast | permanent / multi-card | [poker-hand](https://game-icons.net/1x1/lorc/poker-hand.html) | [card-play](https://game-icons.net/1x1/quoting/card-play.html) | A fan of cards reads as a large hand; avoid food imagery that hides the card-count trigger. |
+| 09 | Sleeve Mark | permanent / multi-card | [semi-closed-eye](https://game-icons.net/1x1/lorc/semi-closed-eye.html) | [secret-book](https://game-icons.net/1x1/delapouite/secret-book.html) | A discreet eye suggests automatic hidden information; the magnifier is reserved for the active peek item. |
+| 10 | Delayed Exit | permanent / surrender | [exit-door](https://game-icons.net/1x1/delapouite/exit-door.html) | [hourglass](https://game-icons.net/1x1/lorc/hourglass.html) | An exit door makes the extended surrender option recognizable. |
+| 11 | Exit Privilege | permanent / surrender | [shaking-hands](https://game-icons.net/1x1/delapouite/shaking-hands.html) | [thumb-up](https://game-icons.net/1x1/delapouite/thumb-up.html) | A negotiated concession differs visually from the wallet core and a free-exit ticket. |
+| 12 | Compensation Receipt | permanent / surrender | [receive-money](https://game-icons.net/1x1/delapouite/receive-money.html) | [scroll-quill](https://game-icons.net/1x1/delapouite/scroll-quill.html) | Money received communicates later compensation; the scroll alternative favors the receipt metaphor. |
+| 13 | Ace After Defeat | permanent / surrender | [card-ace-hearts](https://game-icons.net/1x1/aussiesim/card-ace-hearts.html) | [ace](https://game-icons.net/1x1/lorc/ace.html) | An ace identifies the guaranteed next opening card; the heart suit has no mechanical significance. |
+| 14 | Perfect Total Jackpot | permanent / precision | [coins-pile](https://game-icons.net/1x1/delapouite/coins-pile.html) | [open-treasure-chest](https://game-icons.net/1x1/skoll/open-treasure-chest.html) | A large coin pile identifies the exceptional payout; the 21 requirement needs a label. |
+| 15 | Backup Sleeve Card | permanent / precision | [card-exchange](https://game-icons.net/1x1/delapouite/card-exchange.html) | [card-pickup](https://game-icons.net/1x1/quoting/card-pickup.html) | Exchange arrows correctly express replacement. Share this action silhouette with Swap Cufflink; permanent versus consumable category labels must distinguish them. A pickup icon is weaker because it implies drawing rather than replacement. |
+| 16 | Borrowed Blossom | permanent / precision | **Unassigned** | [card-pick](https://game-icons.net/1x1/faithtoken/card-pick.html), [flower-emblem](https://game-icons.net/1x1/delapouite/flower-emblem.html) | Neither grabbing a card nor a flower reliably represents transferring the dealer natural-win outcome. |
+| 17 | Additional Bet Right | permanent / double | [buy-card](https://game-icons.net/1x1/delapouite/buy-card.html) | [pay-money](https://game-icons.net/1x1/delapouite/pay-money.html) | Money plus cards suggests committing more chips during a hand. |
+| 18 | Risk Sharing | permanent / double | **Unassigned** | [shield-opposition](https://game-icons.net/1x1/delapouite/shield-opposition.html), [split-arrows](https://game-icons.net/1x1/delapouite/split-arrows.html) | Available shields and split arrows imply immunity, combat or split-hand play rather than a partial doubled-loss reduction. |
+| 19 | Face Up Audit | permanent / double | [eye-target](https://game-icons.net/1x1/delapouite/eye-target.html) | [up-card](https://game-icons.net/1x1/delapouite/up-card.html) | A focused eye suggests conditional inspection; it differs from the active cyber-eye hole-card probe. |
+| 20 | Purchase Discount | permanent / finance | [price-tag](https://game-icons.net/1x1/delapouite/price-tag.html) | [shopping-bag](https://game-icons.net/1x1/delapouite/shopping-bag.html) | A price tag communicates a shop purchase discount. |
+| 21 | Profit Bonus | permanent / finance | [profit](https://game-icons.net/1x1/lorc/profit.html) | [growth](https://game-icons.net/1x1/delapouite/growth.html) | Incoming arrows and a money bag suggest additional investment proceeds, distinct from the stock price chart. |
+| 22 | Priority Exchange | permanent / finance | [anticlockwise-rotation](https://game-icons.net/1x1/delapouite/anticlockwise-rotation.html) | [recycle](https://game-icons.net/1x1/lorc/recycle.html) | A circular arrow communicates another shop refresh rather than a card swap. |
+| 23 | Dealer's Welcome Gift | management / general | [present](https://game-icons.net/1x1/delapouite/present.html) | [gift-of-knowledge](https://game-icons.net/1x1/lorc/gift-of-knowledge.html) | A present matches the free opening choice without suggesting a random loot roll. |
+| 24 | Amendment Letter | management / general | [envelope](https://game-icons.net/1x1/lorc/envelope.html) | [scroll-quill](https://game-icons.net/1x1/delapouite/scroll-quill.html) | An envelope matches an amendment letter and differs from the loan contract. |
+| 25 | Peek Lens | consumable / general | [magnifying-glass](https://game-icons.net/1x1/lorc/magnifying-glass.html) | [semi-closed-eye](https://game-icons.net/1x1/lorc/semi-closed-eye.html) | A magnifier matches the item's object and distinguishes an active peek from the passive sleeve mark. |
+| 26 | Swap Cufflink | consumable / general | [card-exchange](https://game-icons.net/1x1/delapouite/card-exchange.html) | [belt-buckles](https://game-icons.net/1x1/lorc/belt-buckles.html) | Exchanging cards conveys the action more clearly than a clothing accessory. |
+| 27 | Hole Card Probe | consumable / general | [cyber-eye](https://game-icons.net/1x1/delapouite/cyber-eye.html) | [spyglass](https://game-icons.net/1x1/lorc/spyglass.html) | Retain the existing hole_card_hacker silhouette for the active dealer-card reveal. |
+| 28 | Danger Pointer | consumable / general | [radar-sweep](https://game-icons.net/1x1/lorc/radar-sweep.html) | [speedometer](https://game-icons.net/1x1/delapouite/speedometer.html) | Retain the existing danger_radar silhouette for the next-hit bust check. |
+| 29 | Fate Prophecy | consumable / general | [crystal-ball](https://game-icons.net/1x1/lorc/crystal-ball.html) | [crystal-eye](https://game-icons.net/1x1/lorc/crystal-eye.html) | Retain the existing fate_oracle crystal ball for a pre-bet future-card preview. |
+| 30 | Tear Up Clause | consumable / general | [scissors](https://game-icons.net/1x1/lorc/scissors.html) | [tearing](https://game-icons.net/1x1/lorc/tearing.html) | Scissors make removing a selected clause clear at 32 pixels; the tearing silhouette is ambiguous when reduced. |
+| 31 | Silence Seal | consumable / general | [wax-seal](https://game-icons.net/1x1/lorc/wax-seal.html) | [pause-button](https://game-icons.net/1x1/guard13007/pause-button.html) | The seal matches the named object; pause is the clearest functional alternative for temporary suppression. |
+| 32 | Grace Approval | consumable / multi-card | **Unassigned** | [scroll-unfurled](https://game-icons.net/1x1/lorc/scroll-unfurled.html), [expand](https://game-icons.net/1x1/delapouite/expand.html) | A generic scroll does not distinguish a temporary +2 bust ceiling from other permissions. |
+| 33 | Lossless Exit Ticket | consumable / surrender | [ticket](https://game-icons.net/1x1/delapouite/ticket.html) | [peace-dove](https://game-icons.net/1x1/delapouite/peace-dove.html) | An exit ticket distinguishes one free surrender from the permanent exit-door ability. |
+| 34 | Aces to Top | consumable / precision | **Unassigned** | [card-ace-spades](https://game-icons.net/1x1/aussiesim/card-ace-spades.html), [up-card](https://game-icons.net/1x1/delapouite/up-card.html) | An ace silhouette does not express moving all remaining aces to the deck top; suit changes are insufficient distinction. |
+| 35 | Card Withdrawal Approval | consumable / precision | [card-discard](https://game-icons.net/1x1/faithtoken/card-discard.html) | [card-burn](https://game-icons.net/1x1/delapouite/card-burn.html) | Discarding a card accurately suggests removing the last card; burning carries a stronger destructive metaphor. |
+| 36 | Quadruple Bet Ticket | consumable / double | **Unassigned** | [money-stack](https://game-icons.net/1x1/delapouite/money-stack.html), [cash](https://game-icons.net/1x1/lorc/cash.html) | A money pile does not identify preparation for a fourfold stake; do not substitute a four-pip die. |
+| 37 | Original Price Buyback Ticket | consumable / double | [return-arrow](https://game-icons.net/1x1/lorc/return-arrow.html) | [sell-card](https://game-icons.net/1x1/delapouite/sell-card.html) | A returning arrow communicates reversing a purchase; sell-card is more literal but may suggest selling playing cards. |
+| 38 | Fixed Interest Deposit | financial / finance | [locked-chest](https://game-icons.net/1x1/lorc/locked-chest.html) | [piggy-bank](https://game-icons.net/1x1/delapouite/piggy-bank.html) | A locked chest emphasizes temporarily inaccessible principal, unlike the financial-access bank core. |
+| 39 | Win Bond | financial / finance | [trophy](https://game-icons.net/1x1/lorc/trophy.html) | [diploma](https://game-icons.net/1x1/delapouite/diploma.html) | A trophy communicates the required wins; a diploma emphasizes the security document but hides the condition. |
+| 40 | Volatile Stock | financial / finance | [chart](https://game-icons.net/1x1/delapouite/chart.html) | [histogram](https://game-icons.net/1x1/delapouite/histogram.html) | A market chart communicates uncertain investment performance; avoid portraying it as guaranteed profit. |
+| 41 | Short Term Loan Contract | financial / finance | [scroll-quill](https://game-icons.net/1x1/delapouite/scroll-quill.html) | [pay-money](https://game-icons.net/1x1/delapouite/pay-money.html) | A scroll and quill suggest agreeing to written repayment terms. The game-icons icon named contract depicts contraction arrows, not a legal contract, and is excluded. |
+
+Selection notes:
+
+- Keep the established cyber-eye, radar-sweep and crystal-ball silhouettes for the corresponding hole-card probe, danger pointer and prophecy effects. Keep card-exchange for active swapping.
+- Reserve semi-closed-eye for the passive sleeve mark; use magnifying-glass for the active peek lens. This is a proposed remapping for the new catalog, not an edit to the current peek asset.
+- Backup Sleeve Card and Swap Cufflink deliberately share card-exchange because both replace a card. Their permanent and consumable labels must remain visible; picking an inaccurate draw icon solely to create uniqueness is worse.
+- Ace suits are decorative, not requirements. Do not distinguish Ace After Defeat and Aces to Top solely by heart versus spade; the latter remains unassigned.
+- Borrowed Blossom needs a victory-transfer symbol, Risk Sharing needs partial loss coverage, Grace Approval needs a temporary ceiling increase, Aces to Top needs ace-stack movement, and Quadruple Bet Ticket needs a clear fourfold-stake identity. Leave these blank until suitable art is selected.
+- The icon named contract means contraction, not a legal agreement. Use scroll-quill for Short Term Loan Contract. Scissors is clearer than tearing at 32 pixels for clause removal.
+
+License: [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The gallery attribution records each author, original source URL, recoloring and rasterization. Preserve those records when exporting any selected icon into shipped assets.
+
+Validation: all 41 effect names accounted for; 74 distinct available candidate silhouettes; 36 recommendations, 5 explicit null selections; all local image references resolve; contact sheets and the overview visually inspected. No game code changed, so game tests were not required for this review.

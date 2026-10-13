@@ -78,9 +78,9 @@ class MetaTableScene(TableScene):
             return
         if self._closed or self._ending_opened:
             return
-        self.feed.update(dt)
+        self.left.update(dt)
+        self.right.update(dt)
         self.fx.update(dt)
-        self.chaos_panel.update(dt)
         if self.fx.busy:
             return
         self._timer += dt

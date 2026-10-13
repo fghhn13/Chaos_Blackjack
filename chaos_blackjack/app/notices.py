@@ -39,6 +39,10 @@ class NoticeKind:
     SHOP_REROLLED = "shop_rerolled"
     CHAOS_DISPELLED = "chaos_dispelled"
     RUN_ENDED = "run_ended"
+    FEE_PAID = "fee_paid"          # a table's per-round charge (J-54's compute fee)
+    TABLE_EVENT = "table_event"    # a table's own mechanics (J-54: deck changes, contracts)
+    CHOICE_OPENED = "choice_opened"   # a command asked a question (app/choice.py)
+    CHOICE_CLOSED = "choice_closed"   # it was answered or cancelled
     GAME_SAVED = "game_saved"
     ERROR = "error"
 

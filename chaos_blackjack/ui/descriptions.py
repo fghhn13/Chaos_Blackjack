@@ -7,6 +7,26 @@ from typing import Any
 from chaos_blackjack.rules.modifiers import ActiveModifiers, merge_chaos_flags
 
 
+# Display names of the built-in rules (the codex, the run log and the GUI parts share them).
+RULE_NAMES = {
+    "modify_card_value": "Value Shift", "great_crash": "Great Crash",
+    "odd_even_chaos": "Odd-Even Chaos", "suit_power": "Suit Power",
+    "fragile_bust": "Fragile Bust", "reverse_bust": "Reverse Bust",
+    "tiebreaker_shift": "Tiebreaker Shift",
+}
+
+
+def rule_display_name(rule_id: str) -> str:
+    """A rule's player-facing name: built-in names, J-54's deck rules, else the id in title case."""
+    if rule_id in RULE_NAMES:
+        return RULE_NAMES[rule_id]
+    from chaos_blackjack.rules.plugins.j54_deck import DECK_RULES
+
+    if rule_id in DECK_RULES:
+        return DECK_RULES[rule_id][0]
+    return rule_id.replace("_", " ").title()
+
+
 def chaos_ai_flavor(mod_count: int) -> str:
     if mod_count == 0:
         return "The table feels oddly quiet..."
@@ -53,6 +73,8 @@ def _describe_one(tid: str, m: Any) -> str:
         if "dealer_wins_ties" in flags:
             return "Tiebreaker Shift: ties go to Dealer (instead of Push)."
         return "Tiebreaker Shift: ties go to Player (instead of Push)."
+    if getattr(m, "deck_rule", False):  # J-54's deck operations describe themselves
+        return m.describe()
     return f"Active rule: {tid}"
 
 

@@ -1,5 +1,6 @@
 {
-  "allowed_rules": ["modify_card_value", "reverse_bust", "great_crash", "odd_even_chaos", "suit_power", "fragile_bust", "tiebreaker_shift"],
+  "allowed_rules": ["modify_card_value", "reverse_bust", "great_crash", "odd_even_chaos", "suit_power", "fragile_bust", "tiebreaker_shift",
+                    "j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection", "j54_layered_sort", "j54_data_backflow"],
   "allowed_items": ["peek", "hole_card_hacker", "fate_oracle", "danger_radar", "shield", "swap"],
   "attempt_limits": {
     "max_actions_per_turn": 1,

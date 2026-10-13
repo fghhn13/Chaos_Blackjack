@@ -31,15 +31,23 @@ def test_custom_item_inventory_keyboard_use(tmp_path):
         controller.phase = TablePhase.PLAYER_TURN
         app.scenes.reset("table", controller=controller)
         app.scenes.apply_pending()
+        table = app.scenes.top
+        # I opens the run panel on the bag, which describes pack items too.
         app.scenes.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_i}))
         app.scenes.apply_pending()
-        assert app.scenes.top.items[0].description.startswith("Discard")
+        panel = app.scenes.top
+        assert panel.tab.id == "bag"
+        assert panel.view.widgets[0].entries[0].text.startswith("Discard")
         app._render()
-        app.scenes.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RETURN}))
+        app.scenes.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_ESCAPE}))
         app.scenes.apply_pending()
+        # 1 uses the first item on your turn.
+        app.scenes.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_1}))
+        app.scenes.apply_pending()
+        assert app.scenes.top is table
         assert len(controller.state.player_hand) == 2
         assert controller.state.inventory == ()
-        assert not app.scenes.top.view.items
+        assert not table.view.items
         app._render()
     finally:
         pygame.quit()
@@ -47,7 +55,7 @@ def test_custom_item_inventory_keyboard_use(tmp_path):
 
 def test_custom_item_panel_tooltip_and_mouse_use(tmp_path, monkeypatch):
     """The redesigned sidebar consumes content-pack help and the same item runtime."""
-    from chaos_blackjack.gui.components import item_panel
+    from chaos_blackjack.gui.components import widget_view
 
     app = App(GuiSettings(asset_dirs=(tmp_path,)))
     import chaos_blackjack.gui.scenes
@@ -64,13 +72,16 @@ def test_custom_item_panel_tooltip_and_mouse_use(tmp_path, monkeypatch):
         app.scenes.apply_pending()
         app._render()
         table = app.scenes.top
-        rect, item = table.item_panel.item_rects[0]
-        assert item.id == "example_trim" and item.description.startswith("Discard")
+        from tests.test_gui_table import item_slot
+
+        slot = item_slot(table)
+        rect = slot.rect.copy()
+        assert slot.act.arg == "example_trim" and "Discard" in slot.tooltip
         tooltips = []
-        monkeypatch.setattr(item_panel, "draw_tooltip", lambda surface, assets, text, pos: tooltips.append(text))
+        monkeypatch.setattr(widget_view, "draw_tooltip", lambda surface, assets, text, pos: tooltips.append(text))
         table.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {"pos": rect.center}))
         app._render()
-        assert item.description in tooltips[-1]
+        assert "Discard" in tooltips[-1]
         table.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": rect.center, "button": 1}))
         assert len(controller.state.player_hand) == 2
         assert controller.state.inventory == () and not table.view.items

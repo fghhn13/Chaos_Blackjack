@@ -44,7 +44,8 @@ NOTICE_TEXT: dict[str, Callable[[Notice], Line | None]] = {
     NoticeKind.ITEM_BOUGHT: lambda n: (f"Bought {asset_name(str(n.data.get('item')))} for {n.data.get('price')}", theme.GOLD),
     NoticeKind.SHOP_RESTOCKED: lambda n: ("The shop has new stock", theme.GOLD),
     NoticeKind.CHAOS_DISPELLED: lambda n: ("Chaos rules dispelled", theme.GOLD),
-    NoticeKind.RULE_MODIFIER_APPLIED: lambda n: (f"Chaos rule: {asset_name(str(n.data.get('rule_id')))}", theme.CHAOS_MAGENTA),
+    NoticeKind.RULE_MODIFIER_APPLIED: lambda n: (str(n.data["text"]) if n.data.get("text") else
+                                                 f"Chaos rule: {asset_name(str(n.data.get('rule_id')))}", theme.CHAOS_MAGENTA),
     NoticeKind.CHAOS_ACTION_REJECTED: lambda n: ("Chaos AI action blocked", theme.TEXT_MUTED),
     NoticeKind.CHAOS_NARRATION: lambda n: (f"Chaos AI: “{n.data.get('text')}”", theme.CHAOS_MAGENTA),
     NoticeKind.CHAOS_POKE_REPLY: lambda n: (f"Chaos AI: “{n.data.get('text')}”", theme.CHAOS_MAGENTA),

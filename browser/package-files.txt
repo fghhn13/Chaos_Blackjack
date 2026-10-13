@@ -300,3 +300,14 @@ chaos_blackjack/ai/assets/poker_head/displeased.png
 chaos_blackjack/ai/assets/poker_head/welcome.png
 chaos_blackjack/ai/assets/poker_head/present_card.png
 chaos_blackjack/ai/assets/poker_head/hidden_card.png
+chaos_blackjack/ai/hosts/j54.json
+chaos_blackjack/ai/personas/j54.json
+chaos_blackjack/ai/assets/j54/grand_welcome.png
+chaos_blackjack/ai/assets/j54/resting_mania.png
+chaos_blackjack/ai/assets/j54/card_reveal.png
+chaos_blackjack/ai/assets/j54/secretive_trick.png
+chaos_blackjack/ai/assets/j54/obsessive_lecture.png
+chaos_blackjack/ai/assets/j54/paranoid_analysis.png
+chaos_blackjack/ai/assets/j54/guarded.png
+chaos_blackjack/ai/assets/j54/irritated.png
+chaos_blackjack/ai/assets/j54/glitching_frenzy.png

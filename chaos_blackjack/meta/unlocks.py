@@ -25,8 +25,9 @@ def owned_cosmetics(db: sqlite3.Connection, player_id: int) -> dict[str, str]:
         "SELECT cosmetic_id, source FROM player_cosmetic WHERE player_id = ?", (player_id,))}
 
 
-def owns(db: sqlite3.Connection, player_id: int, c: Cosmetic) -> bool:
-    return c.default or db.execute(
+def owns(db: sqlite3.Connection, player_id: int, c: Cosmetic, *, all_owned: bool = False) -> bool:
+    """`all_owned`: the profile's meta.unlock_all_cosmetics (every look counts as owned)."""
+    return c.default or all_owned or db.execute(
         "SELECT 1 FROM player_cosmetic WHERE player_id = ? AND cosmetic_id = ?", (player_id, c.id)
     ).fetchone() is not None
 
@@ -41,13 +42,13 @@ def add_cosmetic(db: sqlite3.Connection, player_id: int, cosmetic_id: str, sourc
     return cur.rowcount > 0
 
 
-def loadout(db: sqlite3.Connection, player_id: int) -> dict[str, Cosmetic]:
+def loadout(db: sqlite3.Connection, player_id: int, *, all_owned: bool = False) -> dict[str, Cosmetic]:
     """Equipped cosmetic per slot; unknown, unowned or missing entries show the default."""
     out = {slot: default_cosmetic(slot) for slot in COSMETIC_SLOTS}
     owned = owned_cosmetics(db, player_id)
     for r in db.execute("SELECT slot, cosmetic_id FROM player_loadout WHERE player_id = ?", (player_id,)):
         c = get_cosmetic(r["cosmetic_id"])
-        if c is not None and c.slot == r["slot"] and (c.default or c.id in owned):
+        if c is not None and c.slot == r["slot"] and (c.default or all_owned or c.id in owned):
             out[c.slot] = c
     return out
 

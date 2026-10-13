@@ -31,7 +31,7 @@ def _rig(session: AgentSession, player, dealer, deck=()) -> None:
 def test_new_run_starts_at_betting() -> None:
     r = AgentSession.new(seed=7).execute({"cmd": "observe"})
     obs = r["obs"]
-    assert r["ok"] and obs["schema"] == 2
+    assert r["ok"] and obs["schema"] == 3
     assert obs["phase"] == "betting" and obs["legal_actions"] == ["bet", "buy", "reroll"]
     assert obs["shop"]["reroll_price"] == 3
     assert len(obs["shop"]["offers"]) == 3 and obs["shop"]["restock_in"] == 2

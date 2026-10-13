@@ -128,12 +128,16 @@ class Balance:
     chaos_stub_calm_weight: float = 0.0
     meta_chaos_win_bonus: int = 0
     meta_bring_kinds: int = 99
+    meta_unlock_all_cosmetics: bool = False  # every look counts as owned (nothing is stored)
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
     meta_upgrades: tuple[MetaUpgradeBalance, ...] = field(default=())  # enabled ones only
     cosmetic_prices: tuple[CosmeticPriceBalance, ...] = field(default=())  # enabled ones only
     achievement_rewards: tuple[AchievementRewardBalance, ...] = field(default=())
+    # Settings of one mode's own mechanics ("mode.<mode id>.<name>" keys, e.g. the
+    # J-54 table's compute fee), read by that mode's code; stored without "mode.".
+    mode_settings: Params = field(default=())
 
     @property
     def shop_prices(self) -> dict[str, int]:
@@ -197,12 +201,15 @@ _SETTINGS: dict[str, str] = {
     "meta.loss_per_peak_gain": "meta_loss_per_peak_gain",
     "meta.loss_cap": "meta_loss_cap",
 }
+# "mode.<mode id>.<name>": a setting of one mode's own mechanics (Balance.mode_settings).
+MODE_SETTING_PREFIX = "mode."
 # Settings added later: profiles cloned before them load with the field default.
 _OPTIONAL_SETTINGS: dict[str, str] = {
     "shop.reroll_price": "shop_reroll_price",
     "chaos.stub_calm_weight": "chaos_stub_calm_weight",
     "meta.chaos_win_bonus": "meta_chaos_win_bonus",
     "meta.bring_kinds": "meta_bring_kinds",
+    "meta.unlock_all_cosmetics": "meta_unlock_all_cosmetics",
 }
 
 
@@ -269,9 +276,13 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
     pid = row[0]
 
     values: dict[str, Any] = {}
+    mode_settings: dict[str, Any] = {}
     for key, raw, typ, lo, hi in conn.execute(
         "SELECT key, value, type, min, max FROM setting WHERE profile_id = ?", (pid,)
     ):
+        if key.startswith(MODE_SETTING_PREFIX) and key.count(".") >= 2:
+            mode_settings[key[len(MODE_SETTING_PREFIX):]] = _parse(key, raw, typ, lo, hi)
+            continue
         field_name = _SETTINGS.get(key) or _OPTIONAL_SETTINGS.get(key)
         if field_name is None:
             raise BalanceError(f"Profile {name!r}: unknown setting {key!r}")
@@ -337,7 +348,7 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
     num, den = values.pop("_bj_num"), values.pop("_bj_den")
     return Balance(profile=name, blackjack_pays=(num, den), shop_items=tuple(items),
                    item_tuning=tuning, chaos_rules=rules, meta_upgrades=upgrades, cosmetic_prices=prices,
-                   achievement_rewards=rewards, **values)
+                   achievement_rewards=rewards, mode_settings=tuple(sorted(mode_settings.items())), **values)
 
 
 def clone_profile(conn: sqlite3.Connection, source: str, name: str, description: str = "") -> int:

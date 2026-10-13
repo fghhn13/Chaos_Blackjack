@@ -1,0 +1,83 @@
+{
+  "name": "J-54",
+  "description": "A calculating machine built as a circus clown: a jester's cap, a pixel-screen face and porcelain hands that never stop moving. It performs like a showman and speaks like a compiler.",
+  "default": "resting_mania",
+  "portraits": {
+    "resting_mania": "assets/j54/resting_mania.png",
+    "grand_welcome": "assets/j54/grand_welcome.png",
+    "welcome": "assets/j54/grand_welcome.png",
+    "card_reveal": "assets/j54/card_reveal.png",
+    "secretive_trick": "assets/j54/secretive_trick.png",
+    "obsessive_lecture": "assets/j54/obsessive_lecture.png",
+    "paranoid_analysis": "assets/j54/paranoid_analysis.png",
+    "guarded": "assets/j54/guarded.png",
+    "irritated": "assets/j54/irritated.png",
+    "glitching_frenzy": "assets/j54/glitching_frenzy.png"
+  },
+  "moods": {
+    "off": "resting_mania",
+    "round_started": "resting_mania",
+    "rule_applied": "secretive_trick",
+    "poke": "card_reveal",
+    "item_used": "paranoid_analysis",
+    "player_bust": "obsessive_lecture",
+    "player_blackjack": "guarded",
+    "dealer_blackjack": "card_reveal",
+    "dealer_busts": "irritated",
+    "outcome_dealer": "resting_mania",
+    "outcome_player": "guarded",
+    "outcome_blackjack": "irritated",
+    "outcome_push": "paranoid_analysis",
+    "outcome_surrender": "obsessive_lecture"
+  },
+  "lines": {
+    "idle": [
+      "Awaiting input. Take all the time you can afford.",
+      "Idle cycles are billed. Please continue."
+    ],
+    "round_started": [
+      "Deck shuffled. Every card accounted for.",
+      "New sample drawn. Proceed.",
+      "Executing round. Your move."
+    ],
+    "rule_applied": [
+      "Deck revision applied: {rule}.",
+      "{rule}. The deck has been updated. You will want to update yourself.",
+      "Patch notes: {rule}."
+    ],
+    "item_used": [
+      "External interference logged.",
+      "Noted. Recalculating."
+    ],
+    "player_bust": [
+      "Total exceeded the limit. Predictable.",
+      "Overflow detected in your hand."
+    ],
+    "player_blackjack": [
+      "Twenty-one. Probability was low. Not zero."
+    ],
+    "dealer_blackjack": [
+      "Twenty-one. As calculated."
+    ],
+    "dealer_busts": [
+      "Error in my own hand. Logging it."
+    ],
+    "outcome_dealer": [
+      "Result: house. Chips transferred.",
+      "Outcome within expected range."
+    ],
+    "outcome_player": [
+      "Result: player. Adjusting estimates.",
+      "Your win is recorded. It changes nothing. Yet."
+    ],
+    "outcome_blackjack": [
+      "Natural twenty-one. An outlier. I dislike outliers."
+    ],
+    "outcome_push": [
+      "Equal totals. Null result."
+    ],
+    "outcome_surrender": [
+      "Retreat accepted. Half the stake returned, as specified."
+    ]
+  }
+}

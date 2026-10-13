@@ -30,9 +30,15 @@ def build_chaos_context(controller: "GameController") -> str:
     def cards(hand):
         return [f"{card.rank}{card.suit}" for card in hand]
 
-    def hand(hand):
-        total = c.loop.rules.hand_value(hand, ctx)
-        return {"cards": cards(hand), "total": total, "bust": c.loop.rules.is_bust(total, ctx)}
+    def hand(hand, actor="player"):
+        context = c.loop.context(actor)
+        total = c.loop.rules.hand_value(hand, context)
+        if actor == "player" and c.table is not None and c.table.hidden_player_cards():
+            # Face-down player cards stay hidden from the dealer's chat as well.
+            hidden = c.table.hidden_player_cards()
+            return {"cards": ["??" if i in hidden else f"{x.rank}{x.suit}" for i, x in enumerate(hand)],
+                    "total": None, "bust": None}
+        return {"cards": cards(hand), "total": total, "bust": c.loop.rules.is_bust(total, context)}
 
     data = {
         "phase": c.phase.value, "round": c.run.round,
@@ -42,7 +48,7 @@ def build_chaos_context(controller: "GameController") -> str:
         "bet_range": c.bet_limits(), "doubled": c._doubled,
         "legal_actions": sorted(c._available_actions()),
         "player": hand(st.player_hand) if st else None,
-        "dealer": hand(st.dealer_hand) if st else None,
+        "dealer": hand(st.dealer_hand, "dealer") if st else None,
         "hole_revealed_to_player": c.hole_revealed,
         "deck": cards(st.deck) if st else [],
         "next_hit": hand(st.player_hand + st.deck[:1]) if st and st.deck else None,

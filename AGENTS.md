@@ -22,6 +22,9 @@ python -m chaos_blackjack.agent reroll                # roll the shop's stock ag
 python -m chaos_blackjack.agent bet 20                # place a bet
 python -m chaos_blackjack.agent act hit               # hit | stand | double | surrender
 python -m chaos_blackjack.agent act use_item peek     # use an item from your inventory
+python -m chaos_blackjack.agent choose ph_margin      # answer obs.choice (a core, a replacement, a target)
+python -m chaos_blackjack.agent cancel                # drop obs.choice when it is cancellable
+python -m chaos_blackjack.agent perform ph_sleeve     # one of obs.table_actions
 python -m chaos_blackjack.agent --brief act stand     # smaller reply (recommended)
 ```
 
@@ -29,7 +32,9 @@ python -m chaos_blackjack.agent --brief act stand     # smaller reply (recommend
 (the Chaos AI changes rules each round), `--llm` (the Chaos AI is a real,
 **billed** model instead of the offline stub — only use when told to),
 `--start-money N`, `--target-money N`, `--max-steps N`, `--profile NAME` (a balance
-profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`).
+profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`), `--mode ID`
+(a game mode; `chaos` is Poker Head's build table, `j54` J-54's deck table, a demo — see below;
+`--chaos` without `--mode` keeps the classic Chaos run).
 
 Global flags: `--brief` (only summary / hint / legal actions / results),
 `--compact` (single-line JSON), `--state PATH`.
@@ -46,18 +51,19 @@ drawing, moving to the next round) happens automatically inside your command:
 
 | `obs.phase`   | You send                          |
 | ------------- | --------------------------------- |
-| `betting`     | `bet <amount>` within `obs.bet_range`; optionally `buy <item>` or `reroll` first (see `obs.shop`) |
+| `betting`     | `bet <amount>` within `obs.bet_range`; optionally `buy <item>`, `reroll` or a usable item first (see `obs.shop`, `obs.items`) |
 | `player_turn` | `act <action>` from `obs.legal_actions` |
 | `run_over`    | nothing — read `obs.run_end`; `new` to play again |
+| any, with `obs.choice` | `choose <option>` (or `cancel` when `obs.choice.cancellable`); nothing else is legal until then |
 
-### Reply shape (schema 2)
+### Reply shape (schema 3)
 
 ```json
 {
   "ok": true,
   "events": ["Round 1 started, bet 20", "You draw: Q"],
   "obs": {
-    "schema": 2,
+    "schema": 3,
     "phase": "player_turn",
     "legal_actions": ["hit", "stand"],
     "hint": "Your move: act hit | stand",
@@ -65,7 +71,10 @@ drawing, moving to the next round) happens automatically inside your command:
     "bankroll": 100, "target": 300, "bet": 20, "bet_range": null,
     "you": {"cards": ["8♣", "3♥", "Q♥"], "total": 21},
     "dealer": {"cards": ["K♣", "??"], "total": null},
-    "items": [{"id": "peek", "count": 1, "help": "Reveal the rank of the next card in the deck."}],
+    "items": [{"id": "peek", "name": "", "count": 1, "help": "Reveal the rank of the next card in the deck.",
+               "when": "On your turn", "usable": true}],
+    "choice": null,
+    "table_actions": [],
     "shop": null,
     "chaos": {"enabled": true, "budget": 4, "active_rules": [{"id": "modify_card_value", "help": "..."}]},
     "action_help": {"hit": "take one more card", "stand": "end your turn; the dealer plays"},
@@ -79,6 +88,7 @@ drawing, moving to the next round) happens automatically inside your command:
 - Cards are `<rank><suit>` (`A`, `2`–`10`, `J`, `Q`, `K`; `♠ ♥ ♦ ♣`). `??` is the dealer's face-down card; its total is `null` until revealed.
 - `obs.you.total` already includes active chaos rules — trust it over your own arithmetic.
 - After a round settles, the next `obs` is `betting` and `obs.last_round` holds the result: `outcome` (`player` / `dealer` / `push` / `blackjack` / `surrender`), `delta` (bankroll change), both final hands, `doubled`.
+- `obs.items[].usable` / `reason` and `obs.shop.offers[].affordable` / `reason` come from the same moves the GUI enables. `obs.choice` is `{"prompt", "options": [{"id", "label", "help"}], "cancellable"}` while a command waits for an answer.
 - While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n, "reroll_price": n | null, "reroll_affordable": bool}`; `null` in other phases.
 - On failure `ok` is `false` and `error` is `{code, message, legal_actions}`; the state is unchanged, so fix the command and retry. Codes: `illegal_action`, `invalid_argument`, `unknown_command`, `run_over`, `step_limit`, `usage`.
 - Exit code: `0` ok, `1` command rejected, `2` usage or missing/invalid run file.
@@ -93,6 +103,31 @@ drawing, moving to the next round) happens automatically inside your command:
 - Dealer draws to 17 and stands on 17+.
 - Shop (betting phase only): 3 different items, each buyable once; restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, with a one-chip minimum). `reroll` rolls the current stock again once per stock for 3 chips. A purchase or reroll must leave at least 10 chips. `buy` / `reroll` are in `legal_actions` only when allowed.
 - With `--chaos`, the Chaos AI may apply one rule per round, or leave the round calm (e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push). Active rules are listed in `obs.chaos.active_rules` with a plain-English `help`.
+
+### Poker Head's build table (`--mode chaos`)
+
+Goal: **net assets 500** (cash + invested principal − every loan repayment
+owed; borrowing never wins). The run opens with `obs.choice`: two cores or
+30 chips without a core. Two build slots (a full build asks what to
+replace; `perform ph_discard <id>` drops one before betting), consumables with a phase (`obs.items[].when`), financial products
+with the Private Account core, up to three persistent Chaos rules and a
+rising minimum bet. `obs.table.public` is the public build and money
+snapshot. Guide: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md) §8b; architecture:
+[docs/design/ITEM_ARCHITECTURE.md](docs/design/ITEM_ARCHITECTURE.md).
+
+### J-54's table (`--mode j54`, demo)
+
+The deck lasts the whole run (every round reshuffles all of its cards) and
+J-54's Chaos rules add or remove cards instead of changing values. A random
+**protocol** is the goal: *Single Capture* (draw the Joker yourself; it starts
+sealed until you buy `j54_start_experiment`) or *Capital* (reach the chip
+target). A **compute fee** is charged before each bet and grows with the
+round; the minimum bet is at least the fee. The shop sells **contracts**
+(`buy j54_low_purge`, ...) that change the deck at once or on your next win;
+they never enter `obs.items`. `obs.table` = `{"info": {"Protocol", "Joker" or
+"Goal", "Deck", "Removed"?, "Fee", "Contracts"?}, "fee": n, "deck": {rank: count}}`
+(null at other tables; the deck's make-up is public, its order is not); deck
+changes are reported in `events`. Design: [docs/design/J54_TABLE.md](docs/design/J54_TABLE.md).
 
 ### Fair play
 
@@ -141,4 +176,4 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 - Game numbers live in SQLite balance profiles (`data/game.db`, git-ignored). Shipped values: `chaos_blackjack/data/seed/default.sql` (the locked `default` profile is re-imported when it changes). Schema changes: new `chaos_blackjack/data/migrations/NNNN_*.sql`. Manage profiles with `python -m chaos_blackjack.data profiles | show | clone | set | diff | export | delete` (never edit the locked `default`; clone it). Saves (`run_save`) and preferences (`preference`) live in the same database; `python -m chaos_blackjack.data saves` lists saves, `import-saves` imports old JSON saves. Tests force `CHAOS_DB=:memory:` (use a tmp file when a test needs data to persist between connections); never commit a `.db` file.
 - Meta progression (players, upgrades, run history, codex) follows `docs/design/META_PROGRESSION.md`; that file is the contract between agents. Cosmetics and achievements follow `docs/design/COSMETICS_ACHIEVEMENTS.md` (adding one is a catalog entry plus seed rows; see its section 2); modes, their hosts and pools follow `docs/design/AI_MODES.md`. The agent CLI does not use meta progression.
 - Balance: the simulator is a separate, git-ignored repo in `black-jack-sim/` (see its README). It only imports the game through `bjsim/adapter.py`; after changing rules, prices or the controller API, run `python -m bjsim check` there and update that adapter if needed.
-- Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController`, `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.
+- Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController` (a mode's own mechanics plug in through `app/table_mechanics.py`; J-54's are `j54/`; what the table shows comes from parts and per-mode layouts, see `docs/design/TABLE_UI.md`), `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.
