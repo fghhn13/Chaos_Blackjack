@@ -200,10 +200,11 @@ INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost) VALUES
 
 -- Achievement rewards (catalog: chaos_blackjack/achievements/catalog.py): tokens
 -- and optional cosmetics (comma-separated ids). An achievement without a row
--- pays nothing. Placeholder values.
+-- pays nothing. Placeholder values. Poker Face also hands out the rest of Poker
+-- Head's House Collection until those looks get their own unlock rules.
 INSERT INTO achievement_reward (profile_id, achievement_id, tokens, cosmetic_ids) VALUES
     (:profile, 'first_win',           10, NULL),
-    (:profile, 'chaos_conqueror',     10, 'deck_poker_head,table_poker_head'),
+    (:profile, 'chaos_conqueror',     10, 'deck_poker_head,table_poker_head,deck_poker_head_gold,chips_poker_head,avatar_poker_head_j'),
     (:profile, 'regular',              8, NULL),
     (:profile, 'marathon',            15, NULL),
     (:profile, 'natural_talent',       8, NULL),

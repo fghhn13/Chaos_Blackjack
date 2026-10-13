@@ -236,7 +236,8 @@ def test_cosmetic_rewards_are_owned_and_equippable(svc) -> None:
     _history_row(svc, p.id, "victory", mode="chaos")
     states = {s.achievement.id: s for s in meta.achievements(p.id)}
     poker_face = states["chaos_conqueror"]
-    assert poker_face.unlocked and poker_face.reward_cosmetics == ("deck_poker_head", "table_poker_head")
+    assert poker_face.unlocked and poker_face.reward_cosmetics == (
+        "deck_poker_head", "table_poker_head", "deck_poker_head_gold", "chips_poker_head", "avatar_poker_head_j")
     offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_poker_head"]
     assert offer.owned and not offer.can_buy and offer.unlock_hint == "Achievement: Poker Face"
     loadout = meta.equip(p.id, "deck_poker_head")
@@ -346,4 +347,5 @@ def test_every_cosmetic_belongs_to_a_registered_series() -> None:
 
     known = {s.id for s in series_list()}
     assert all(c.series in known for c in cosmetics())
-    assert {c.id for c in cosmetics() if c.series == "poker_head"} == {"deck_poker_head", "table_poker_head"}
+    assert {c.id for c in cosmetics() if c.series == "poker_head"} == {
+        "deck_poker_head", "table_poker_head", "deck_poker_head_gold", "chips_poker_head", "avatar_poker_head_j"}

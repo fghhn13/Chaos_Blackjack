@@ -147,11 +147,17 @@ _SKINS: dict[str, tuple[str, tuple[int, int], Placeholder]] = {
                                                       theme.GOLD)),
     "table_midnight": ("background", BG, ph.felt_table((0x16, 0x22, 0x38), (0x22, 0x32, 0x50), (0x6E, 0x7E, 0xA0))),
     "table_chaos": ("background", BG, ph.felt_table((0x2E, 0x18, 0x3C), (0x44, 0x26, 0x56), theme.CHAOS_MAGENTA)),
-    # Poker Head's deck and table (placeholders for his final art)
+    # Poker Head's deck and table (art: assets/cosmetics/procedural; the rest of his
+    # House Collection ships as files in assets/cosmetics/poker_head)
     "card_back_poker_head": ("card", CARD, ph.flower_back((0xA8, 0x36, 0x5A), (0xF4, 0xE4, 0xC8), theme.FELT,
                                                           theme.INK)),
     "card_front_poker_head": ("card", CARD, ph.framed_front((0xF6, 0xEA, 0xD0), (0xA8, 0x36, 0x5A), theme.INK)),
     "table_poker_head": ("background", BG, ph.felt_table((0x2E, 0x46, 0x3A), (0x3A, 0x54, 0x46), (0xB0, 0x96, 0x5A))),
+    "card_back_poker_head_gold": ("card", CARD, ph.lattice_back((0x8E, 0x3C, 0x59), (0xD5, 0xB9, 0x75), (0xD5, 0xB9, 0x75),
+                                                               (0xB7, 0xA4, 0x77))),
+    **{f"chips_poker_head_{v}": ("chip", ICON, ph.chip(c, (0x17, 0x1C, 0x1B))) for v, c in
+       {1: (0xF1, 0xE6, 0xD2), 5: (0xA2, 0x3D, 0x43), 10: (0x34, 0x4B, 0x72), 25: (0x3B, 0x65, 0x52)}.items()},
+    "avatar_poker_head_j": ("avatar", AVATAR, ph.avatar("bust", (0x1D, 0x30, 0x29), (0xB7, 0xA4, 0x77))),
     **{f"chips_neon_{v}": ("chip", ICON, ph.chip(c, theme.DARK)) for v, c in _NEON.items()},
     **{f"chips_gold_{v}": ("chip", ICON, ph.chip(c, (0x6E, 0x50, 0x1E))) for v, c in _GOLD_CHIPS.items()},
     # J-54's look (art: assets/cosmetics/j54, scripts/generate_j54_theme.py)
