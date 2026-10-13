@@ -109,6 +109,7 @@ def build_save_data(
     config: dict | None = None,
     table: dict | None = None,
     log: dict | None = None,
+    choice: dict | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -135,4 +136,5 @@ def build_save_data(
         config=config,
         table=table,
         log=log,
+        choice=choice,
     )

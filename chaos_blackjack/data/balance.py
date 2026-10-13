@@ -128,6 +128,7 @@ class Balance:
     chaos_stub_calm_weight: float = 0.0
     meta_chaos_win_bonus: int = 0
     meta_bring_kinds: int = 99
+    meta_unlock_all_cosmetics: bool = False  # every look counts as owned (nothing is stored)
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
@@ -208,6 +209,7 @@ _OPTIONAL_SETTINGS: dict[str, str] = {
     "chaos.stub_calm_weight": "chaos_stub_calm_weight",
     "meta.chaos_win_bonus": "meta_chaos_win_bonus",
     "meta.bring_kinds": "meta_bring_kinds",
+    "meta.unlock_all_cosmetics": "meta_unlock_all_cosmetics",
 }
 
 

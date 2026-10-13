@@ -13,6 +13,12 @@ GOLD: Color = (0xC2, 0xAE, 0x7E)
 GOLD_DIM: Color = (0x7E, 0x71, 0x52)
 CHAOS_PURPLE: Color = (0x88, 0x75, 0x8F)
 CHAOS_MAGENTA: Color = (0xB9, 0x8A, 0xA2)
+# Product groups (app/products.py ProductDef.group): icon tint and frame colour.
+GROUP_COLORS: dict[str, Color] = {
+    "permanent": (0xC2, 0xAE, 0x7E),    # old gold, as the art is drawn
+    "consumable": (0x6E, 0xC4, 0xB2),   # teal
+    "special": (0x9C, 0x94, 0xE8),      # violet: cores, money products, system items
+}
 IVORY: Color = (0xE6, 0xE0, 0xD2)
 INK: Color = (0x22, 0x24, 0x23)
 SUIT_RED: Color = (0xA8, 0x35, 0x2F)

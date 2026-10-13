@@ -130,12 +130,14 @@ class AssetManager:
 
     def _load_base(self, asset_id: str) -> pygame.Surface:
         path = self.path(asset_id)
+        spec = self.manifest.get(asset_id)
         if path is not None:
             try:
-                return self._optimize(pygame.image.load(str(path)))
+                surf = self._optimize(pygame.image.load(str(path)))
             except (pygame.error, OSError):
                 pass  # unreadable file -> fall through to placeholder
-        spec = self.manifest.get(asset_id)
+            else:
+                return tinted(surf, spec.tint) if spec is not None and spec.tint else surf
         if spec is not None:
             return self._optimize(spec.placeholder(spec.size, self.font))
         return self._optimize(placeholders.missing(_FALLBACK_SIZE, self.font))
@@ -177,3 +179,12 @@ class AssetManager:
             if path:
                 return pygame.font.Font(path, size)
         return pygame.font.Font(None, size)
+
+
+def tinted(surf: pygame.Surface, color: tuple[int, int, int]) -> pygame.Surface:
+    """A one-colour silhouette repainted in `color`, keeping its alpha (and anti-aliased edges)."""
+    out = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+    out.blit(surf, (0, 0))
+    out.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    out.fill((*color, 0), special_flags=pygame.BLEND_RGBA_ADD)
+    return out

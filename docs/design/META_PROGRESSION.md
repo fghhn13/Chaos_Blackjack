@@ -170,8 +170,9 @@ meta layer uses it to build the run summary.
 
 ```python
 CodexEntry(kind, id, name, icon: str, summary: str, detail: Callable[[RunConfig], str],
-           demo: DemoScript | None, order: int = 0)
-codex_kinds() -> list[CodexKind]                     # rule, mode, item, ai (label, order)
+           demo: DemoScript | None, order: int = 0, category: str = "", style: str = "",
+           timing: str = "", price: str = "", related: tuple[str, ...] = ())
+codex_kinds() -> list[CodexKind]                     # rule, mode, item, ai, build, environment (label, order)
 codex_entries(kind=None, config=None) -> list[CodexEntry]
 
 DemoScript(player: tuple[str, ...], dealer: tuple[str, ...], deck: tuple[str, ...],
@@ -182,8 +183,10 @@ run_demo(script, config) -> list[DemoFrame]          # DemoFrame(view: GameView,
 ```
 
 Demos run on a real `GameController` with a rigged deal, so they always match
-the rules and the profile's numbers. Entries without a demo show a large icon
-and the text. The GUI only plays frames.
+the rules and the profile's numbers. Entries without a demo show a compact icon
+and a wide reference panel. Optional browser metadata describes product type,
+build style, timing, price and related entries; existing providers can omit it.
+The GUI only plays frames.
 
 ## 6. Screens
 
@@ -195,7 +198,7 @@ and the text. The GUI only plays frames.
 | Shop (formerly Upgrades) | B | areas (Upgrades, Cosmetics, Starter items), then series tabs (Classic Table, Dealers): permanent upgrades (level pips, next cost) and consumables (owned count) |
 | Run result | B | victory / defeat, token breakdown, back to home (replaces the ending scene when a player is active) |
 | History | B | list of runs, detail with summary |
-| Collection (codex) | C | tabs: Classic Table + one per dealer (character profile, its rules and table items); detail: animated demo + text with live numbers |
+| Collection (codex) | C | series tabs; compact host/category sidebar, type/style-filtered cards and inline reference; details: animated demos or compact text references with live numbers and adopted product icons |
 
 The game starts on Home (see `docs/META_GUI.md`). There is no quick play and no in-game asset gallery.
 

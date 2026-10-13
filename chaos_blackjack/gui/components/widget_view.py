@@ -39,6 +39,11 @@ def tone(name: str) -> tuple[int, int, int]:
     return TONES.get(name, theme.IVORY)
 
 
+def _dim(color: tuple[int, int, int]) -> tuple[int, int, int]:
+    """A disabled element's edge: the colour at about 60%."""
+    return tuple(round(c * 0.6) for c in color)  # type: ignore[return-value]
+
+
 @dataclass
 class Hit:
     rect: pygame.Rect
@@ -248,7 +253,10 @@ def _list(r: _Render, w: Any, x: int, y: int, width: int) -> int:
             r.rect(theme.GOLD, row, 1, 8)
         tx = x + 8
         if e.icon:
-            r.icon(e.icon, pygame.Rect(x + 6, y + 4, icon, icon), 255 if usable or e.act is None else 120)
+            box = pygame.Rect(x + 6, y + 4, icon, icon)
+            if e.frame in theme.GROUP_COLORS:
+                r.rect(theme.GROUP_COLORS[e.frame], box.inflate(4, 4), 1, 6)
+            r.icon(e.icon, box, 255 if usable or e.act is None else 120)
             tx = x + icon + 16
         badge_w = 0
         if e.badge:
@@ -292,14 +300,15 @@ def _slots(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         rect = pygame.Rect(x + col * (size + 6), y + row * (size + 6), size, size)
         usable = s.act is not None and s.act.enabled
         r.rect(theme.FELT if r.hovered(rect) and usable else theme.DARK, rect, 0, 8)
-        r.rect(theme.GOLD if usable else theme.GOLD_DIM, rect, 1, 8)
+        edge = theme.GROUP_COLORS.get(s.frame, theme.GOLD)
+        r.rect(edge if usable else _dim(edge), rect, 2 if s.frame else 1, 8)
         r.icon(s.icon, rect.inflate(-10, -10), 255 if usable else 110)
         if s.count > 1:
             count = tiny.render(f"×{s.count}", True, theme.GOLD)
             r.blit(count, (rect.right - count.get_width() - 3, rect.bottom - count.get_height() - 1))
         if s.hotkey:
             r.blit(r.font(theme.FONT_TINY).render(s.hotkey, True, theme.TEXT_MUTED), (rect.x + 4, rect.y + 2))
-        r.hits.append(Hit(rect, s.act, s.tooltip + ("" if usable else " (on your turn)")))
+        r.hits.append(Hit(rect, s.act, s.tooltip))
     rows = (len(w.slots) + cols - 1) // cols
     return y + rows * (size + 6) - top
 

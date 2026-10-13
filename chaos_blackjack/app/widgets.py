@@ -91,6 +91,7 @@ class Entry:
     tooltip: str = ""
     badge: str = ""         # short tag shown on the right (e.g. a count or a trigger)
     act: Act | None = None
+    frame: str = ""         # a product group (permanent, consumable, special): frames the icon in its colour
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,7 @@ class Slot:
     tooltip: str = ""
     hotkey: str = ""        # "1".."9"
     act: Act | None = None
+    frame: str = ""         # a product group: the slot's border colour
 
 
 @dataclass(frozen=True)

@@ -114,7 +114,77 @@ def item_entries(config: RunConfig) -> list[CodexEntry]:
         getattr(cls, "codex_summary", _ITEM_SUMMARIES.get(iid, help_fn(iid) or "A registered table item.")),
         getattr(cls, "codex_detail", partial(_item_detail, iid)),
         getattr(cls, "codex_demo", ITEM_DEMOS.get(iid)), getattr(cls, "codex_order", 0),
-    ) for iid, cls in tuple(registry._items.items())]
+    ) for iid, cls in tuple(registry._items.items()) if getattr(cls, "codex_kind", "item") == "item"]
+
+
+def _build_detail(item_id: str, config: RunConfig) -> str:
+    from chaos_blackjack.codex.build_reference import detail
+
+    return detail(item_id, config)
+
+
+def build_entries(config: RunConfig) -> list[CodexEntry]:
+    from chaos_blackjack.codex.build_reference import effect, price_label, related, timing
+    from chaos_blackjack.poker_head.catalog import PRODUCTS
+
+    return [CodexEntry("build", p.id, p.name, p.id, effect(p.id, config),
+                       partial(_build_detail, p.id), None, i, p.kind, p.style,
+                       timing(p.id), price_label(p.id, config), related(p.id))
+            for i, p in enumerate(PRODUCTS.values())]
+
+
+# Poker Head's environment rules (poker_head/environment.py): name and one-line summary per type.
+_ENVIRONMENT = {
+    "fixed": ("Card Rewrite", "Some cards count as a fixed value."),
+    "shift": ("Card Shift", "Some cards count more or less."),
+    "bust": ("Bust Limit", "Your bust limit falls, or the dealer's rises."),
+    "tie": ("Ties to the House", "Equal totals go to the dealer."),
+    "bust_outcome": ("Dealer Bust Pardon", "A dealer bust becomes a push."),
+    "profit_cap": ("Withdrawal Limit", "A round's profit is capped."),
+    "item_ban": ("Item Ban", "Your next consumable only lifts the ban."),
+    "markup": ("Price Hike", "Consumables and permanents cost more."),
+    "hidden": ("Face-Down Card", "Your second opening card is dealt face down."),
+}
+
+
+def _director(config: RunConfig):
+    from chaos_blackjack.poker_head.director import Director
+
+    settings = {k[len("chaos."):]: v for k, v in config.mode_settings.items() if k.startswith("chaos.")}
+    return Director(settings, seed=0, rule_slots=int(config.mode_settings.get("chaos.rule_slots", 3)))
+
+
+def _environment_detail(rule_type: str, config: RunConfig) -> str:
+    from chaos_blackjack.poker_head.director import STAGE_NAMES, pool_summary
+
+    d = _director(config)
+    stages, example = [], None
+    for index, (first, act, slots, budget) in enumerate(d.stages):
+        weight = d.weights.get(rule_type, [0] * len(d.stages))[index]
+        spec = d.pools[index].get(rule_type)
+        last = d.stages[index + 1][0] - 1 if index + 1 < len(d.stages) else None
+        rounds = f"rounds {first}–{last}" if last else f"round {first} on"
+        if weight and spec:
+            stages.append(f"{STAGE_NAMES[min(index, len(STAGE_NAMES) - 1)]} ({rounds}): {pool_summary(rule_type, spec)}")
+            stage = d.stage(first)
+            example = example or next(iter(d.variants(stage).get(rule_type, [])), None)
+    text = _ENVIRONMENT[rule_type][1]
+    if example is not None:
+        text += f"\n\nFor example\n{example.title}: {example.effect_text()}\n\nGoes away\n{example.removal_text()}"
+    text += "\n\nWhen it appears\n" + ("\n".join(stages) if stages else "Not in this profile's pools.")
+    text += ("\n\nHow the dealer acts\nBefore you shop and bet each round, Poker Head may add one rule or replace "
+             "one that has been in force for two rounds; it never changes the rules after the deal. Up to "
+             f"{d.rule_slots} rules at once, one of each kind; fewer early on. A kind you clear waits two rounds "
+             "before it can return, and one that ends waits a round.")
+    return text
+
+
+def environment_entries(config: RunConfig) -> list[CodexEntry]:
+    from chaos_blackjack.poker_head.environment import TYPES
+
+    return [CodexEntry("environment", t, _ENVIRONMENT[t][0], "ph_env_" + t, _ENVIRONMENT[t][1],
+                       partial(_environment_detail, t), None, i, "environment")
+            for i, t in enumerate(TYPES)]
 
 
 @dataclass(frozen=True)
@@ -166,7 +236,11 @@ def _mode_detail(mode_id: str, config: RunConfig) -> str:
         text += f" You may {moves} on your first decision."
     if banned:
         text += f" No {banned} at this table."
-    if cfg.enable_chaos:
+    from chaos_blackjack.app.table_mechanics import table_factory
+
+    if cfg.enable_chaos and getattr(table_factory(cfg), "environment_rules", False):
+        text += " Before you shop and bet, the dealer may add or replace one environment rule; it grows harsher round by round."
+    elif cfg.enable_chaos:
         pool = [r for r, _, w in cfg.chaos_stub if r and w > 0]
         if cfg.rule_pool is not None:
             pool = [r for r in pool if r in cfg.rule_pool]
@@ -233,5 +307,6 @@ def _pack_ai_detail(ai_id: str, config: RunConfig) -> str:
 
 def install() -> None:
     for kind, provider in (("rule", rule_entries), ("mode", mode_entries),
-                           ("item", item_entries), ("ai", ai_entries)):
+                           ("item", item_entries), ("ai", ai_entries), ("build", build_entries),
+                           ("environment", environment_entries)):
         register_codex_provider(kind, provider)

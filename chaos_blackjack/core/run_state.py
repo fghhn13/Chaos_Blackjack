@@ -107,6 +107,8 @@ class RunSaveData:
     table: dict[str, Any] | None = None
     # The run log (app/run_log.py): lines and summary counters.
     log: dict[str, Any] | None = None
+    # A question waiting for the player's answer (app/choice.py Choice.to_dict()).
+    choice: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -134,6 +136,8 @@ class RunSaveData:
             data["table"] = self.table
         if self.log is not None:
             data["log"] = self.log
+        if self.choice is not None:
+            data["choice"] = self.choice
         return data
 
     @staticmethod
@@ -162,6 +166,7 @@ class RunSaveData:
             config=d.get("config"),
             table=d.get("table"),
             log=d.get("log"),
+            choice=d.get("choice"),
         )
 
 

@@ -402,7 +402,8 @@ class MetaService:
             player = self._player(db, player_id)
             balance = self._balance(db, profile)
             owned = unlocks.owned_cosmetics(db, player_id)
-            equipped = {c.id for c in unlocks.loadout(db, player_id).values()}
+            all_owned = self._all_looks(db, profile)
+            equipped = {c.id for c in unlocks.loadout(db, player_id, all_owned=all_owned).values()}
         prices = {p.cosmetic_id: p.cost for p in balance.cosmetic_prices}
         rewarded_by: dict[str, list[str]] = {}
         for r in balance.achievement_rewards:
@@ -411,14 +412,14 @@ class MetaService:
                 rewarded_by.setdefault(cosmetic_id, []).append("???" if a.hidden else a.name)
         offers = []
         for c in cosmetics(slot):
-            have = c.default or c.id in owned
+            have = c.default or all_owned or c.id in owned
             if c.hidden and not have:
                 continue
             price = None if c.default else prices.get(c.id)
             hints = [f"{price} tokens"] if price is not None else []
             hints += [f"Achievement: {name}" for name in rewarded_by.get(c.id, ())]
             if have:
-                reason = "Owned"
+                reason = "Owned" if c.default or c.id in owned else "Unlocked"
             elif price is None:
                 reason = "Not for sale"
             elif player.tokens < price:
@@ -433,13 +434,13 @@ class MetaService:
         """Slot -> equipped cosmetic id; every slot is filled (defaults included)."""
         with self._db() as db:
             self._player(db, player_id)
-            return {slot: c.id for slot, c in unlocks.loadout(db, player_id).items()}
+            return {slot: c.id for slot, c in unlocks.loadout(db, player_id, all_owned=self._all_looks(db)).items()}
 
     def asset_aliases(self, player_id: int) -> dict[str, str]:
         """Base asset id -> asset id of the player's equipped looks, for the GUI's AssetManager."""
         with self._db() as db:
             self._player(db, player_id)
-            return unlocks.asset_aliases(unlocks.loadout(db, player_id))
+            return unlocks.asset_aliases(unlocks.loadout(db, player_id, all_owned=self._all_looks(db)))
 
     def equip(self, player_id: int, cosmetic_id: str) -> dict[str, str]:
         """Equip an owned cosmetic in its slot; returns the new loadout."""
@@ -448,7 +449,7 @@ class MetaService:
             raise MetaError(f"Unknown cosmetic {cosmetic_id!r}")
         with self._db() as db:
             self._player(db, player_id)
-            if not unlocks.owns(db, player_id, c):
+            if not unlocks.owns(db, player_id, c, all_owned=self._all_looks(db)):
                 raise MetaError(f"You do not own {c.name} yet")
             with db:
                 db.execute(
@@ -456,7 +457,7 @@ class MetaService:
                     "ON CONFLICT(player_id, slot) DO UPDATE SET cosmetic_id = excluded.cosmetic_id",
                     (player_id, c.slot, c.id),
                 )
-            return {slot: e.id for slot, e in unlocks.loadout(db, player_id).items()}
+            return {slot: e.id for slot, e in unlocks.loadout(db, player_id, all_owned=self._all_looks(db)).items()}
 
     def buy_cosmetic(self, player_id: int, cosmetic_id: str, profile: str | None = None) -> Player:
         c = get_cosmetic(cosmetic_id)
@@ -464,7 +465,7 @@ class MetaService:
             raise MetaError(f"Unknown cosmetic {cosmetic_id!r}")
         with self._db() as db:
             player = self._player(db, player_id)
-            if unlocks.owns(db, player_id, c):
+            if unlocks.owns(db, player_id, c, all_owned=self._all_looks(db, profile)):
                 raise MetaError(f"You already own {c.name}")
             price = next((p.cost for p in self._balance(db, profile).cosmetic_prices if p.cosmetic_id == c.id), None)
             if price is None:
@@ -530,9 +531,14 @@ class MetaService:
             "WHERE player_id = ? AND result IS NOT NULL", (player_id,),
         ).fetchone()
         stats = PlayerStats(s["runs"] or 0, s["v"] or 0, s["d"] or 0, s["a"] or 0, s["best"] or 0, s["t"] or 0)
-        avatar = unlocks.loadout(db, player_id)["avatar"].asset_map()["avatar"]
+        avatar = unlocks.loadout(db, player_id, all_owned=self._all_looks(db))["avatar"].asset_map()["avatar"]
         return Player(row["id"], row["slot"], row["name"], row["tokens"], upgrades, stats,
                       row["created_at"], row["last_played_at"], avatar)
+
+    @classmethod
+    def _all_looks(cls, db: sqlite3.Connection, profile: str | None = None) -> bool:
+        """The profile's meta.unlock_all_cosmetics: every look counts as owned."""
+        return cls._balance(db, profile, fallback=True).meta_unlock_all_cosmetics
 
     @staticmethod
     def _balance(db: sqlite3.Connection, profile: str | None, *, fallback: bool = False) -> Balance:

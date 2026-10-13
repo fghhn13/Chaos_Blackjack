@@ -14,6 +14,8 @@ _KINDS = {
     "mode": CodexKind("mode", "Game modes", 1),
     "item": CodexKind("item", "Items", 2),
     "ai": CodexKind("ai", "Chaos AI", 3),
+    "build": CodexKind("build", "Build", 4),
+    "environment": CodexKind("environment", "Environment rules", 5),
 }
 _PROVIDERS: dict[str, list[CodexProvider]] = {}
 

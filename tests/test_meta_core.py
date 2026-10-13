@@ -130,7 +130,7 @@ def test_upgrades_shape_the_run(svc) -> None:
     assert cfg.start_money == base.start_money + 20 and cfg.bring_kinds == base.bring_kinds + 1
     # Classic sells every profile item except other tables' own offers (J-54's contracts).
     assert cfg.free_rerolls == 1
-    assert cfg.shop_prices == {k: v for k, v in base.shop_prices.items() if not k.startswith("j54_")}
+    assert cfg.shop_prices == {k: v for k, v in base.shop_prices.items() if not k.startswith(("j54_", "ph_"))}
     assert cfg.starting_items == ("peek", "shield") and not cfg.enable_chaos
     assert sorted(i.id for i in run.controller.view().items) == ["peek", "shield"]
     assert run.controller.view().money == base.start_money + 20
@@ -194,6 +194,7 @@ def test_victory_pays_and_records(svc) -> None:
 def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
     p = meta.create_player(1, "L")
     run = meta.start_run(p.id, "chaos", seed=2)
+    run.controller.choose(run.controller.view().choice.options[0].id)  # Poker Head's opening invitation
     run.controller.buy(run.controller.view().shop_offers[0].item)
     _play_out(run.controller)
     if run.controller.run_end.kind != "defeat":

@@ -113,7 +113,7 @@ class ChaosPanel(Widget):
         if n.kind in (NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY):
             self.speech = str(n.data.get("text") or n.text) or self.speech
         elif n.kind == NoticeKind.RULE_MODIFIER_APPLIED:
-            self.speech = f"New rule: {asset_name(str(n.data.get('rule_id')))}. Good luck."
+            self.speech = f"New rule: {n.data.get('rule_name') or asset_name(str(n.data.get('rule_id')))}. Good luck."
         elif n.kind == NoticeKind.ROUND_STARTED:
             self.speech = ROUND_LINE
         elif n.kind == NoticeKind.PLAYER_BUST:
@@ -143,7 +143,8 @@ class ChaosPanel(Widget):
         elif not (n.kind == NoticeKind.ROUND_SETTLED and self._busted):  # keep the bust remark
             line = p.line(event, self._turn)
             if line is not None:
-                rule = asset_name(str(n.data.get("rule_id", ""))) if n.kind == NoticeKind.RULE_MODIFIER_APPLIED else ""
+                rule = (str(n.data.get("rule_name") or asset_name(str(n.data.get("rule_id", ""))))
+                        if n.kind == NoticeKind.RULE_MODIFIER_APPLIED else "")
                 self.speech = line.replace("{rule}", rule)
                 self._turn += 1
         if n.kind == NoticeKind.PLAYER_BUST:

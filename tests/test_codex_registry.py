@@ -13,7 +13,10 @@ from chaos_blackjack.registry import get_registry
 
 
 def test_builtins_and_tab_order():
-    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai"]
+    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment"]
+    assert [e.id for e in codex_entries("environment")] == [
+        "fixed", "shift", "bust", "tie", "bust_outcome", "profit_cap", "item_ban", "markup", "hidden"]
+    assert len(codex_entries("build")) == 41
     assert len(codex_entries("rule")) == 13  # Poker Head's 7 and J-54's 6
     assert len(codex_entries("item")) == 6
     assert [e.id for e in codex_entries("mode")] == ["normal", "chaos", "j54"]
@@ -61,7 +64,9 @@ def test_modes_describe_the_supplied_config():
                     allow_surrender=False)
     for entry in codex_entries("mode", cfg):
         detail = entry.detail(cfg)
-        if entry.id == "j54":  # J-54's goal is a protocol, not a chip target
+        if entry.id == "chaos":
+            assert "500 net assets" in detail
+        elif entry.id == "j54":  # J-54's goal is a protocol, not a chip target
             assert "random protocol" in detail
         else:
             assert "230 chips" in detail and "into 920" in detail
@@ -138,3 +143,31 @@ def test_fractional_probabilities_and_bet_limits_are_not_rounded():
     cfg = RunConfig(chaos_guidance_probability=.875, max_bet_fraction=.333)
     assert "87.5%" in codex_entries("ai")[0].detail(cfg)
     assert "33.3%" in codex_entries("mode")[0].detail(cfg)
+
+
+def test_build_references_use_live_effects_prices_and_slot_limit():
+    original = {e.id: e for e in codex_entries("build")}
+    cfg = replace(RunConfig(), mode_settings={**RunConfig().mode_settings,
+        "chaos.build_slots": 2, "chaos.margin_bonus": 3, "chaos.surrender_pct": 15,
+        "chaos.approx_values": "19,22", "chaos.extra_shop_slots": 2},
+        item_params={"ph_court": {"value": 4}, "ph_stock": {"payout": 120, "probability": .6},
+                     "ph_loan": {"advance": 60, "repay": 80}},
+        shop_prices={"ph_court": 77, "ph_stock": 45, "ph_loan": 0})
+    entries = {e.id: e for e in codex_entries("build", cfg)}
+    assert "by 3" in original["ph_margin"].detail(cfg)
+    assert "15%" in entries["ph_retreat"].summary
+    assert "19 and 22" in entries["ph_approx"].summary
+    assert "2 shop" in entries["ph_account"].summary
+    assert "as 4 each" in entries["ph_court"].summary
+    assert "2 permanent slots" in original["ph_court"].detail(cfg)
+    assert entries["ph_court"].price == "77 chips"
+    assert entries["ph_stock"].price == "Invest 45 chips"
+    assert "60% chance of 120" in entries["ph_stock"].summary
+    assert entries["ph_loan"].price == "Borrow 60 / Repay 80"
+    assert "Tuning:" not in entries["ph_court"].detail(cfg)
+    assert entries["ph_oracle"].timing == "Before betting"
+    assert entries["ph_buffer"].timing == "Before bet / Your turn"
+    assert "Creates no Recovery Receipt" in entries["ph_waiver"].detail(cfg)
+    for entry in entries.values():
+        assert entry.category and entry.style and entry.timing and entry.price
+        assert all(target in entries for target in entry.related)

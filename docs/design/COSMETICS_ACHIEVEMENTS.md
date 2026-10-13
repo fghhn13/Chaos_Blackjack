@@ -47,6 +47,12 @@ instead of shipping a broken unlock.
 
 ## 3. Cosmetics
 
+**Every look unlocked.** The balance setting `meta.unlock_all_cosmetics`
+(on in the shipped `default` profile) makes every player own every look,
+hidden ones included, in the wardrobe, the shop and the loadout. Nothing is
+written to `player_cosmetic`, so turning it off (in a cloned profile) restores
+each player's real collection.
+
 ### 3.1 Catalog (code registry, `chaos_blackjack/cosmetics/`)
 
 ```python

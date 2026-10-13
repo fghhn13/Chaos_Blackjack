@@ -18,6 +18,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from chaos_blackjack.content.host_script import HostLine, host_script, summary_mood
+from chaos_blackjack.poker_head.catalog import ALIASES as POKER_HEAD_ALIASES, SHOP_IDS as POKER_HEAD_ITEMS
 
 if TYPE_CHECKING:
     from chaos_blackjack.app.config import RunConfig
@@ -42,6 +43,7 @@ class GameMode:
     # The rules and items of this mode's pools belong to it alone: modes without
     # a pool ("all") do not get them (e.g. J-54's deck rules and contracts).
     exclusive: bool = False
+    shared_items: tuple[str, ...] = ()  # usable starter aliases, not claimed from other modes
     # Which parts the table shows and where (app/layout.py); None = the default layout.
     layout: "Layout | None" = None
 
@@ -108,7 +110,8 @@ def series_list() -> list[Series]:
 
 def _claimed(mode_id: str, pool: str) -> frozenset[str]:
     """Rule or item ids that other exclusive modes keep to themselves."""
-    return frozenset(i for m in _MODES.values() if m.exclusive and m.id != mode_id for i in getattr(m, pool) or ())
+    return frozenset(i for m in _MODES.values() if m.exclusive and m.id != mode_id
+                     for i in getattr(m, pool) or () if pool != "items" or i not in m.shared_items)
 
 
 def register_mode(mode: GameMode) -> GameMode:
@@ -189,11 +192,28 @@ register_mode(GameMode(
     "Poker Head deals by the book and the rules never change. Know your blackjack and win each hand on judgement.",
     icon="mode_normal", overrides={"enable_chaos": False}, order=0, host="poker_head", rules=(), series="core",
 ))
+def _poker_head_layout() -> "Layout":
+    """Poker Head's build table: goal and build on the right, the full build, bag and money in the panel."""
+    from chaos_blackjack.app.layout import DEFAULT_LAYOUT, LOG, RULES, Layout, PanelTab
+
+    return Layout(
+        left=DEFAULT_LAYOUT.left,
+        right=("core.deck_pile", "poker_head.status:compact", "core.items:compact", "core.actions", "core.buttons"),
+        panel=(PanelTab("build", "Build", ("poker_head.status", "poker_head.loadout", "poker_head.preparations",
+                                           "core.actions"), hotkey="b"),
+               PanelTab("bag", "Bag", ("core.items", "poker_head.loadout"), hotkey="i"),
+               PanelTab("finance", "Finance", ("poker_head.wallet", "poker_head.finance"), hotkey="f"),
+               RULES, LOG, PanelTab("run", "Run", ("poker_head.wallet", "core.run_stats"))),
+    )
+
+
 register_mode(GameMode(
     "chaos", "Poker Head's Table",
     "Familiar blackjack, with a dealer fond of small adjustments. Watch the rule change announced each round "
     "and adapt your strategy.",
     icon="mode_poker_head", overrides={"enable_chaos": True}, order=1, host="poker_head", series="poker_head",
+    items=POKER_HEAD_ITEMS + tuple(POKER_HEAD_ALIASES), exclusive=True,
+    shared_items=tuple(POKER_HEAD_ALIASES), layout=_poker_head_layout(),
 ))
 # Demo of the deck-rebuilding table (docs/design/J54_TABLE.md); its mechanics are chaos_blackjack/j54.
 J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection",

@@ -102,6 +102,17 @@ class RunPanelScene(Scene):
             self.message = (str(e), BAD)
         if self.on_change is not None:
             self.on_change()
+        if self.controller.view().choice is not None:  # e.g. an item asks for its target
+            self.message = None
+            self.app.scenes.push("choice", controller=self.controller, on_change=self._choice_changed)
+        self._build()
+
+    def _choice_changed(self) -> None:
+        if self.on_change is not None:
+            self.on_change()
+        self._build()
+
+    def on_resume(self, result=None) -> None:
         self._build()
 
     def handle_event(self, event: pygame.event.Event) -> None:

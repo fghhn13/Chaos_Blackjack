@@ -48,17 +48,24 @@ def test_gallery_core_series_then_expansions_and_detail_back_preserve_section(ap
     gallery = open_scene(app)
     assert [s.label for s in gallery.sections] == ["Classic Table", "Poker Head", "J-54"]
     assert gallery.current == "core" and gallery.expansions_label_x is not None
-    assert {e.kind for _, e in gallery.tiles} == {"mode", "item"} and not gallery.about.visible
+    # The Classic Table also lists the registry Chaos rules: no dealer's table uses them now.
+    assert {e.kind for _, e in gallery.tiles} == {"mode", "item", "rule"} and not gallery.about.visible
     key(app, pygame.K_TAB)
     assert gallery.current == "poker_head" and gallery.about.visible
     assert gallery.section.profile and gallery.section.quote.startswith("Old friends")
-    assert len([e for _, e in gallery.tiles if e.kind == "rule"]) == 7
+    assert len([e for _, e in gallery.tiles if e.kind == "environment"]) == 9
+    assert not [e for _, e in gallery.tiles if e.kind == "rule"]
+    assert gallery.selected_entry.category == "core"
+    click(app, gallery.category_buttons["environment"].rect.center)
     gallery.draw(app.canvas)
     rect, entry = gallery.tiles[0]
     click(app, rect.center)
+    assert app.scenes.top is gallery and gallery.selected_entry == entry
+    assert "When it appears" in gallery.reference and "Probing" in gallery.reference
+    click(app, gallery.open_detail.rect.center)
     detail = app.scenes.top
     assert isinstance(detail, scenes.CodexDetailScene)
-    assert detail.entry == entry and detail.demo.frames
+    assert detail.entry == entry
     key(app, pygame.K_ESCAPE)
     assert app.scenes.top is gallery and gallery.current == "poker_head"
     click(app, gallery.about.rect.center)
@@ -137,12 +144,13 @@ def test_long_sections_scroll_without_hiding_entries(app, monkeypatch):
                           lambda cfg: "Details", None) for i in range(15)]
     register_codex_provider("item", lambda cfg: entries)
     scene = open_scene(app, section="core")
-    assert len(scene.entries) == 21 and len(scene.tiles) == 21  # Classic + 5 shared items + 15 never sold
-    assert scene.max_scroll > 0 and len(scene.visible_tiles()) < 21
+    # Classic + 5 shared items + 15 never sold + 7 registry Chaos rules no dealer uses
+    assert len(scene.entries) == 28 and len(scene.tiles) == 28
+    assert scene.max_scroll > 0 and len(scene.visible_tiles()) < 28
     first = scene.tiles[0][0].y
     key(app, pygame.K_PAGEDOWN)
     assert scene.scroll > 0 and scene.tiles[0][0].y < first
-    for _ in range(10):
+    for _ in range(100):
         scene.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, {"y": -1}))
     assert scene.scroll == scene.max_scroll and scene.tiles[-1] in scene.visible_tiles()
     scene.draw(app.canvas)
@@ -198,14 +206,18 @@ def test_sections_place_every_entry_by_series():
     assert poker_head.host == "poker_head" and poker_head.portrait.startswith("default_poker_head_")
     assert poker_head.mode.id == "chaos" and poker_head.quote
     groups = {g.id: g for g in poker_head.groups}
-    assert {e.id for e in groups["rules"].entries} == {e.id for e in codex_entries("rule")
-                                                       if not e.id.startswith("j54_")}
+    # Poker Head's build table changes the rules through its director: its page lists the environment rules.
+    assert groups["rules"].label == "Environment rules"
+    assert [e.id for e in groups["rules"].entries] == [e.id for e in codex_entries("environment")]
     assert [e.id for e in groups["items"].entries] == ["shield"]  # Classic never sells Shield
-    assert "shield" not in {e.id for e in core.entries} and "rules" not in {g.id for g in core.groups}
+    core_groups = {g.id: g for g in core.groups}
+    assert "shield" not in {e.id for e in core.entries}
+    assert {e.id for e in core_groups["rules"].entries} == {e.id for e in codex_entries("rule")
+                                                           if not e.id.startswith("j54_")}
     # Nothing is left out: every rule, item and mode appears somewhere.
     placed = {(e.kind, e.id) for s in sections.values() for e in s.entries}
     placed |= {("mode", s.mode.id) for s in sections.values() if s.mode is not None}
-    for kind in ("rule", "item", "mode"):
+    for kind in ("rule", "item", "mode", "environment"):
         assert {(kind, e.id) for e in codex_entries(kind)} <= placed, kind
 
 
@@ -225,3 +237,103 @@ def test_sections_follow_mode_pools(monkeypatch):
     # still sold at the core Classic table, so it stays there as well.
     core_items = {e.id for e in sections["core"].entries if e.kind == "item"}
     assert {"peek", "fate_oracle", "swap"} <= core_items and "shield" not in core_items
+
+
+def test_build_filters_combine_type_and_style_and_show_empty_result(app):
+    scene = open_scene(app, section="poker_head")
+    click(app, scene.style_buttons["retreat"].rect.center)
+    assert {e.category for e in scene.filtered_entries} == {"core", "permanent", "item"}
+    assert all(e.style == "retreat" for e in scene.filtered_entries)
+    click(app, scene.category_buttons["permanent"].rect.center)
+    assert {e.id for e in scene.filtered_entries} == {"ph_late_retreat", "ph_loss_discount", "ph_claim", "ph_ace"}
+    click(app, scene.category_buttons["finance"].rect.center)
+    assert scene.filtered_entries == () and scene.selected_entry is None
+    assert not scene.open_detail.enabled
+    scene.draw(app.canvas)
+    key(app, pygame.K_TAB)
+    key(app, pygame.K_TAB)
+    key(app, pygame.K_TAB)
+    assert scene.current == "poker_head" and scene.filtered_entries == ()
+    assert scene.category == "finance" and scene.style == "retreat"
+    click(app, scene.style_buttons["finance"].rect.center)
+    assert len(scene.filtered_entries) == 4 and scene.selected_entry is not None
+
+
+def test_inline_reference_and_series_preserve_filter_selection_and_scroll(app, monkeypatch):
+    scene = open_scene(app, section="poker_head")
+    click(app, scene.category_buttons["permanent"].rect.center)
+    key(app, pygame.K_PAGEDOWN)
+    rect, entry = next((r, e) for r, e in scene.visible_tiles() if scene._area().collidepoint(r.center))
+    click(app, rect.center)
+    monkeypatch.setattr(app, "mouse_pos", lambda: scenes.PREVIEW_TEXT.center)
+    scene.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, {"y": -2}))
+    state = (scene.category, scene.style, scene.scroll, scene.selected_entry, scene.detail_offset)
+    assert state[-1] > 0
+    click(app, scene.open_detail.rect.center)
+    detail = app.scenes.top
+    assert detail.entry == entry and not detail.play.visible
+    assert detail.text_rect.w > scenes.TEXT_RECT.w
+    key(app, pygame.K_ESCAPE)
+    assert app.scenes.top is scene
+    assert (scene.category, scene.style, scene.scroll, scene.selected_entry, scene.detail_offset) == state
+    key(app, pygame.K_TAB)
+    assert scene.current == "j54"
+    key(app, pygame.K_TAB)
+    key(app, pygame.K_TAB)
+    assert scene.current == "poker_head"
+    assert (scene.category, scene.style, scene.scroll, scene.selected_entry, scene.detail_offset) == state
+
+
+def test_related_link_crosses_filters_and_reveals_target(app):
+    scene = open_scene(app, section="poker_head")
+    scene._filter(category="core", style="exact")
+    assert scene.selected_entry.id == "ph_approx"
+    click(app, scene.related_buttons[0].rect.center)
+    assert scene.selected_entry.id == "ph_jackpot"
+    assert scene.category == scene.style == "all"
+    target = next(r for r, e in scene.visible_tiles() if e == scene.selected_entry)
+    assert scene._area().contains(target)
+
+
+def test_partial_cards_do_not_accept_clicks_below_grid(app):
+    scene = open_scene(app, section="poker_head")
+    selected = scene.selected_entry
+    area = scene._area()
+    scene._scroll_by(30)
+    rect, entry = next((r, e) for r, e in scene.visible_tiles() if r.bottom > area.bottom)
+    click(app, (rect.centerx, area.bottom + 4))
+    assert scene.selected_entry == selected and app.scenes.top is scene
+
+
+def test_all_build_cards_and_details_request_adopted_icons(app, monkeypatch):
+    from chaos_blackjack.gui.assets import AssetManager
+    from chaos_blackjack.gui.settings import PROJECT_ROOT
+
+    assets = AssetManager((PROJECT_ROOT / "assets",))
+    entries = codex_entries("build")
+    for entry in entries:
+        assert assets.source(entry.icon) == "file"
+        assert assets.path(entry.icon) == PROJECT_ROOT / "assets" / "poker_head" / (entry.id + ".png")
+        original = pygame.image.load(str(assets.path(entry.icon))).convert_alpha()
+        tint = assets.manifest[entry.icon].tint   # consumables and special products are recoloured by group
+        if tint:
+            from chaos_blackjack.gui.assets.manager import tinted
+            original = tinted(original, tint)
+        assert pygame.image.tobytes(assets.image(entry.icon), "RGBA") == pygame.image.tobytes(original, "RGBA")
+    requested = []
+    fit = assets.image_fit
+    monkeypatch.setattr(assets, "image_fit", lambda asset_id, size: requested.append(asset_id) or fit(asset_id, size))
+    app.assets = assets
+    scene = open_scene(app, section="poker_head")
+    for entry in entries:
+        requested.clear()
+        scene._follow_related(entry)
+        scene.draw(app.canvas)
+        assert entry.icon in requested
+        assert app.canvas.get_clip() == app.canvas.get_rect()
+        detail = scenes.CodexDetailScene(app)
+        detail.on_enter(entry=entry)
+        requested.clear()
+        detail.draw(app.canvas)
+        assert entry.icon in requested
+        assert not detail.play.visible and not detail.replay.visible

@@ -14,6 +14,7 @@ class RuleContext:
     """Everything the rule engine needs besides raw state."""
 
     modifiers: ActiveModifiers
+    actor: str = "player"
 
 
 BLACKJACK = 21

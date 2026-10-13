@@ -8,7 +8,7 @@ mechanic adds parts — and maybe controller actions — but no GUI code.
 
     register_part("curse.meter", build_meter, available=lambda ctx: ctx.table is not None)
 
-Core parts: core.items, core.rules, core.log, core.run_stats. J-54's are in
+Core parts: core.items, core.actions, core.rules, core.log, core.run_stats. J-54's are in
 chaos_blackjack/j54/parts.py. Parts that need the GUI itself (the host
 portrait, the deck pile, the buttons, the live feed) are native GUI
 components with the same ids (gui/components/side_column.py).
@@ -76,6 +76,7 @@ def build_part(part_id: str, ctx: PartContext, variant: str = "full") -> tuple[W
 
 def _load_builtin_parts() -> None:
     import chaos_blackjack.j54.parts  # noqa: F401  (registers j54.*)
+    import chaos_blackjack.poker_head.parts  # noqa: F401
 
 
 def title(entry_id: str) -> str:
@@ -93,17 +94,40 @@ def rule_name(ctx: PartContext, rule_id: str) -> str:
 
 
 def _items(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
+    """Held items; each is enabled by its own move (GameController.moves), with when and why not."""
     v = ctx.view
-    usable = v.can(Action.USE_ITEM)
-    help_of = {i.id: i.description or ITEM_HELP.get(i.id, "") for i in v.items}
+    held = [i for i in v.items if i.count > 0]
+
+    def note(i) -> str:
+        """When it can be used, and why not now (unless that is just the wrong phase); a ban first."""
+        if i.note:
+            return i.note
+        when = f"{i.when}." if i.when else ""
+        if i.usable or not i.reason or i.reason == f"{i.when} only.":
+            return when
+        return f"{when} Not now: {i.reason}".strip()
+
+    def help_of(i) -> str:
+        return i.description or ITEM_HELP.get(i.id, "")
+
     if variant == "compact":
-        slots = tuple(Slot(i.id, i.count, f"{title(i.id)}: {help_of[i.id]}", hotkey=str(n + 1) if n < 9 else "",
-                           act=Act("use_item", i.id, usable)) for n, i in enumerate(v.items) if i.count > 0)
+        slots = tuple(Slot(i.id, i.count, f"{i.name or title(i.id)}: {help_of(i)} ({note(i).strip()})",
+                           hotkey=str(n + 1) if n < 9 else "", act=Act(Action.USE_ITEM, i.id, i.usable), frame=i.group)
+                      for n, i in enumerate(held))
         return (Slots(slots, title="Items", empty="No items"),)
-    entries = tuple(Entry(title(i.id), help_of[i.id], icon=i.id, badge=f"×{i.count}",
-                          act=Act("use_item", i.id, usable)) for i in v.items if i.count > 0)
-    note = "Use items on your turn." if not usable else "Click an item to use it."
-    return (ListWidget(entries, title="Items", empty=f"No items. {note}"),)
+    entries = tuple(Entry(i.name or title(i.id), f"{help_of(i)}  ·  {note(i)}" if note(i) else help_of(i),
+                          icon=i.id, badge=f"×{i.count}",
+                          tone="warn" if i.note else "" if i.usable else "muted",
+                          act=Act(Action.USE_ITEM, i.id, i.usable), frame=i.group)
+                    for i in held)
+    return (ListWidget(entries, title="Items", empty="No items. Buy them in the shop while betting."),)
+
+
+def _actions(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
+    """The table's own moves (e.g. a once-per-round permanent), enabled as the controller says."""
+    entries = tuple(Entry(m.label, m.reason, act=Act(m.action, m.arg, m.enabled), tone="" if m.enabled else "muted")
+                    for m in ctx.view.moves if m.table and m.listed)
+    return (ListWidget(entries, title="Table actions"),) if entries else ()
 
 
 def _detail(name: str, text: str) -> str:
@@ -112,17 +136,30 @@ def _detail(name: str, text: str) -> str:
     return rest if sep and head.lower() == name.lower() else text
 
 
+def _rule_entry(ctx: PartContext, r, full: bool) -> Entry:
+    """One rule card: name, then (full) what it acts on, its effect, how long and how it goes away."""
+    name = r.name or rule_name(ctx, r.id)
+    if not r.effect:  # a Chaos AI modifier: its description is the whole story
+        return Entry(name, _detail(name, r.description), icon=r.icon or r.id, tone="chaos", tooltip=r.description)
+    left = "Until removed" if r.remaining is None else f"{r.remaining} round{'s' if r.remaining != 1 else ''}"
+    badge = "Silenced" if r.silenced else left
+    text = f"{r.effect}  {r.removal}" if full else r.effect
+    return Entry(f"{name} · {r.scope}" if full else name, text, icon=r.icon or r.id,
+                 tone="muted" if r.silenced else "chaos", badge=badge,
+                 tooltip=f"{r.scope}: {r.description}" + (" Silenced this round." if r.silenced else ""))
+
+
 def _rules(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
     v = ctx.view
-    active = tuple(Entry(rule_name(ctx, r.id), _detail(rule_name(ctx, r.id), r.description), icon=r.id, tone="chaos",
-                         tooltip=r.description) for r in v.active_rules)
+    active = tuple(_rule_entry(ctx, r, variant != "compact") for r in v.active_rules)
+    own_rules = any(r.effect for r in v.active_rules) or (ctx.table is not None and ctx.table.active_rules() is not None)
     if variant == "compact":
         empty = "None yet" if v.chaos_enabled else "Chaos off"
         return (ListWidget(active, title="Active rules", empty=empty, compact=len(active) > 1),)
-    widgets: list[Widget] = [ListWidget(active, title="Active this round",
-                                        empty="No rule this round." if v.chaos_enabled else "This table never bends the rules.")]
+    widgets: list[Widget] = [ListWidget(active, title="Rules in force" if own_rules else "Active this round",
+                                        empty="No rule in force." if v.chaos_enabled else "This table never bends the rules.")]
     cfg = ctx.controller.config
-    if cfg.enable_chaos:
+    if cfg.enable_chaos and not own_rules:
         from chaos_blackjack.ui.descriptions import describe_modifier
 
         pool = [rid for rid, _, weight in cfg.chaos_stub if rid and weight > 0
@@ -165,6 +202,7 @@ def _run_stats(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
 
 
 register_part("core.items", _items)
+register_part("core.actions", _actions)
 register_part("core.rules", _rules)
 register_part("core.log", _log)
 register_part("core.run_stats", _run_stats)

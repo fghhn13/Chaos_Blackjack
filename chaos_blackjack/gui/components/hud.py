@@ -33,7 +33,35 @@ def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView
     small = assets.font(theme.FONT_SMALL)
     tiny = assets.font(theme.FONT_TINY, bold=True)
 
-    # Bankroll progress toward the target, aligned with the left column.
+    if v.goal is not None:
+        _bankroll_and_goal(surface, assets, v, shown)
+    else:
+        _bankroll(surface, assets, v, shown)
+
+    bet = v.current_bet if v.player_cards else "-"
+    fee = f"     Fee {v.fee}" if v.fee else ""
+    mid = body.render(f"Round {v.round}     Bet {bet}{fee}", True, theme.TEXT)
+    surface.blit(mid, mid.get_rect(center=(W // 2, BAR_H // 2)))
+
+    hint = small.render("Esc  menu", True, theme.TEXT_MUTED)
+    hint_rect = hint.get_rect(midright=(W - 20, BAR_H // 2))
+    surface.blit(hint, hint_rect)
+
+    if v.chaos_enabled and v.chaos_budget_shown:
+        # Remaining chaos budget as pips, right-aligned before the menu hint.
+        n = max(0, v.chaos_budget)
+        right = hint_rect.left - 32
+        for i in range(n):
+            c = (right - i * 16, BAR_H // 2)
+            pygame.draw.polygon(surface, theme.CHAOS_MAGENTA,
+                                [(c[0], c[1] - 6), (c[0] + 5, c[1]), (c[0], c[1] + 6), (c[0] - 5, c[1])])
+        label = tiny.render("CHAOS" if n else "CHAOS SPENT", True, theme.CHAOS_PURPLE)
+        surface.blit(label, label.get_rect(midright=(right - max(0, n - 1) * 16 - 14, BAR_H // 2)))
+
+
+def _bankroll(surface: pygame.Surface, assets: "AssetManager", v: GameView, shown: int) -> None:
+    """Bankroll progress toward the chip target, aligned with the left column."""
+    body, tiny = assets.font(theme.FONT_BODY), assets.font(theme.FONT_TINY, bold=True)
     x, y, pw, ph = 16, 10, 240, 28
     pygame.draw.rect(surface, theme.PANEL, (x, y, pw, ph), border_radius=6)
     # A table without a chip target (J-54's capture protocol) shows the bankroll alone.
@@ -46,25 +74,29 @@ def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView
     surface.blit(money, money.get_rect(center=(x + pw // 2, y + ph // 2)))
     surface.blit(tiny.render("BANKROLL", True, theme.GOLD_DIM), (x + pw + 12, y + 7))
 
-    bet = v.current_bet if v.player_cards else "-"
-    fee = f"     Fee {v.fee}" if v.fee else ""
-    mid = body.render(f"Round {v.round}     Bet {bet}{fee}", True, theme.TEXT)
-    surface.blit(mid, mid.get_rect(center=(W // 2, BAR_H // 2)))
 
-    hint = small.render("Esc  menu", True, theme.TEXT_MUTED)
-    hint_rect = hint.get_rect(midright=(W - 20, BAR_H // 2))
-    surface.blit(hint, hint_rect)
-
-    if v.chaos_enabled:
-        # Remaining chaos budget as pips, right-aligned before the menu hint.
-        n = max(0, v.chaos_budget)
-        right = hint_rect.left - 32
-        for i in range(n):
-            c = (right - i * 16, BAR_H // 2)
-            pygame.draw.polygon(surface, theme.CHAOS_MAGENTA,
-                                [(c[0], c[1] - 6), (c[0] + 5, c[1]), (c[0], c[1] + 6), (c[0] - 5, c[1])])
-        label = tiny.render("CHAOS" if n else "CHAOS SPENT", True, theme.CHAOS_PURPLE)
-        surface.blit(label, label.get_rect(midright=(right - max(0, n - 1) * 16 - 14, BAR_H // 2)))
+def _bankroll_and_goal(surface: pygame.Surface, assets: "AssetManager", v: GameView, shown: int) -> None:
+    """Cash on top; beneath it the goal (e.g. net assets) as the progress bar toward the target."""
+    assert v.goal is not None
+    label, value, target = v.goal
+    small, tiny = assets.font(theme.FONT_SMALL, bold=True), assets.font(theme.FONT_TINY, bold=True)
+    x, pw = 16, 240
+    cash = pygame.Rect(x, 4, pw, 20)
+    pygame.draw.rect(surface, theme.PANEL, cash, border_radius=5)
+    pygame.draw.rect(surface, theme.GOLD_DIM, cash, 1, border_radius=5)
+    color = theme.IVORY if shown == v.money else (GAIN if shown < v.money else LOSS)
+    money = small.render(str(shown), True, color)
+    surface.blit(money, money.get_rect(center=cash.center))
+    surface.blit(tiny.render("BANKROLL", True, theme.GOLD_DIM), (x + pw + 12, cash.y + 3))
+    goal = pygame.Rect(x, 28, pw, 16)
+    pygame.draw.rect(surface, theme.PANEL, goal, border_radius=5)
+    k = max(0.0, min(1.0, value / max(1, target)))
+    if k > 0:
+        pygame.draw.rect(surface, theme.GOLD_DIM, (goal.x, goal.y, max(10, int(pw * k)), goal.h), border_radius=5)
+    pygame.draw.rect(surface, theme.GOLD, goal, 1, border_radius=5)
+    text = tiny.render(f"{label} {value} / {target}", True, theme.IVORY)
+    surface.blit(text, text.get_rect(center=goal.center))
+    surface.blit(tiny.render("GOAL", True, theme.GOLD_DIM), (x + pw + 12, goal.y + 1))
 
 
 @dataclass

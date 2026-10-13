@@ -216,7 +216,7 @@ class TableScene(Scene):
 
     def _quick_item(self, index: int) -> None:
         items = [i for i in self.view.items if i.count > 0]
-        if index < len(items) and self.view.can(Action.USE_ITEM):
+        if index < len(items) and items[index].usable:
             self._use_item(items[index].id)
 
     def _command(self, method: str) -> Callable[[], None]:
@@ -354,6 +354,10 @@ class TableScene(Scene):
         if self.fx.busy:
             return  # automatic steps wait for cards to land; input is never blocked
         self._timer += dt
+        if self.view.choice is not None and self._chaos_future is None and not self.intro_open():
+            # A command asked a question (a core, a replacement, a target): answer it in the dialog.
+            self.app.scenes.push("choice", controller=self.controller, on_change=self._after_command)
+            return
         if self._chaos_future is not None:
             if self._chaos_future.done():
                 result = self._chaos_future
@@ -396,6 +400,7 @@ class TableScene(Scene):
         self.next_button.visible = v.phase == TablePhase.ROUND_OVER
         if v.phase == TablePhase.BETTING:
             self.bet_panel.set_limits(v.bet_min, v.bet_max)
+            self.bet_panel.deal_button.enabled = v.can(Action.BET)
         ctx = PartContext(self.controller, v) if not self._busy() else None
         self.left.sync(v, ctx)
         self.right.sync(v, ctx)
@@ -412,7 +417,8 @@ class TableScene(Scene):
             total = "?" if v.dealer_total is None else str(v.dealer_total)
             self._draw_hand(surface, v.dealer_cards, DEALER_Y, "dealer", total)
         if v.player_cards:
-            self._draw_hand(surface, v.player_cards, PLAYER_Y, "player", str(v.player_total))
+            self._draw_hand(surface, v.player_cards, PLAYER_Y, "player",
+                            "?" if v.player_total is None else str(v.player_total))
         self._draw_bet_zone(surface, v)  # after the hands: settling chips fly over the cards
 
         if v.phase == TablePhase.BETTING:

@@ -44,6 +44,11 @@ class CodexEntry:
     detail: Callable[[RunConfig], str]
     demo: DemoScript | None
     order: int = 0
+    category: str = ""                 # optional reference-browser metadata
+    style: str = ""
+    timing: str = ""
+    price: str = ""
+    related: tuple[str, ...] = ()       # related entry IDs within this kind
 
 
 @dataclass(frozen=True)

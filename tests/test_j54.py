@@ -75,7 +75,7 @@ def test_mode_keeps_its_rules_and_contracts_to_itself() -> None:
 
 
 def test_plain_tables_have_no_mechanics() -> None:
-    c = GameController(get_mode("chaos").apply(RunConfig.from_balance(default_balance(), seed=1)))
+    c = GameController(get_mode("normal").apply(RunConfig.from_balance(default_balance(), seed=1)))
     assert c.table is None and c.view().table_info == () and c.view().fee == 0
 
 

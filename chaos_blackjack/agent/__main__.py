@@ -8,7 +8,10 @@ One-shot commands (state kept in a file between calls):
   python -m chaos_blackjack.agent reroll
   python -m chaos_blackjack.agent bet 20
   python -m chaos_blackjack.agent act hit|stand|double|surrender
-  python -m chaos_blackjack.agent act use_item peek
+  python -m chaos_blackjack.agent act use_item peek [--target ID]
+  python -m chaos_blackjack.agent choose <option>      # answer obs.choice
+  python -m chaos_blackjack.agent cancel               # drop obs.choice (when cancellable)
+  python -m chaos_blackjack.agent perform <action> [arg]   # one of obs.table_actions
 
 Streaming (one JSON command per stdin line, one JSON reply per stdout line):
 
@@ -31,14 +34,16 @@ from chaos_blackjack.agent.session import AgentSession, LlmUnavailable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE = PROJECT_ROOT / ".agent_runs" / "current.json"
-BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "bet_range", "shop", "table", "last_round", "run_end")
+BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "choice", "table_actions", "bet_range", "shop",
+                  "table", "last_round", "run_end")
 
 
 def _emit(reply: dict[str, Any], *, brief: bool, compact: bool) -> None:
     if brief:
         obs = reply.get("obs", {})
         reply = {k: v for k, v in reply.items() if k not in ("obs", "run")}
-        reply["obs"] = {k: obs[k] for k in BRIEF_OBS_KEYS if obs.get(k) is not None}
+        reply["obs"] = {k: obs[k] for k in BRIEF_OBS_KEYS if obs.get(k) is not None and obs.get(k) != []
+                        or k == "legal_actions"}
     text = json.dumps(reply, ensure_ascii=False, separators=(",", ":") if compact else None,
                       indent=None if compact else 2)
     sys.stdout.write(text + "\n")
@@ -143,12 +148,20 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("help", help="list game commands")
     buy = sub.add_parser("buy", help="buy a shop item (betting phase)")
     buy.add_argument("item")
+    buy.add_argument("--replace", default="", help="the equipped permanent to replace when every slot is full")
     sub.add_parser("reroll", help="roll the shop's stock again (betting phase, once per stock)")
     bet = sub.add_parser("bet", help="place a bet")
     bet.add_argument("amount", type=int)
     act = sub.add_parser("act", help="act in your turn")
     act.add_argument("action", choices=("hit", "stand", "double", "surrender", "use_item"))
     act.add_argument("item", nargs="?", help="item id for use_item")
+    act.add_argument("--target", default="", help="the target a targeted item asks for (an option id of obs.choice)")
+    choose = sub.add_parser("choose", help="answer the pending question (obs.choice)")
+    choose.add_argument("option")
+    sub.add_parser("cancel", help="drop the pending question when it allows it")
+    perform = sub.add_parser("perform", help="run one of the table's own actions (obs.table_actions)")
+    perform.add_argument("action")
+    perform.add_argument("arg", nargs="?", default="")
     play = sub.add_parser("play", help="streaming JSON-lines mode on stdin/stdout")
     _add_new_options(play)
     args = parser.parse_args(argv)
@@ -170,10 +183,19 @@ def main(argv: list[str] | None = None) -> int:
                 command["amount"] = args.amount
             elif args.command == "buy":
                 command["item"] = args.item
+                if args.replace:
+                    command["replace"] = args.replace
+            elif args.command == "choose":
+                command["option"] = args.option
             elif args.command == "act":
                 command["action"] = args.action
                 if args.item:
                     command["item"] = args.item
+                if args.target:
+                    command["target"] = args.target
+            elif args.command == "perform":
+                command["action"] = args.action
+                command["arg"] = args.arg
             reply = session.execute(command)
         reply["run"] = {"seed": session.seed, "steps": session.steps, "state_file": str(args.state),
                         "profile": session.controller.config.balance_profile}

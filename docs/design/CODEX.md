@@ -123,6 +123,34 @@ controller's scoped registry so content-pack rules can be demonstrated too.
 
 ## GUI scenes (M4b)
 
+The collection browser uses three columns: a compact character/category sidebar,
+a filtered card grid, and the selected entry's scrollable reference. Series tabs
+remain at the top. Poker Head additionally offers multi-card, surrender,
+precision, double, finance and general build filters, combined with item type.
+Selection, filters and scroll positions survive opening a full detail/demo and
+returning, and switching series. Every entry remains visible without unlocks.
+
+Poker Head's build table changes the rules through its offline director, so its
+page lists the `environment` kind (one entry per environment rule type, with
+an example, how it goes away and the director's stages from the balance
+profile) instead of registry Chaos rules. The registry rules no dealer's table
+uses any more (they still play in the mode-less `--chaos` run) appear on the
+Classic Table page.
+
+`CodexEntry` has optional `category`, `style`, `timing`, `price` strings and a
+`related` tuple of entry IDs within the same kind. Existing providers may omit
+these fields. Build entries supply live effect text and readable prices from the
+selected balance profile; raw tuning JSON is not player-facing content. Financial
+cards distinguish invested principal from loan advances and repayment. The 41
+Poker Head entries request their product ID directly, resolving the adopted
+transparent PNGs under `assets/poker_head/` through the normal asset manager.
+
+Clicking a card selects it inline. The reference offers a full-detail or demo
+button and links to related entries. Its mouse wheel scroll is independent of
+the card grid. Entries without demos use a compact icon/summary column beside a
+wide text panel, with playback controls hidden. Existing animated demos retain
+their playback and seeking controls.
+
 Open the gallery with `app.scenes.push("codex", config=config)`; `config` is
 optional and defaults to `app.run_config`. An optional `kind` selects the
 initial tab. The home screen uses this entry point without importing the
@@ -130,11 +158,12 @@ scene class. For development, launch `python -m chaos_blackjack.gui --scene
 codex`. The existing scene package imports register both `codex` and
 `codex_detail`.
 
-The gallery has tabs and an icon/name grid. Every entry is available;
-additional content paginates automatically. Click a tile to open its detail,
-press Tab to change tabs (Shift-Tab goes back), and use Left/Right or the
-mouse wheel to change pages. Back/Escape returns to the caller, retaining
-the gallery's selected category and page.
+The gallery has series tabs and a scrollable card grid. Every entry is available.
+Click a card to select its inline reference; the reference button or Enter opens
+its full detail/demo. Tab changes series (Shift-Tab goes back), arrows select
+cards, and the wheel or Page Up/Page Down scrolls the grid. The wheel over the
+reference scrolls that text independently. Back/Escape returns to the caller;
+returning from a detail preserves filters, selection and both scroll positions.
 
 The detail scene accepts `entry=CodexEntry` and the same optional config.
 It evaluates the detail and demo using that configuration, then retains only
@@ -144,8 +173,9 @@ no controller action is executed during playback. Demos stop on their last
 frame. Space pauses/plays, R replays, Left/Right steps through snapshots.
 Seeking pauses and shows the selected frame immediately. The right-hand
 description wraps and scrolls with the wheel or Page Up/Page Down. Entries
-without a demo show their large icon and summary. A demo incompatible with
-the selected settings falls back to readable text and disables playback.
+without a demo show a compact icon/summary column and a wide text panel, hiding
+playback controls. A demo incompatible with the selected settings falls back to
+readable text and hides playback.
 
 Mode icon specs live in the manifest. The final transparent PNGs were fetched
 through `scripts/fetch_icons.py` and exported with `scripts/asset_tools.py`:
@@ -172,10 +202,10 @@ Poker Head). `codex_sections(config) -> list[CodexSection]` returns:
 `CodexSection(id, label, groups, expansion, host, mode, portrait, summary, quote,
 entries)` and `CodexGroup(id, label, entries, empty)` are headless. Every
 rule, item and mode appears in some section, so nothing is hidden; a new
-expansion gets its own tab automatically. The GUI lays the core out as a
-grid and an expansion as a host panel (with "About this table") beside its
-groups; long sections scroll with the wheel or Page Up/Page Down, and Tab
-cycles sections. `codex_kinds` and `codex_entries` remain available for tools
+expansion gets its own tab automatically. The GUI displays a compact identity
+panel (with "Table rules"), category navigation, cards and an inline reference.
+Long grids scroll with the wheel or Page Up/Page Down, and Tab cycles sections.
+`codex_kinds` and `codex_entries` remain available for tools
 and tests.
 
 `tests/test_codex_gui.py` verifies gallery/detail navigation, sections, scrolling, pause,

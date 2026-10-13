@@ -38,7 +38,7 @@ def test_shipped_values_are_unchanged() -> None:
     assert (b.start_money, b.target_money, b.objective) == (100, 300, "double_money")
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
-    assert b.shop_prices == {"peek": 4, "danger_radar": 6, "swap": 2, "hole_card_hacker": 3,
+    assert {k: v for k, v in b.shop_prices.items() if not k.startswith("ph_")} == {"peek": 4, "danger_radar": 6, "swap": 2, "hole_card_hacker": 3,
                              "fate_oracle": 8, "shield": 5, "example_trim": 20,
                              # J-54's contracts (its table only)
                              "j54_streamline": 20, "j54_low_purge": 10, "j54_high_injection": 20,
@@ -216,7 +216,7 @@ def test_shipped_phase_two_values() -> None:
         "odd_even_chaos": {"even_delta": 2, "odd_delta": -1}, "suit_power": {"red_delta": 1, "black_delta": -1},
     }
     assert b.disabled_rules == ()
-    assert {k: v for k, v in b.item_params.items() if not k.startswith("j54_")} == {"fate_oracle": {"cards": 3}}
+    assert {k: v for k, v in b.item_params.items() if not k.startswith(("j54_", "ph_"))} == {"fate_oracle": {"cards": 3}}
 
 
 def test_bet_limits_come_from_the_profile(db) -> None:

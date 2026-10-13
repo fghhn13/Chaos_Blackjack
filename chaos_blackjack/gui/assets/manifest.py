@@ -16,6 +16,7 @@ from chaos_blackjack.content.builtin_persona import default_persona, host_person
 from chaos_blackjack.cosmetics import cosmetics
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import placeholders as ph
+from chaos_blackjack.poker_head.catalog import PRODUCTS as POKER_HEAD_PRODUCTS
 
 Placeholder = Callable[[tuple[int, int], Callable[[int], pygame.font.Font]], pygame.Surface]
 
@@ -27,6 +28,8 @@ class AssetSpec:
     size: tuple[int, int]  # delivery size (asset-list.md); placeholders draw at this size
     placeholder: Placeholder
     description: str = ""
+    # Recolour a one-colour silhouette file at load time (alpha kept); None = draw the file as it is.
+    tint: tuple[int, int, int] | None = None
 
 
 MANIFEST: dict[str, AssetSpec] = {}
@@ -49,6 +52,7 @@ CARD = (512, 768)
 ICON = (256, 256)
 PORTRAIT = (512, 512)
 _J54_RED = (0xC8, 0x3A, 0x3A)  # J-54's jester red
+_J54_BLACK = (0x17, 0x17, 0x19)
 
 for _spec in (
     AssetSpec("table_background", "background", BG, ph.table_background, "Table background"),
@@ -110,6 +114,24 @@ for _spec in (
     register(_spec)
 
 
+# Poker Head build icons share their IDs with the product catalog.
+# Selection and visual meanings: docs/design/POKER_HEAD_ART.md.
+# Poker Head's environment rule types (poker_head/environment.py); placeholders until art exists.
+for _type, _mark, _name in (("fixed", "=#", "Card Rewrite"), ("shift", "+-", "Card Shift"), ("bust", "21", "Bust Limit"),
+                            ("tie", "==", "Tie Rule"), ("bust_outcome", "BX", "Bust Pardon"),
+                            ("profit_cap", "$|", "Withdrawal Limit"), ("item_ban", "X", "Item Ban"),
+                            ("markup", "%+", "Price Hike"), ("hidden", "??", "Face-Down Card")):
+    register(AssetSpec("ph_env_" + _type, "rule", ICON, ph.icon(_mark, theme.CHAOS_MAGENTA), _name))
+
+
+# Icons are tinted by product group (theme.GROUP_COLORS); permanents keep the art's gold.
+for _product in POKER_HEAD_PRODUCTS.values():
+    _group = _product.to_def().group
+    register(AssetSpec(_product.id, "item", ICON,
+                       ph.icon(_product.id.removeprefix("ph_")[:2].upper(), theme.GROUP_COLORS[_group]),
+                       _product.name, tint=None if _group == "permanent" else theme.GROUP_COLORS[_group]))
+
+
 # Cosmetics (docs/design/COSMETICS_ACHIEVEMENTS.md). Skin art uses the base
 # asset's category and size; a cosmetic asset with neither a file nor an entry
 # here draws the base look (AssetManager.resolve).
@@ -132,6 +154,15 @@ _SKINS: dict[str, tuple[str, tuple[int, int], Placeholder]] = {
     "table_poker_head": ("background", BG, ph.felt_table((0x2E, 0x46, 0x3A), (0x3A, 0x54, 0x46), (0xB0, 0x96, 0x5A))),
     **{f"chips_neon_{v}": ("chip", ICON, ph.chip(c, theme.DARK)) for v, c in _NEON.items()},
     **{f"chips_gold_{v}": ("chip", ICON, ph.chip(c, (0x6E, 0x50, 0x1E))) for v, c in _GOLD_CHIPS.items()},
+    # J-54's look (art: assets/cosmetics/j54, scripts/generate_j54_theme.py)
+    "card_back_j54": ("card", CARD, ph.lattice_back(_J54_BLACK, _J54_RED, _J54_RED, _J54_RED)),
+    "card_back_j54_calculator": ("card", CARD, ph.lattice_back(_J54_RED, _J54_BLACK, _J54_BLACK, _J54_BLACK)),
+    "card_front_j54": ("card", CARD, ph.framed_front((0xED, 0xE4, 0xD2), _J54_RED, theme.INK)),
+    "table_j54": ("background", BG, ph.felt_table(_J54_BLACK, (0x2C, 0x29, 0x2D), _J54_RED)),
+    **{f"chips_j54_{v}": ("chip", ICON, ph.chip(c, _J54_BLACK)) for v, c in
+       {1: (0xED, 0xE4, 0xD2), 5: _J54_RED, 10: (0x8E, 0x89, 0x85), 25: (0x77, 0x23, 0x2F)}.items()},
+    "avatar_j54": ("avatar", AVATAR, ph.avatar("bust", _J54_BLACK, _J54_RED)),
+    "avatar_j54_computer": ("avatar", AVATAR, ph.avatar("bust", _J54_RED, _J54_BLACK)),
     "avatar_spade": ("avatar", AVATAR, ph.avatar("spade", theme.DARK, theme.GOLD)),
     "avatar_joker": ("avatar", AVATAR, ph.avatar("flag", (0x3A, 0x2A, 0x44), theme.CHAOS_MAGENTA)),
 }

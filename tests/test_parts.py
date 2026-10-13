@@ -30,6 +30,8 @@ def _controller(mode: str = "chaos", seed: int = 3) -> GameController:
     c = GameController(get_mode(mode).apply(RunConfig.from_balance(default_balance(), seed=seed)),
                        save_fn=lambda d, n: n)
     c.drain_notices()
+    if c.view().choice is not None:  # Poker Head's opening invitation
+        c.choose(c.view().choice.options[0].id)
     return c
 
 
@@ -186,7 +188,7 @@ def test_table_builds_its_columns_from_the_layout(app) -> None:
     t = _open(app, _controller("j54"))
     right = [b.part for b in t.right.visible if isinstance(b, DataBlock)]
     assert right == ["j54.deck", "j54.badges", "core.items"]
-    plain = _open(app, _controller("chaos"))
+    plain = _open(app, _controller("normal"))
     assert [b.part for b in plain.right.visible if isinstance(b, DataBlock)] == ["core.items"]
     assert plain.deck_rect.size == t.deck_rect.size
 

@@ -33,17 +33,26 @@ layouts (app/layout.py) name which parts go in which column / tab
 - **Parts** (`app/parts.py`): `register_part(id, build, available=...)`;
   `build(ctx, variant)` reads `ctx.controller` / `ctx.view` (never changes
   them) and returns widgets. Variants: `compact` (side columns), `full` (the
-  panel), `tail` (recent lines). Core parts: `core.items`, `core.rules`,
-  `core.log`, `core.run_stats`. J-54: `j54.deck`, `j54.badges`,
-  `j54.contracts`, `j54.goal` (`j54/parts.py`).
+  panel), `tail` (recent lines). Core parts: `core.items` (each item enabled
+  by its own move, with when and why not), `core.actions` (the table's own
+  moves), `core.rules`, `core.log`, `core.run_stats`. J-54: `j54.deck`,
+  `j54.badges`, `j54.contracts`, `j54.goal` (`j54/parts.py`). Poker Head:
+  `poker_head.status`, `.loadout`, `.wallet`, `.finance`, `.preparations`
+  (`poker_head/parts.py`, reading only `view.table_public`).
 - **Native blocks** (`gui/components/side_column.py`): parts that need the
   GUI itself — `core.host` (portrait, speech, poke), `core.deck_pile` (the
   shoe cards fly from; opens the Deck tab when the layout has one),
   `core.buttons` (Shop, Panel; pinned to the bottom), `core.feed` (live
   feed; takes the space left; its heading opens the Log tab).
-- **Actions**: `GameController.perform(action, arg)` runs `use_item`, or
-  hands any other action to the table's `perform(action, arg, controller)`.
-  `gui:` actions are handled by the GUI (`gui:panel <tab>`, `gui:log_filter`).
+- **Actions**: `GameController.perform(action, arg)` runs `use_item`, `buy`,
+  `choose` and `cancel`, or one of the table's own moves
+  (`TableMechanics.table_moves()` / `perform(action, arg)`). Whether an `Act`
+  is enabled comes from `GameController.moves()`, the same list the agent
+  reads (docs/design/ITEM_ARCHITECTURE.md §7). `gui:` actions are handled by
+  the GUI (`gui:panel <tab>`, `gui:log_filter`).
+- **Choices**: a command that asks a question sets `view.choice`; the table
+  scene, the shop and the run panel open the generic `choice` scene
+  (`gui/scenes/choice.py`), which only sends `choose` / `cancel`.
 - **Layouts** (`app/layout.py`): `Layout(left, right, panel)`; entries are
   `"part"` or `"part:variant"`; `PanelTab(id, label, parts, hotkey)`.
   `GameMode.layout` (None = `DEFAULT_LAYOUT`).
@@ -52,14 +61,17 @@ layouts (app/layout.py) name which parts go in which column / tab
 
 | | Left | Right | Panel tabs |
 |---|---|---|---|
-| Default (Classic, Poker Head) | host, rules (compact), feed | deck pile, item slots, buttons | Bag (I), Rules, Log (L), Run |
+| Default (Classic, mode-less `--chaos`) | host, rules (compact), feed | deck pile, item slots, buttons | Bag (I), Rules, Log (L), Run |
+| Poker Head (builds) | same | status, item slots, table actions, deck pile, buttons | Build (B), Bag (I), Finance (F), Rules, Log (L), Run |
 | J-54 | same | deck pile, deck strip, badges, item slots, buttons | Bag (I), Deck (K), Contracts, Rules, Log (L), Run (goal + stats) |
 
 ## 4. Adding a table with its own mechanics
 
 1. Mechanics: a `TableMechanics` subclass (`app/table_mechanics.py`),
-   registered for the mode id; optional `perform(action, arg, controller)`
-   for new interactions.
+   registered for the mode id; every hook is declared there with a neutral
+   default. New interactions are `table_moves()` + `perform(action, arg)`;
+   questions go through `GameController.ask(Choice(...))` +
+   `resolve_choice`; goods follow docs/design/ITEM_ARCHITECTURE.md.
 2. Parts: `register_part("<table>.<name>", build, available=...)`, returning
    existing widget kinds; put clickable things behind an `Act`.
 3. Layout: `GameMode(..., layout=Layout(...))`, usually the default columns

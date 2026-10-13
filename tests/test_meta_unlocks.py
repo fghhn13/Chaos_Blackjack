@@ -28,10 +28,26 @@ from chaos_blackjack.meta.tracker import RunTracker
 
 
 @pytest.fixture()
-def svc():
+def svc(monkeypatch):
+    # Ownership itself is tested with the shipped "every look unlocked" switch off.
+    monkeypatch.setattr(MetaService, "_all_looks", classmethod(lambda cls, db, profile=None: False))
     s = install_fake(demo=False)
     yield s
     meta.use_service(None)
+
+
+def test_every_look_is_unlocked_by_the_shipped_profile():
+    s = install_fake(demo=False)
+    try:
+        p = s.create_player(1, "All")
+        offers = s.wardrobe(p.id)
+        assert offers and all(o.owned for o in offers)                      # hidden looks included
+        assert {o.cosmetic.id for o in offers} == {c.id for c in cosmetics()}
+        s.equip(p.id, "table_j54")
+        assert s.asset_aliases(p.id) == {"table_background": "table_j54"}
+        assert s._conn.execute("SELECT COUNT(*) FROM player_cosmetic").fetchone()[0] == 0  # nothing stored
+    finally:
+        meta.use_service(None)
 
 
 def _cards(*ranks: str) -> tuple[Card, ...]:
