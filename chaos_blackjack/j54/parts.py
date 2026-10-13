@@ -14,6 +14,7 @@ from chaos_blackjack.app.widgets import (
 )
 from chaos_blackjack.j54.contracts import CONTRACTS, contract_spec, describe
 from chaos_blackjack.j54.deck_ops import LOW_RANKS, RANKS
+from chaos_blackjack.j54.table import standard_cards
 
 _TRIGGER_TAG = {"now": "now", "win": "on win", "loss": "on loss", "natural": "on natural"}
 _JOKER_TONE = {"sealed": "muted", "in the deck": "gold", "captured": "good"}
@@ -35,13 +36,19 @@ def _deck(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
         rows.append(Row("Left this round", f"{v.deck_count} cards"))
     if t.protocol == "capture":
         rows.append(Row("Joker", t.joker_state(), _JOKER_TONE.get(t.joker_state(), "")))
-    rows.append(Row("Removed", f"{len(t.removed)} cards"))
-    removed = Counter(str(c.rank) for c in t.removed)
-    gone = tuple(Entry(rank, badge=f"×{removed[rank]}", tone="bad" if rank in LOW_RANKS else "")
-                 for rank in RANKS if removed[rank])
-    return (Bars(bars, title="Deck by rank", note="All cards of the run's deck; every round reshuffles them."),
-            Rows(tuple(rows)),
-            ListWidget(gone, title="Removed cards", empty="Nothing removed yet.", compact=True))
+    rows.append(Row("Removed so far", f"{len(t.removed)} cards"))
+    # Against a standard 52-card deck: fewer in red, more in green.
+    standard = Counter(str(c.rank) for c in standard_cards())
+    counts = dict(t.deck_counts())
+    diff = tuple(Entry(rank, badge=f"{counts[rank] - standard[rank]:+d}",
+                       tone="good" if counts[rank] > standard[rank] else "bad",
+                       tooltip=f"{rank}: {counts[rank]} in the deck, {standard[rank]} in a standard deck")
+                 for rank in RANKS if counts[rank] != standard[rank])
+    plain = tuple(Bar(b.label, b.value) for b in bars)
+    return (Bars(plain, title="Deck by rank", note="Every card of the run's deck; each round reshuffles them all.",
+                 baseline=standard[RANKS[0]], baseline_label="Standard deck"),
+            ListWidget(diff, title="Compared with a standard deck", empty="Same as a standard deck.", compact=True),
+            Rows(tuple(rows)))
 
 
 def _badges(ctx: PartContext, variant: str) -> tuple[Widget, ...]:

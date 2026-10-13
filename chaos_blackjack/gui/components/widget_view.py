@@ -149,24 +149,43 @@ def _bars(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         r.hits.insert(0, Hit(area, w.act, ""))  # fallback for the gaps between bars
         return y - top
     y = r.heading(w.title, x, y, width)
-    if w.note:
-        r.blit(small.render(fit_text(small, w.note, width), True, theme.TEXT_MUTED), (x, y))
+    legend = None
+    if w.baseline:
+        legend = small.render(f"{w.baseline_label}: {w.baseline}".strip(": "), True, theme.TEXT_MUTED)
+    if w.note or legend is not None:
+        if w.note:
+            room = width - (legend.get_width() + 40 if legend is not None else 0)
+            r.blit(small.render(fit_text(small, w.note, room), True, theme.TEXT_MUTED), (x, y))
+        if legend is not None:  # a dashed sample, then the reference's name
+            lx = x + width - legend.get_width()
+            r.blit(legend, (lx, y))
+            if r.surface is not None:
+                for dx in (0, 10, 20):
+                    pygame.draw.line(r.surface, theme.TEXT_MUTED, (lx - 34 + dx, y + 9), (lx - 29 + dx, y + 9), 1)
         y += 20
+    y += 18  # room for the counts above the tallest bar
     n = max(1, len(w.bars))
     step = width / n
-    most = max((b.value for b in w.bars), default=1) or 1
-    chart = 110
+    top_value = max([b.value for b in w.bars] + [w.baseline or 0]) or 1
+    chart = 120
+    bar_w = min(44, max(6, round(step * 0.55)))
+    if w.baseline and r.surface is not None:  # behind the bars and their counts
+        by = y + chart - round(chart * w.baseline / top_value)
+        for dx in range(0, width, 10):
+            pygame.draw.line(r.surface, theme.TEXT_MUTED, (x + dx, by), (x + min(dx + 5, width), by), 1)
     for i, b in enumerate(w.bars):
-        bx = round(x + i * step)
-        bw = max(4, round(step) - 8)
-        h = round(chart * b.value / most) if b.value else 0
+        cx = round(x + i * step + step / 2)
+        h = round(chart * b.value / top_value) if b.value else 0
         count = small.render(str(b.value), True, theme.IVORY if b.value else theme.TEXT_MUTED)
-        r.blit(count, (bx + bw // 2 - count.get_width() // 2 + 2, y + chart - h - 16))
+        spot = count.get_rect(midbottom=(cx, y + chart - h - 2))
+        r.rect(theme.PANEL, spot.inflate(6, 0))
+        r.blit(count, spot)
         if h:
-            r.rect(BAD if b.tone == "bad" else theme.GOLD_DIM, pygame.Rect(bx + 2, y + chart - h, bw, h), 0, 3)
+            r.rect(tone(b.tone) if b.tone else theme.GOLD_DIM, pygame.Rect(cx - bar_w // 2, y + chart - h, bar_w, h), 0, 3)
         label = r.font(theme.FONT_SMALL, bold=True).render(b.label, True, tone(b.tone) if b.tone else theme.IVORY)
-        r.blit(label, (bx + bw // 2 - label.get_width() // 2 + 2, y + chart + 4))
-    return y + chart + 26 - top
+        r.blit(label, (cx - label.get_width() // 2, y + chart + 6))
+        r.hits.append(Hit(pygame.Rect(cx - step / 2, y, step, chart + 26), None, f"{b.label}: {b.value}"))
+    return y + chart + 30 - top
 
 
 def _progress(r: _Render, w: Any, x: int, y: int, width: int) -> int:

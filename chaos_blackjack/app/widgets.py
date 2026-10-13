@@ -67,6 +67,8 @@ class Bars:
     note: str = ""
     compact: bool = False   # a strip of thin bars without labels (side columns)
     act: Act | None = None  # clicking the widget
+    baseline: int | None = None   # a reference value drawn as a line (e.g. a standard deck's 4)
+    baseline_label: str = ""
     kind: str = "bars"
 
 

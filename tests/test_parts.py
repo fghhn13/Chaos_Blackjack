@@ -59,7 +59,7 @@ def test_parts_only_show_where_they_apply() -> None:
     assert build_part("j54.deck", PartContext(plain, plain.view())) == ()
     assert build_part("no.such.part", PartContext(plain, plain.view())) == ()
     kinds = [w.kind for w in build_part("j54.deck", PartContext(j54, j54.view()), "full")]
-    assert kinds == ["bars", "rows", "list"]
+    assert kinds == ["bars", "list", "rows"]
     compact = build_part("j54.deck", PartContext(j54, j54.view()), "compact")[0]
     assert compact.compact and compact.act == Act("gui:panel", "deck") and len(compact.bars) == 13
 
