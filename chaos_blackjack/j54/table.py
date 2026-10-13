@@ -89,6 +89,7 @@ class J54Table(TableMechanics):
         self.captured = 0
         self.experiment = False
         self.pending: list[str] = []
+        self.signed: list[tuple[int, str]] = []  # (round, contract id), in signing order
         self.freeze = 0
         self.won = False
         self._ops = 0             # RNG counter (saved), see _rng
@@ -197,6 +198,7 @@ class J54Table(TableMechanics):
     def buy(self, item_id: str, run: "RunState") -> str:
         spec = contract_spec(item_id, self.config.item_params)
         name = CONTRACTS[item_id].name
+        self.signed.append((run.round, item_id))
         if spec.trigger == "now":
             self._fire(item_id)
             return f"Signed {name}."
@@ -311,6 +313,7 @@ class J54Table(TableMechanics):
             "captured": self.captured,
             "experiment": self.experiment,
             "pending": list(self.pending),
+            "signed": [[r, c] for r, c in self.signed],
             "freeze": self.freeze,
             "won": self.won,
             "ops": self._ops,
@@ -327,6 +330,7 @@ class J54Table(TableMechanics):
         self.captured = int(data.get("captured", 0))
         self.experiment = bool(data.get("experiment", False))
         self.pending = [str(c) for c in data.get("pending", []) if c in CONTRACTS]
+        self.signed = [(int(r), str(c)) for r, c in data.get("signed", []) if c in CONTRACTS]
         self.freeze = int(data.get("freeze", 0))
         self.won = bool(data.get("won", False))
         self._ops = int(data.get("ops", 0))

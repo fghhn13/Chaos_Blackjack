@@ -108,6 +108,7 @@ def build_save_data(
     chaos_memory: list[dict] | None = None,
     config: dict | None = None,
     table: dict | None = None,
+    log: dict | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -133,4 +134,5 @@ def build_save_data(
         chaos_memory=chaos_memory,
         config=config,
         table=table,
+        log=log,
     )

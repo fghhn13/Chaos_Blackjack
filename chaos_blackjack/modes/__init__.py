@@ -21,6 +21,7 @@ from chaos_blackjack.content.host_script import HostLine, host_script, summary_m
 
 if TYPE_CHECKING:
     from chaos_blackjack.app.config import RunConfig
+    from chaos_blackjack.app.layout import Layout
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,8 @@ class GameMode:
     # The rules and items of this mode's pools belong to it alone: modes without
     # a pool ("all") do not get them (e.g. J-54's deck rules and contracts).
     exclusive: bool = False
+    # Which parts the table shows and where (app/layout.py); None = the default layout.
+    layout: "Layout | None" = None
 
     def apply(self, config: "RunConfig") -> "RunConfig":
         """The run's config in this mode: goal overrides, host, AI and pools."""
@@ -196,12 +199,24 @@ register_mode(GameMode(
 J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection",
              "j54_layered_sort", "j54_data_backflow")
 J54_CONTRACTS = ("j54_streamline", "j54_low_purge", "j54_high_injection", "j54_freeze", "j54_start_experiment")
+def _j54_layout() -> "Layout":
+    from chaos_blackjack.app.layout import BAG, DEFAULT_LAYOUT, LOG, RULES, Layout, PanelTab
+
+    return Layout(
+        left=DEFAULT_LAYOUT.left,
+        right=("core.deck_pile", "j54.deck:compact", "j54.badges", "core.items:compact", "core.buttons"),
+        panel=(BAG, PanelTab("deck", "Deck", ("j54.deck",), hotkey="k"),
+               PanelTab("contracts", "Contracts", ("j54.contracts",)), RULES, LOG,
+               PanelTab("run", "Run", ("j54.goal", "core.run_stats"))),
+    )
+
+
 register_mode(GameMode(
     "j54", "J-54's Table (demo)",
     "J-54 does not bend the rules; it rewrites the deck, and the deck lasts the whole run. Sign contracts to "
     "reshape it, pay the compute fee each round and complete the protocol before the deck turns against you.",
     icon="mode_j54", overrides={"enable_chaos": True}, order=2, host="j54", series="j54",
-    rules=J54_RULES, items=J54_CONTRACTS, exclusive=True,
+    rules=J54_RULES, items=J54_CONTRACTS, exclusive=True, layout=_j54_layout(),
 ))
 
 __all__ = [

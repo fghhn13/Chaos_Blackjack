@@ -44,7 +44,11 @@ In v1:
   deck by rank (plus Joker state and removed cards); click it to pin the view.
   Agents get `obs.table.deck`. The order is never shown. (Lies and challenges
   are postponed.)
-- Placeholder icons for contracts, rules and the mode; no J-54 card art.
+- Placeholder icons for contracts, rules, badges and the mode; no J-54 card art.
+- **UI** (docs/design/TABLE_UI.md): the right column shows the shoe, a 13-bar
+  deck strip, badges (Joker state or capital progress, compute fee and the
+  next step, pending contracts, freeze) and item slots; the run panel adds
+  Deck and Contracts tabs and a Run tab with the protocol and the fee table.
 
 Not in v1: lies and challenges (section 6), Double Capture,
 Eradication, Joker values, targeted contracts or items, a J-54 LLM prompt,

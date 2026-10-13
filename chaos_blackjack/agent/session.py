@@ -231,6 +231,7 @@ class AgentSession:
             chaos_memory=c.chaos_memory.export(),
             config=c.config.to_dict(),
             table=c.table.to_dict() if c.table is not None else None,
+            log=c.run_log.to_dict(),
         )
         hidden = {
             "save": save.to_dict(),

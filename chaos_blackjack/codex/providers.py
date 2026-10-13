@@ -13,14 +13,9 @@ from chaos_blackjack.codex.models import CodexEntry
 from chaos_blackjack.codex.registry import register_codex_provider
 from chaos_blackjack.codex.scripts import ITEM_DEMOS, RULE_DEMOS
 from chaos_blackjack.registry import auto_load_plugins, get_registry
-from chaos_blackjack.ui.descriptions import describe_modifier
+from chaos_blackjack.ui.descriptions import RULE_NAMES, describe_modifier
 
-_RULE_NAMES = {
-    "modify_card_value": "Value Shift", "great_crash": "Great Crash",
-    "odd_even_chaos": "Odd-Even Chaos", "suit_power": "Suit Power",
-    "fragile_bust": "Fragile Bust", "reverse_bust": "Reverse Bust",
-    "tiebreaker_shift": "Tiebreaker Shift",
-}
+_RULE_NAMES = RULE_NAMES
 _RULE_SUMMARIES = {
     "modify_card_value": "Shift the value of every card.",
     "great_crash": "Face cards and tens take a new value.",

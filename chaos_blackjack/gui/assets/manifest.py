@@ -99,6 +99,13 @@ for _spec in (
     AssetSpec("j54_high_injection", "item", ICON, ph.icon("HI", _J54_RED), "High Injection Contract"),
     AssetSpec("j54_freeze", "item", ICON, ph.icon("FZ", _J54_RED), "Freeze Contract"),
     AssetSpec("j54_start_experiment", "item", ICON, ph.icon("JK", _J54_RED), "Start Experiment"),
+    # J-54 badges (j54/parts.py)
+    AssetSpec("j54_joker_sealed", "icon", ICON, ph.icon("JK", theme.TEXT_MUTED), "Joker sealed"),
+    AssetSpec("j54_joker_in_the_deck", "icon", ICON, ph.icon("JK", theme.GOLD), "Joker in the deck"),
+    AssetSpec("j54_joker_captured", "icon", ICON, ph.icon("JK", (0x9C, 0xC2, 0x96)), "Joker captured"),
+    AssetSpec("j54_goal", "icon", ICON, ph.icon("$", theme.GOLD), "Capital goal"),
+    AssetSpec("j54_fee", "icon", ICON, ph.icon("F", (0xE0, 0xB0, 0x60)), "Compute fee"),
+    AssetSpec("j54_freeze", "icon", ICON, ph.icon("*", (0x9C, 0xB8, 0xD8)), "Freeze"),
 ):
     register(_spec)
 

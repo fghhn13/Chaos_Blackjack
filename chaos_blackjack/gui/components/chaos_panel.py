@@ -1,4 +1,4 @@
-"""Left table column: the Chaos AI's portrait, mood, speech and active rules.
+"""The table host (native part `core.host`): portrait, mood and speech.
 
 The panel only reads `GameView` and notices. Mood is a presentation choice:
 the portrait reacts to what just happened (a rule landing, a bust, a win).
@@ -14,20 +14,18 @@ from collections.abc import Callable
 import pygame
 
 from chaos_blackjack.app.notices import Notice, NoticeKind
-from chaos_blackjack.app.view import GameView, RuleView, TablePhase
+from chaos_blackjack.app.view import GameView, TablePhase
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.anim import Tween, out_back
 from chaos_blackjack.gui.texts import asset_name
-from chaos_blackjack.gui.widgets import Widget, draw_heading, draw_panel, draw_tooltip, fit_text, wrap_text
+from chaos_blackjack.gui.widgets import Widget, wrap_text
 
 if TYPE_CHECKING:
     from chaos_blackjack.content.ai_profile import Persona
     from chaos_blackjack.gui.assets import AssetManager
 
 PORTRAIT = 200
-RULE_ROW = 44
-RULE_ICON = 32
-MAX_RULE_ROWS = 4
+HEIGHT = 12 + PORTRAIT + 4 + 30 + 70 + 6  # portrait, name row, speech bubble
 
 # Round outcome (RoundResult.outcome) -> how the house feels about it.
 OUTCOME_MOOD = {"dealer": "laugh", "player": "angry", "blackjack": "angry", "surrender": "smug", "push": "calm"}
@@ -86,10 +84,6 @@ class ChaosPanel(Widget):
         self.mood = persona.default if persona else "calm"
         self.speech: str | None = None
         self.chaos_enabled = False
-        self.rules: tuple[RuleView, ...] = ()
-        self.rule_rects: list[tuple[pygame.Rect, RuleView]] = []
-        self.hovered: RuleView | None = None
-        self._mouse = (0, 0)
         self.on_poke = on_poke
         self.poke_enabled = False
         self._pop: Tween | None = None  # portrait bounce when the mood changes
@@ -100,18 +94,10 @@ class ChaosPanel(Widget):
         rect.midtop = (self.rect.centerx, self.rect.y + 12)
         return rect
 
-    @property
-    def log_area(self) -> pygame.Rect:
-        """Space below the rules list for the event feed (grows when few rules are active)."""
-        rows = max(1, min(len(self.rules), MAX_RULE_ROWS)) if self.chaos_enabled else 1
-        top = self._rules_top() + rows * RULE_ROW + 4 + 30  # + "Table log" heading
-        return pygame.Rect(self.rect.x + 14, top, self.rect.w - 28, self.rect.bottom - 10 - top)
-
     # -------------------------------------------------------------- state
 
     def sync(self, v: GameView) -> None:
         self.chaos_enabled = v.chaos_enabled
-        self.rules = v.active_rules
         self.poke_enabled = bool(self.on_poke and v.chaos_enabled and v.phase in (
             TablePhase.BETTING, TablePhase.PLAYER_TURN, TablePhase.ROUND_OVER,
         ))
@@ -182,26 +168,13 @@ class ChaosPanel(Widget):
                 and self.portrait_rect.collidepoint(event.pos)):
             self.on_poke()
             return True
-        if event.type == pygame.MOUSEMOTION:
-            self._mouse = event.pos
-            self.hovered = next((r for rect, r in self.rule_rects if rect.collidepoint(event.pos)), None)
         return False
 
     # --------------------------------------------------------------- draw
 
-    def _heading_y(self) -> int:
-        # portrait, name row (30), speech bubble (70), gap
-        return self.rect.y + 12 + PORTRAIT + 4 + 30 + 70 + 12
-
-    def _rules_top(self) -> int:
-        return self._heading_y() + 30
-
     def draw(self, surface: pygame.Surface) -> None:
         a = self.assets
         r = self.rect
-        draw_panel(surface, r)
-        inner_w = r.w - 28
-
         portrait = a.image_fit(self._face(), (PORTRAIT, PORTRAIT))
         if self._pop is not None:
             k = 0.86 + 0.14 * self._pop.value
@@ -222,34 +195,7 @@ class ChaosPanel(Widget):
         mood = a.font(theme.FONT_TINY).render(mood_text, True, theme.TEXT_MUTED)
         surface.blit(name, (r.x + 14, y))
         surface.blit(mood, mood.get_rect(bottomright=(r.right - 14, y + name.get_height() - 2)))
-
         self._draw_speech(surface, pygame.Rect(r.x + 12, y + 34, r.w - 24, 66))
-
-        draw_heading(surface, a, "Active rules", (r.x + 14, self._heading_y()), inner_w)
-        y = self._rules_top()
-        self.rule_rects = []
-        small = a.font(theme.FONT_SMALL, bold=True)
-        tiny = a.font(theme.FONT_TINY)
-        log = self.log_area
-        draw_heading(surface, a, "Table log", (r.x + 14, log.y - 30), inner_w)
-        if not self.chaos_enabled or not self.rules:
-            text = "Chaos off" if not self.chaos_enabled else "None yet"
-            surface.blit(tiny.render(text, True, theme.TEXT_MUTED), (r.x + 14, y + 4))
-            return
-        shown = self.rules[:MAX_RULE_ROWS]
-        for i, rule in enumerate(shown):
-            row = pygame.Rect(r.x + 8, y + i * RULE_ROW, r.w - 16, RULE_ROW - 4)
-            if rule is self.hovered:
-                pygame.draw.rect(surface, theme.FELT, row, border_radius=8)
-            surface.blit(a.image(rule.id, (RULE_ICON, RULE_ICON)), (row.x + 6, row.centery - RULE_ICON // 2))
-            tx = row.x + RULE_ICON + 14
-            tw = row.right - tx - 6
-            surface.blit(small.render(fit_text(small, asset_name(rule.id), tw), True, theme.CHAOS_MAGENTA), (tx, row.y + 2))
-            surface.blit(tiny.render(fit_text(tiny, rule.description, tw), True, theme.TEXT_MUTED), (tx, row.y + 21))
-            self.rule_rects.append((row, rule))
-        if len(self.rules) > MAX_RULE_ROWS:
-            more = tiny.render(f"+{len(self.rules) - MAX_RULE_ROWS} more", True, theme.TEXT_MUTED)
-            surface.blit(more, more.get_rect(topright=(r.right - 14, y + MAX_RULE_ROWS * RULE_ROW - 4)))
 
     def _draw_speech(self, surface: pygame.Surface, box: pygame.Rect) -> None:
         p = self.persona
@@ -269,8 +215,3 @@ class ChaosPanel(Widget):
         for line in lines:
             surface.blit(font.render(line, True, color), (box.x + 10, y))
             y += lh
-
-    def draw_overlay(self, surface: pygame.Surface) -> None:
-        if self.hovered is not None:
-            draw_tooltip(surface, self.assets, f"{asset_name(self.hovered.id)}: {self.hovered.description}",
-                         (self._mouse[0] + 16, self._mouse[1] + 12))

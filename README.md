@@ -183,7 +183,10 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene codex, --prof
 | Round over | Next Round | Enter |
 | Anywhere | — | Esc (back to the main menu, asks first), F11 fullscreen, F5 reload assets |
 
-The window scales a fixed 1280×720 canvas with letterboxing. Choose **Poker Head's Table** in New run's table list for Chaos rules.
+The window scales a fixed 1280×720 canvas with letterboxing. At the table,
+**Tab** opens the run panel (Bag, Rules, Log, Run, plus a table's own tabs such
+as J-54's Deck and Contracts), **L** opens its log, **I** its bag, and **1–9** use
+an item from the quick slots on your turn. The run log is saved with the run. Choose **Poker Head's Table** in New run's table list for Chaos rules.
 
 Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
 indicator appears while the table waits; gameplay controls stay disabled, and Esc,
@@ -466,6 +469,7 @@ streaming play. Packs load into a registry scoped to the run; their item help,
 starting inventory, balance-profile shop prices and selected AI are wired automatically.
 Pack items are sold only when their plugin is loaded; win streaks grant no items.
 
+0. **Table information on screen**: side columns and the run panel are built from parts and a per-mode layout; a new mechanic registers parts and names them in its mode's layout, with no GUI code. See [docs/design/TABLE_UI.md](docs/design/TABLE_UI.md).
 1. **Chaos rule**: add `chaos_blackjack/rules/plugins/your_rule.py`, implement `from_params` → `RuleModifier`, call `register_rule("id", YourPlugin)`. Add an icon spec in `gui/assets/manifest.py` (a test checks every rule and item has one).
 2. **Item**: preferably add it through a content pack. Implement `ItemProtocol` and return `ItemResult.effects` for state changes. Players and Chaos AI use the same executor. Built-in items can still self-register under `items/`; expose a `description` for shared help.
 3. **Player action**: add a `GameController` method + `Action` id, then a row in the GUI's `ACTION_BUTTONS` and the agent's `_ACT_METHODS`.

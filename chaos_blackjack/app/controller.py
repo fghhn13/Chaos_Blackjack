@@ -49,6 +49,7 @@ from chaos_blackjack.app.help_text import ITEM_HELP
 from chaos_blackjack.app.shop import (
     ShopOffer, ShopState, needs_restock, roll_stock, rounds_until_restock, shop_prices,
 )
+from chaos_blackjack.app.run_log import RunLog
 from chaos_blackjack.app.table_mechanics import TableMechanics, make_table
 from chaos_blackjack.app.view import (
     Action,
@@ -154,6 +155,9 @@ class GameController:
             current_bet=0,
             items=(*self.config.starting_items, *content.starting_items),
         )
+        # The whole run's record (saved with the run; the GUI's run panel shows it).
+        self.run_log = RunLog()
+        self.run_log.stats["peak"] = self.run.money
         self.state: GameState | None = None
         self.phase = TablePhase.BETTING
         self.last_result: RoundResult | None = None
@@ -210,6 +214,7 @@ class GameController:
         c.shop = ShopState.from_dict(data.shop) if data.shop else c._roll_shop()
         c.hole_revealed = data.hole_revealed
         c.chaos_memory.restore(data.chaos_memory)
+        c.run_log.restore(data.log)
         c.run_end = None
         c.phase = TablePhase.BETTING
 
@@ -371,6 +376,17 @@ class GameController:
             self._settle_if_player_bust()
         return result
 
+    def perform(self, action: str, arg: str = "") -> object:
+        """Run an action a widget sent (app/widgets.py `Act`): a controller
+        command by id, or the table's own action. Raises ActionError when the
+        action is unknown or not allowed now."""
+        if action == "use_item":
+            return self.use_item(arg)
+        handler = getattr(self.table, "perform", None) if self.table is not None else None
+        if handler is None:
+            raise ActionError(f"Unknown action {action!r}")
+        return handler(action, arg, self)
+
     def dealer_step(self) -> bool:
         """Advance the dealer by one decision. Returns True while the dealer
         still has more to do."""
@@ -448,6 +464,7 @@ class GameController:
             chaos_memory=self.chaos_memory.export(),
             config=self.config.to_dict(),
             table=self.table.to_dict() if self.table is not None else None,
+            log=self.run_log.to_dict(),
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})
@@ -591,6 +608,7 @@ class GameController:
             self.chaos_memory.record(self.run.round, notice.kind, dict(notice.data))
 
     def _publish(self, notice: Notice) -> None:
+        self.run_log.record(self.run.round, notice)
         self._notices.append(notice)
         for fn in list(self._listeners):
             fn(notice)

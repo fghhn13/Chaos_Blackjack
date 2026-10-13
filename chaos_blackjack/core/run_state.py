@@ -105,6 +105,8 @@ class RunSaveData:
     config: dict[str, Any] | None = None
     # State of the mode's own mechanics (e.g. J-54's persistent deck); None on plain tables.
     table: dict[str, Any] | None = None
+    # The run log (app/run_log.py): lines and summary counters.
+    log: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -130,6 +132,8 @@ class RunSaveData:
             data["chaos_memory"] = self.chaos_memory
         if self.table is not None:
             data["table"] = self.table
+        if self.log is not None:
+            data["log"] = self.log
         return data
 
     @staticmethod
@@ -157,6 +161,7 @@ class RunSaveData:
             chaos_memory=d.get("chaos_memory"),
             config=d.get("config"),
             table=d.get("table"),
+            log=d.get("log"),
         )
 
 

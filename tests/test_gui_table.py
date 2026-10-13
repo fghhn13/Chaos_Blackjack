@@ -630,11 +630,22 @@ def test_clicking_hovered_item_keeps_drawing(app: App) -> None:
     t.controller.run.items = ("peek", "peek")
     _key(app, pygame.K_RETURN)
     _tick(app, 0.5, times=4)
-    rect, _ = t.item_panel.item_rects[0]
+    app._render()  # noqa: SLF001 - lays out the item slots
+    rect = item_slot(t).rect.copy()
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEMOTION, {"pos": rect.center, "rel": (0, 0), "buttons": (0, 0, 0)}))
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": rect.center, "button": 1}))
-    _tick(app, 0.01)  # the tooltip follows the refreshed item instead of crashing
-    assert t.view.items[0].count == 1 and t.item_panel.hovered is t.item_panel.items[0]
+    _tick(app, 0.01)  # the tooltip follows the refreshed slot instead of crashing
+    app._render()  # noqa: SLF001
+    assert t.view.items[0].count == 1 and item_slot(t) is not None
     app.scenes.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": rect.center, "button": 1}))
-    _tick(app, 0.01)  # last copy used: the hover clears with the row
-    assert not t.view.items and t.item_panel.hovered is None
+    _tick(app, 0.01)
+    app._render()  # noqa: SLF001 - last copy used: the slot disappears
+    assert not t.view.items and item_slot(t) is None
+
+
+def item_slot(table):
+    """The first item slot drawn in the table's side columns (None if there is none)."""
+    from chaos_blackjack.gui.components.side_column import DataBlock
+
+    blocks = [b for col in (table.left, table.right) for b in col.visible if isinstance(b, DataBlock)]
+    return next((h for b in blocks for h in b.view.hits if h.act is not None and h.act.id == "use_item"), None)
