@@ -1,6 +1,7 @@
 """Illustrative deals; captions avoid claims about profile-specific numbers."""
 
 from chaos_blackjack.codex.models import DemoScript, DemoStep as Step
+from chaos_blackjack.rules.plugins.j54_deck import DECK_RULES
 
 
 def _rule(rule_id, player, dealer=("10♣", "7♦"), deck=("2♣", "3♠", "K♦"), *, hit=False):
@@ -31,8 +32,7 @@ RULE_DEMOS = {
     "fragile_bust": _rule("fragile_bust", ("10♠", "7♥"), deck=("3♣",), hit=True),
     "reverse_bust": _rule("reverse_bust", ("10♠", "9♥"), deck=("5♣",), hit=True),
     "tiebreaker_shift": _rule("tiebreaker_shift", ("10♠", "8♥"), dealer=("K♣", "8♦")),
-    **{rid: _deck_rule(rid) for rid in ("j54_burn", "j54_sample_injection", "j54_redundancy_purge",
-                                        "j54_ace_injection")},
+    **{rid: _deck_rule(rid) for rid in DECK_RULES},
 }
 
 

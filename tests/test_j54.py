@@ -161,7 +161,7 @@ def test_triggered_contract_waits_for_a_win() -> None:
 def test_deletions_stop_at_the_minimum_deck() -> None:
     t = _controller(protocol="capital").table
     for _ in range(20):
-        t._fire("j54_streamline", {"effect": "delete_random", "count": 5})
+        t._fire("j54_streamline")
     assert t.deck_size == 12
 
 
@@ -231,11 +231,11 @@ def test_injection_and_purge_change_this_round_and_the_rest_of_the_run() -> None
     t.round_cards()
     state = GameState((_c("10"), _c("8")), (_c("10", "♥"), _c("7", "♦")),
                       (_c("5", "♦"), _c("5", "♣"), _c("9", "♦"), _c("K", "♦")), GamePhase.PLAYER_TURN)
-    mods = ActiveModifiers(items=(c.registry.build_chaos_rule("j54_sample_injection", {"count": 3, "rank": "Q"}),))
+    mods = ActiveModifiers(items=(c.registry.build_chaos_rule("j54_sample_injection", {"count": 3, "select": "rank:Q"}),))
     state, mods = t.after_chaos(state, mods)
     assert len(state.deck) == 7 and t.deck_size == 55
-    assert mods.items[0].rank == "Q"
-    mods = mods.with_added(c.registry.build_chaos_rule("j54_redundancy_purge", {"count": 3, "rank": "5"}))
+    assert "3 cards of rank Q" in mods.items[0].describe()
+    mods = mods.with_added(c.registry.build_chaos_rule("j54_redundancy_purge", {"count": 3, "select": "rank:5"}))
     before = t.deck_size
     state, mods = t.after_chaos(state, mods)
     assert [str(x.rank) for x in state.deck].count("5") == 0 and t.deck_size == before - 2
@@ -341,3 +341,91 @@ def test_meta_run_saves_resumes_and_finishes() -> None:
         assert reward is not None
     finally:
         meta.use_service(None)
+
+
+# ------------------------------------------------------- deck operations
+
+
+def _ctx(cards=None, deck=None, removed=None, player=(), dealer=(), min_deck=0):
+    import random as _random
+
+    from chaos_blackjack.j54.deck_ops import DeckContext
+
+    counter = iter(range(10**6))
+    return DeckContext(list(cards if cards is not None else []), list(removed or []),
+                       lambda: _random.Random(next(counter)), min_deck, deck, tuple(player), tuple(dealer))
+
+
+def test_deck_operations_are_validated() -> None:
+    from chaos_blackjack.j54.deck_ops import DeckOp
+
+    for bad in ({"op": "explode"}, {"op": "add", "select": "drawn"}, {"op": "add", "count": "all"},
+                {"op": "move_top", "select": "low", "when": "round_end"}, {"op": "add", "select": "rank:Z"},
+                {"op": "remove", "count": 0}, {"op": "return", "select": "low"}):
+        with pytest.raises(ValueError):
+            DeckOp.from_params(bad)
+
+
+def test_moves_only_reorder_this_round() -> None:
+    from chaos_blackjack.j54.deck_ops import DeckOp, apply
+
+    deck = [_c("K"), _c("2"), _c("A", "♥"), _c("5"), joker()]
+    ctx = _ctx(cards=[*deck[:4]], deck=list(deck))
+    result = apply(DeckOp.from_params({"op": "move_bottom", "select": "high", "count": "all"}), ctx)
+    assert [str(c.rank) for c in ctx.deck[:3]] == ["2", "5", "JK"] and len(result.cards) == 2
+    assert {str(c.rank) for c in ctx.deck[3:]} == {"K", "A"} and len(ctx.cards) == 4
+    apply(DeckOp.from_params({"op": "move_top", "select": "rank:5", "count": 1}), ctx)
+    assert str(ctx.deck[0].rank) == "5"
+
+
+def test_return_and_copy_bring_cards_back() -> None:
+    from chaos_blackjack.j54.deck_ops import DeckOp, apply
+
+    ctx = _ctx(cards=[_c("9")], removed=[_c("2"), _c("3"), _c("4")], deck=[_c("9")],
+               player=(_c("10"), _c("7")), dealer=(_c("Q", "♥"), _c("6")))
+    back = apply(DeckOp.from_params({"op": "return", "select": "removed", "count": 2}), ctx)
+    assert len(back.cards) == 2 and len(ctx.removed) == 1 and len(ctx.cards) == 3 and len(ctx.deck) == 3
+    copied = apply(DeckOp.from_params({"op": "copy", "select": "dealer_up", "count": "all"}), ctx)
+    assert [str(c.rank) for c in copied.cards] == ["Q"] and len(ctx.cards) == 4
+    apply(DeckOp.from_params({"op": "copy", "select": "player_hand", "count": "all"}), ctx)
+    assert len(ctx.cards) == 6
+
+
+def test_deletions_keep_the_minimum_and_feed_the_removed_pile() -> None:
+    from chaos_blackjack.j54.deck_ops import DeckOp, apply
+
+    ctx = _ctx(cards=[_c(r) for r in ("2", "3", "4", "K")], min_deck=2)
+    gone = apply(DeckOp.from_params({"op": "remove", "select": "low", "count": "all"}), ctx)
+    assert len(gone.cards) == 2 and len(ctx.cards) == 2 and ctx.removed == gone.cards
+
+
+def test_backflow_returns_deleted_cards_at_the_table() -> None:
+    c = _controller(protocol="capital")
+    c.buy("j54_low_purge") if any(o.item == "j54_low_purge" for o in c.shop.offers) else c.table._fire("j54_low_purge")
+    assert len(c.table.removed) == 6 and dict(c.view().table_info)["Removed"] == "6 cards"
+    _no_chaos(c)
+    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("7", "♦")], deck=[_c("9")])
+    _bet(c)
+    rule = c.registry.build_chaos_rule("j54_data_backflow", {})
+    c.state, c.loop.modifiers = c.table.after_chaos(c.state, c.loop.modifiers.with_added(rule))
+    assert len(c.table.removed) == 2 and len(c.state.deck) == 5
+
+
+def test_new_rules_are_data_and_describe_themselves() -> None:
+    from chaos_blackjack.rules.plugins.j54_deck import DECK_RULES
+
+    cfg = _config()
+    assert set(DECK_RULES) == set(J54_RULES) == set(cfg.rule_pool)
+    reg = _controller().registry
+    for rid in DECK_RULES:
+        m = reg.build_chaos_rule(rid, cfg.chaos_rule_params.get(rid, {}))
+        assert m.describe().startswith(DECK_RULES[rid][0] + ": ")
+    assert "bottom" in reg.build_chaos_rule("j54_layered_sort", {}).describe()
+
+
+def test_deck_make_up_is_public() -> None:
+    c = _controller(protocol="capture")
+    counts = dict(c.view().deck_counts)
+    assert counts == {r: 4 for r in ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A")}
+    obs = AgentSession.new(seed=5, mode="j54").observe()
+    assert sum(obs["table"]["deck"].values()) == 52

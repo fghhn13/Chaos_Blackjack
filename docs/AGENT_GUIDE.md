@@ -244,7 +244,7 @@ What `peek`, `fate_oracle` and `danger_radar` reveal only appears in `events`; r
 
 J-54 changes the **cards**, not the rules. Design: `docs/design/J54_TABLE.md`.
 
-- **Persistent deck.** The deck's cards last the whole run; each round shuffles all of them. `obs.table.info.Deck` is its size.
+- **Persistent deck.** The deck's cards last the whole run; each round shuffles all of them. `obs.table.info.Deck` is its size and `obs.table.deck` its make-up (`{"2": 4, ..., "A": 5}`, every card of the run's deck, never the order). Deleted cards are counted in `obs.table.info.Removed`.
 - **Protocol (goal).** Drawn at random per run, shown in `obs.table.info.Protocol`:
   - *Single Capture* — draw the Joker yourself (deal, hit or double). It starts **sealed**; `buy j54_start_experiment` (always on the shelf until bought) puts it in the deck. If the dealer would get it, J-54 shuffles it back and adds a low card. `obs.target` is 0.
   - *Capital* — reach the chip target (`obs.target`).
@@ -260,7 +260,7 @@ J-54 changes the **cards**, not the rules. Design: `docs/design/J54_TABLE.md`.
 | `j54_freeze` | at once: J-54 adds no cards for a few rounds |
 | `j54_start_experiment` | at once: release the Joker (Single Capture only) |
 
-- **Chaos rules** (`j54_burn`, `j54_sample_injection`, `j54_redundancy_purge`, `j54_ace_injection`) add or remove cards; Burn removes every card drawn this round after it settles. All changes are announced in `events`.
+- **Chaos rules** are deck operations, described in plain English in `obs.chaos.active_rules`: `j54_burn` (after the hand, delete every card drawn), `j54_sample_injection` / `j54_ace_injection` (add cards), `j54_redundancy_purge` (delete cards of one rank), `j54_layered_sort` (high cards to the bottom of this round's deck), `j54_data_backflow` (removed cards return). All changes are announced in `events`.
 
 ## 9. Worked examples
 

@@ -193,7 +193,8 @@ register_mode(GameMode(
     icon="mode_poker_head", overrides={"enable_chaos": True}, order=1, host="poker_head", series="poker_head",
 ))
 # Demo of the deck-rebuilding table (docs/design/J54_TABLE.md); its mechanics are chaos_blackjack/j54.
-J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection")
+J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection",
+             "j54_layered_sort", "j54_data_backflow")
 J54_CONTRACTS = ("j54_streamline", "j54_low_purge", "j54_high_injection", "j54_freeze", "j54_start_experiment")
 register_mode(GameMode(
     "j54", "J-54's Table (demo)",

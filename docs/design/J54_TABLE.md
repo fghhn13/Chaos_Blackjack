@@ -29,11 +29,24 @@ In v1:
 - Entropy after every round; Freeze skips it.
 - Contracts: Low Purge (now), Streamline (next win), High Injection (now),
   Freeze (now), Start Experiment (now). Pending ones show at the table.
+- **Deck operations** (`j54/deck_ops.py`): every rule, deck contract, entropy
+  and the Joker penalty is data — `when` (now, round_end), `select` (rank:R,
+  random_rank, low, high, any, drawn, player_hand, dealer_up, removed), `op`
+  (add, remove, copy, move_top, move_bottom, return), `count` (n or all).
+  Descriptions are generated. A new rule is a `chaos_rule` row plus a name in
+  `rules/plugins/j54_deck.py`; a new deck contract is a `shop_item` row plus
+  a name in `j54/contracts.py`. Deleted cards go to a removed pile.
 - Chaos rules: Burn Protocol, Sample Injection, Redundancy Purge, Ace
-  Injection (offline Chaos AI only; the LLM may pick them but has no J-54 prompt).
+  Injection, Layered Sort (high cards to the bottom of this round's deck),
+  Data Backflow (4 removed cards return). Offline Chaos AI only; the LLM may
+  pick them but has no J-54 prompt.
+- **Deck inspection, always on and truthful**: hover the shoe to see the whole
+  deck by rank (plus Joker state and removed cards); click it to pin the view.
+  Agents get `obs.table.deck`. The order is never shown. (Lies and challenges
+  are postponed.)
 - Placeholder icons for contracts, rules and the mode; no J-54 card art.
 
-Not in v1: deck inspection and challenges (section 6), Double Capture,
+Not in v1: lies and challenges (section 6), Double Capture,
 Eradication, Joker values, targeted contracts or items, a J-54 LLM prompt,
 upgrades / achievements / cosmetics, simulator support, player-guide and
 wiki pages.
@@ -55,7 +68,8 @@ from surplus, starts the experiment at <= 38 cards, bets up to half the
 bankroll on a rich deck): Single Capture won ~23 % (median round 12), Capital
 ~19 % but with a **median win in round 4**; never buying won 0 % / ~2 % and died
 around round 18. Capital therefore still allows lucky early wins (open
-question below); capping bets at 25-30 % did not move its wins past round 5-6. Measured edge of the bot's play: -1.3 %
+question below); capping bets at 25-30 % did not move its wins past round 5-6.
+With Layered Sort and Data Backflow added: ~15 % / ~13 %, same shape. Measured edge of the bot's play: -1.3 %
 per hand on a full deck, about 0 with 8 low cards removed, about +5 % with 16
 removed. Lessons: a fee above ~2 per round outweighs the deck edge at these
 bankrolls, so entropy (not the fee) carries most of the anti-stall pressure;

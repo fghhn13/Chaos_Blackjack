@@ -92,6 +92,8 @@ for _spec in (
     AssetSpec("j54_sample_injection", "rule", ICON, ph.icon("S+", _J54_RED), "Sample Injection"),
     AssetSpec("j54_redundancy_purge", "rule", ICON, ph.icon("R-", _J54_RED), "Redundancy Purge"),
     AssetSpec("j54_ace_injection", "rule", ICON, ph.icon("A+", _J54_RED), "Ace Injection"),
+    AssetSpec("j54_layered_sort", "rule", ICON, ph.icon("LS", _J54_RED), "Layered Sort"),
+    AssetSpec("j54_data_backflow", "rule", ICON, ph.icon("DB", _J54_RED), "Data Backflow"),
     AssetSpec("j54_streamline", "item", ICON, ph.icon("ST", _J54_RED), "Streamline Contract"),
     AssetSpec("j54_low_purge", "item", ICON, ph.icon("LP", _J54_RED), "Low Purge Contract"),
     AssetSpec("j54_high_injection", "item", ICON, ph.icon("HI", _J54_RED), "High Injection Contract"),

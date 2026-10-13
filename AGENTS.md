@@ -105,7 +105,8 @@ target). A **compute fee** is charged before each bet and grows with the
 round; the minimum bet is at least the fee. The shop sells **contracts**
 (`buy j54_low_purge`, ...) that change the deck at once or on your next win;
 they never enter `obs.items`. `obs.table` = `{"info": {"Protocol", "Joker" or
-"Goal", "Deck", "Fee", "Contracts"?}, "fee": n}` (null at other tables); deck
+"Goal", "Deck", "Removed"?, "Fee", "Contracts"?}, "fee": n, "deck": {rank: count}}`
+(null at other tables; the deck's make-up is public, its order is not); deck
 changes are reported in `events`. Design: [docs/design/J54_TABLE.md](docs/design/J54_TABLE.md).
 
 ### Fair play

@@ -3,7 +3,8 @@ e.g. J-54's protocol and deck) and the shop button.
 
 Items are buttons: clicking one calls `on_use(item_id)` while the view allows
 `use_item`. Hovering shows what the item does. The shop button calls
-`on_shop()` while betting.
+`on_shop()` while betting. At a table whose deck is public (J-54), hovering
+the shoe shows the deck's make-up and clicking it pins that view open.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from chaos_blackjack.app.help_text import ITEM_HELP
 from chaos_blackjack.app.view import Action, GameView, ItemView
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.cards import CARD_SIZE
-from chaos_blackjack.gui.texts import asset_name
+from chaos_blackjack.gui.texts import BAD, asset_name
 from chaos_blackjack.gui.widgets import Button, Widget, draw_heading, draw_panel, draw_tooltip, fit_text
 
 if TYPE_CHECKING:
@@ -42,6 +43,9 @@ class ItemPanel(Widget):
         self.can_use = False
         self.restock_in = 0
         self.table_info: tuple[tuple[str, str], ...] = ()
+        self.deck_counts: tuple[tuple[str, int], ...] = ()
+        self.deck_hover = False
+        self.deck_pinned = False
         self.shop_button = Button(
             assets, (self.rect.x + 14, self.rect.bottom - 62, self.rect.w - 28, 48), "Shop",
             on_shop, hotkey=pygame.K_b, font_size=theme.FONT_BODY,
@@ -68,14 +72,20 @@ class ItemPanel(Widget):
         self.shop_button.enabled = v.can(Action.BUY)
         self.restock_in = v.shop_restock_in
         self.table_info = v.table_info
+        self.deck_counts = v.deck_counts
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if self.shop_button.handle_event(event) and event.type != pygame.MOUSEMOTION:
             return True
         if event.type == pygame.MOUSEMOTION:
             self._mouse = event.pos
+            self.deck_hover = bool(self.deck_counts) and self.deck_rect.collidepoint(event.pos)
             self.hovered = next((i for rect, i in self.item_rects if rect.collidepoint(event.pos)), None)
             return False
+        if (event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.deck_counts
+                and self.deck_rect.collidepoint(event.pos)):
+            self.deck_pinned = not self.deck_pinned
+            return True
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.can_use:
             hit = next((i for rect, i in self.item_rects if rect.collidepoint(event.pos)), None)
             if hit is not None:
@@ -137,6 +147,39 @@ class ItemPanel(Widget):
             surface.blit(value_font.render(fit_text(value_font, value, r.w - 28), True, theme.IVORY), (r.x + 14, y))
             y += value_font.get_linesize() + 6
 
+    def _draw_deck_counts(self, surface: pygame.Surface) -> None:
+        """The whole deck by rank (two columns), beside the shoe."""
+        a = self.assets
+        info = dict(self.table_info)
+        head_font, font, tiny = a.font(theme.FONT_SMALL, bold=True), a.font(theme.FONT_SMALL), a.font(theme.FONT_TINY)
+        rows = (len(self.deck_counts) + 1) // 2
+        lh = font.get_linesize() + 2
+        box = pygame.Rect(0, 0, 236, 58 + rows * lh + 46)
+        box.topright = (self.rect.x - 10, self.deck_rect.y - 8)
+        pygame.draw.rect(surface, theme.DARK, box, border_radius=10)
+        pygame.draw.rect(surface, theme.GOLD if self.deck_pinned else theme.GOLD_DIM, box, 1, border_radius=10)
+        total = sum(n for _, n in self.deck_counts)
+        surface.blit(head_font.render(f"Deck  {total} cards", True, theme.IVORY), (box.x + 14, box.y + 10))
+        surface.blit(tiny.render("All cards, reshuffled every round", True, theme.TEXT_MUTED), (box.x + 14, box.y + 32))
+        most = max((n for _, n in self.deck_counts), default=1) or 1
+        for i, (rank, n) in enumerate(self.deck_counts):
+            col, row = divmod(i, rows)
+            x, y = box.x + 14 + col * 112, box.y + 56 + row * lh
+            low = rank in ("2", "3", "4", "5", "6")
+            color = theme.TEXT_MUTED if n == 0 else (BAD if low else theme.IVORY)
+            surface.blit(font.render(f"{rank:>2}", True, color), (x, y))
+            surface.blit(font.render(str(n), True, color), (x + 30, y))
+            bar = pygame.Rect(x + 52, y + 6, round(46 * n / most), 8)
+            if n:
+                pygame.draw.rect(surface, BAD if low else theme.GOLD_DIM, bar, border_radius=3)
+        y = box.y + 56 + rows * lh + 4
+        extra = [f"Joker: {info['Joker']}"] if "Joker" in info else []
+        if "Removed" in info:
+            extra.append(f"Removed: {info['Removed']}")
+        surface.blit(tiny.render("   ".join(extra), True, theme.GOLD), (box.x + 14, y))
+        hint = "Click the deck to close" if self.deck_pinned else "Click the deck to pin"
+        surface.blit(tiny.render(hint, True, theme.TEXT_MUTED), (box.x + 14, y + 20))
+
     def _draw_shop(self, surface: pygame.Surface) -> None:
         """Shop button (usable while betting) and the restock countdown."""
         r = self.rect
@@ -148,6 +191,8 @@ class ItemPanel(Widget):
         self.shop_button.draw(surface)
 
     def draw_overlay(self, surface: pygame.Surface) -> None:
+        if self.deck_counts and (self.deck_hover or self.deck_pinned):
+            self._draw_deck_counts(surface)
         if self.hovered is not None:
             description = self.hovered.description or ITEM_HELP.get(self.hovered.id, "")
             text = f"{asset_name(self.hovered.id)}: {description}"

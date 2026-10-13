@@ -54,10 +54,11 @@ def serialize_modifier_params(mod: object) -> dict[str, object]:
         except Exception:
             pass
 
-    for key in ("count", "rank"):  # J-54 deck rules
-        value = getattr(mod, key, None)
-        if value is not None:
-            params[key] = value
+    op = getattr(mod, "op", None)  # J-54 deck rules: the operation and the rank it drew
+    if getattr(mod, "deck_rule", False) and op is not None:
+        params.update(when=op.when, select=op.select, op=op.op, count="all" if op.count is None else op.count)
+        if getattr(mod, "rank", None):
+            params["rank"] = mod.rank
 
     mid = getattr(mod, "id", None)
     if mid == "tiebreaker_shift" and hasattr(mod, "chaos_flags"):

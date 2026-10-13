@@ -115,6 +115,8 @@ class GameView:
     # chips charged before this round's bet.
     table_info: tuple[tuple[str, str], ...] = ()
     fee: int = 0
+    # (rank, cards) of the whole deck when the table makes it public (J-54); () elsewhere.
+    deck_counts: tuple[tuple[str, int], ...] = ()
 
     def can(self, action: str) -> bool:
         return action in self.available_actions

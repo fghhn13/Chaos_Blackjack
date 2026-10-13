@@ -52,6 +52,10 @@ class TableMechanics:
         """(label, value) rows the table shows next to the cards."""
         return ()
 
+    def deck_counts(self) -> tuple[tuple[str, int], ...]:
+        """(rank, cards) of the table's whole deck when its make-up is public (J-54), else ()."""
+        return ()
+
     def victory(self, run: "RunState") -> str | None:
         """A message when the run is won, else None."""
         return None
@@ -141,4 +145,4 @@ def table_goal(config: "RunConfig") -> str | None:
 
 
 def _load_builtin_tables() -> None:
-    import chaos_blackjack.j54  # noqa: F401  (registers "j54")
+    import chaos_blackjack.j54.table  # noqa: F401  (registers "j54")

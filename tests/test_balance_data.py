@@ -211,7 +211,7 @@ def test_old_databases_are_migrated(tmp_path) -> None:
 def test_shipped_phase_two_values() -> None:
     b = default_balance()
     assert (b.min_bet, b.max_bet_fraction) == (5, 0.5)
-    assert b.chaos_rule_params == {
+    assert {k: v for k, v in b.chaos_rule_params.items() if not k.startswith("j54_")} == {
         "fragile_bust": {"bust_limit": 19}, "great_crash": {"ten_value": 8},
         "odd_even_chaos": {"even_delta": 2, "odd_delta": -1}, "suit_power": {"red_delta": 1, "black_delta": -1},
     }

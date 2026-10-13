@@ -63,12 +63,13 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
 INSERT INTO shop_item (profile_id, item_id, price_mode, price) VALUES
     (:profile, 'example_trim', 'fixed', 20);
 
--- J-54's run contracts (sold only at its table). `params`: trigger (win, loss,
--- natural, now), effect and its numbers; read by chaos_blackjack/j54/contracts.py.
+-- J-54's run contracts (sold only at its table). `params`: a trigger (now, win,
+-- loss, natural) and a deck operation (select / op / count, see
+-- chaos_blackjack/j54/deck_ops.py) or a special effect (freeze, release_jokers).
 INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
-    (:profile, 'j54_streamline',        'fixed',  20, '{"trigger": "win", "effect": "delete_random", "count": 5}'),
-    (:profile, 'j54_low_purge',         'fixed',  10, '{"trigger": "now", "effect": "delete_low", "count": 6}'),
-    (:profile, 'j54_high_injection',    'fixed',  20, '{"trigger": "now", "effect": "add_high", "count": 3}'),
+    (:profile, 'j54_streamline',        'fixed',  20, '{"trigger": "win", "select": "any", "op": "remove", "count": 5}'),
+    (:profile, 'j54_low_purge',         'fixed',  10, '{"trigger": "now", "select": "low", "op": "remove", "count": 6}'),
+    (:profile, 'j54_high_injection',    'fixed',  20, '{"trigger": "now", "select": "high", "op": "add", "count": 3}'),
     (:profile, 'j54_freeze',            'fixed',  15, '{"trigger": "now", "effect": "freeze", "rounds": 3}'),
     (:profile, 'j54_start_experiment',  'fixed',  50, '{"trigger": "now", "effect": "release_jokers"}');
 
@@ -85,11 +86,15 @@ INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_
     (:profile, 'suit_power',        1, '{"red_delta": 1, "black_delta": -1}', 20, NULL),                   --  -5 %
     (:profile, 'fragile_bust',      1, '{"bust_limit": 19}',                  15, NULL),                   --  +8 %
     (:profile, 'tiebreaker_shift',  1, NULL,                                  15, '{"ties_to": "dealer"}'), --  -9 %
-    -- J-54's deck rules (its table only); a rank is drawn when none is given.
-    (:profile, 'j54_burn',              1, NULL,                              20, NULL),
-    (:profile, 'j54_sample_injection',  1, NULL,                              25, '{"count": 3}'),
-    (:profile, 'j54_redundancy_purge',  1, NULL,                              25, '{"count": 3}'),
-    (:profile, 'j54_ace_injection',     1, NULL,                              10, '{"count": 1}');
+    -- J-54's deck rules (its table only): `params` is the deck operation
+    -- (when / select / op / count, chaos_blackjack/j54/deck_ops.py). A new rule
+    -- is a row here plus a name in rules/plugins/j54_deck.py.
+    (:profile, 'j54_burn',              1, '{"when": "round_end", "select": "drawn", "op": "remove", "count": "all"}', 20, NULL),
+    (:profile, 'j54_sample_injection',  1, '{"select": "random_rank", "op": "add", "count": 3}',      25, NULL),
+    (:profile, 'j54_redundancy_purge',  1, '{"select": "random_rank", "op": "remove", "count": 3}',   25, NULL),
+    (:profile, 'j54_ace_injection',     1, '{"select": "rank:A", "op": "add", "count": 1}',           10, NULL),
+    (:profile, 'j54_layered_sort',      1, '{"select": "high", "op": "move_bottom", "count": "all"}', 10, NULL),
+    (:profile, 'j54_data_backflow',     1, '{"select": "removed", "op": "return", "count": 4}',       10, NULL);
 
 -- Meta upgrades bought with tokens between runs (tuned with black-jack-sim). Effects
 -- are code (chaos_blackjack/meta/effects.py); each row is one upgrade.

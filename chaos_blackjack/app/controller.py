@@ -539,6 +539,7 @@ class GameController:
             shop_reroll_price=self.reroll_price() if self.phase == TablePhase.BETTING else None,
             table_info=self.table.info(self.run) if self.table is not None else (),
             fee=self._fee(),
+            deck_counts=self.table.deck_counts() if self.table is not None else (),
         )
 
     # -------------------------------------------------------------- internal

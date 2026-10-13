@@ -1,15 +1,16 @@
 """J-54's table (demo): a deck that lasts the whole run (docs/design/J54_TABLE.md).
 
 * The deck's cards persist between rounds; every round shuffles all of them.
+  Its make-up is public (`deck_counts`); its order never is.
 * A protocol drawn per run is the goal: Single Capture (draw the Joker
-  yourself) or Capital (reach a large bankroll).
+  yourself) or Capital (reach a chip target).
 * The Joker starts sealed; the Start Experiment contract puts it in the deck.
   If the dealer would get it, J-54 takes it back into the deck and adds low
   cards as a penalty.
 * A compute fee is charged before every bet and grows with the round; J-54
   adds low cards after every round (entropy), so idle rounds only hurt.
-* The shop sells contracts (j54/contracts.py) and the Chaos AI's rules change
-  the deck (rules/plugins/j54_deck.py).
+* Rules (rules/plugins/j54_deck.py), contracts (j54/contracts.py), entropy
+  and the penalty are all deck operations (j54/deck_ops.py).
 
 Random choices use a counter-seeded RNG, so a run replays identically however
 it is saved and resumed.
@@ -22,22 +23,17 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from chaos_blackjack.app.notices import NoticeKind
-from chaos_blackjack.app.table_mechanics import Notify, TableMechanics
+from chaos_blackjack.app.table_mechanics import Notify, TableMechanics, register_table
 from chaos_blackjack.core.game_state import Card, GameState, Rank
-from chaos_blackjack.j54.contracts import CONTRACTS, contract_params, describe, effect_text
+from chaos_blackjack.j54.contracts import CONTRACTS, contract_spec, describe
+from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, is_joker
 from chaos_blackjack.rules.modifiers import ActiveModifiers
-from chaos_blackjack.rules.plugins.j54_deck import BURN_FLAG
 
 if TYPE_CHECKING:
     from chaos_blackjack.app.config import RunConfig
     from chaos_blackjack.app.economy import RunState
 
 TABLE_EVENT = NoticeKind.TABLE_EVENT  # notice kind of everything the table announces
-JOKER = "JK"
-RANKS = ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A")
-SUITS = ("♠", "♥", "♦", "♣")
-LOW_RANKS = ("2", "3", "4", "5", "6")
-HIGH_RANKS = ("10", "J", "Q", "K", "A")
 START_EXPERIMENT = "j54_start_experiment"
 
 PROTOCOLS: dict[str, str] = {"capture": "Single Capture", "capital": "Capital"}
@@ -56,10 +52,6 @@ DEFAULTS: dict[str, Any] = {
 }
 
 
-def is_joker(card: Card) -> bool:
-    return str(card.rank).upper() == JOKER
-
-
 def joker() -> Card:
     return Card(Rank(JOKER), "")
 
@@ -72,20 +64,24 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'s' if n != 1 else ''}"
 
 
+def _settings(config: "RunConfig") -> dict[str, Any]:
+    return {**DEFAULTS, **{k[4:]: v for k, v in config.mode_settings.items() if k.startswith("j54.")}}
+
+
 class J54Table(TableMechanics):
     id = "j54"
 
     @classmethod
     def goal(cls, config: "RunConfig") -> str:
-        settings = {**DEFAULTS, **{k[4:]: v for k, v in config.mode_settings.items() if k.startswith("j54.")}}
-        return f"A random protocol: draw the Joker, or reach {settings['capital_target']} chips"
+        return f"A random protocol: draw the Joker, or reach {_settings(config)['capital_target']} chips"
 
     def __init__(self, config: "RunConfig", seed: int | str, notify: Notify) -> None:
         super().__init__(config, seed, notify)
-        self.settings = {**DEFAULTS, **{k[4:]: v for k, v in config.mode_settings.items() if k.startswith("j54.")}}
+        self.settings = _settings(config)
         protocols = [p.strip() for p in str(self.settings["protocols"]).split(",") if p.strip() in PROTOCOLS]
         self.protocol = random.Random(f"{seed}:j54:protocol").choice(protocols or ["capture"])
         self.cards: list[Card] = standard_cards()
+        self.removed: list[Card] = []     # cards deleted during the run (Data Backflow returns them)
         jokers = int(self.settings["experiment_jokers"]) if self.protocol == "capture" else 0
         self.jokers_sealed = jokers
         self.jokers_needed = jokers
@@ -115,36 +111,15 @@ class J54Table(TableMechanics):
     def capital_target(self) -> int:
         return int(self.settings["capital_target"])
 
-    def _room(self) -> int:
-        """Cards that may still be deleted before the deck hits its minimum."""
-        return max(0, len(self.cards) - int(self.settings["min_deck"]))
+    def _run(self, op: DeckOp, state: GameState | None = None, deck: list[Card] | None = None):
+        """Apply a deck operation to the run's deck (and this round's, when `deck` is given)."""
+        ctx = DeckContext(self.cards, self.removed, self._rng, int(self.settings["min_deck"]), deck,
+                          state.player_hand if state else (), state.dealer_hand if state else ())
+        return apply(op, ctx)
 
-    def _add(self, ranks: tuple[str, ...], count: int, rank: str | None = None) -> list[Card]:
-        rng = self._rng()
-        added = [Card(Rank(rank or rng.choice(ranks)), rng.choice(SUITS)) for _ in range(count)]
-        self.cards.extend(added)
-        return added
-
-    def _delete(self, cards: list[Card]) -> list[Card]:
-        """Remove these cards from the deck (one copy each), never below the minimum."""
-        removed = []
-        for card in cards:
-            if self._room() <= 0:
-                break
-            if card in self.cards:
-                self.cards.remove(card)
-                removed.append(card)
-        return removed
-
-    def _delete_random(self, count: int, ranks: tuple[str, ...] | None = None) -> list[Card]:
-        pool = [c for c in self.cards if ranks is None or str(c.rank) in ranks]
-        picked = self._rng().sample(pool, min(count, len(pool)))
-        return self._delete(picked)
-
-    @staticmethod
-    def _names(cards: list[Card]) -> str:
-        # Ranks only, like the other table log lines (the UI font has no suit glyphs).
-        return ", ".join(str(c.rank) for c in cards) if cards else "nothing"
+    def deck_counts(self) -> tuple[tuple[str, int], ...]:
+        """How many cards of each rank the deck holds (all of them, whatever is in play)."""
+        return tuple((r, sum(1 for c in self.cards if str(c.rank) == r)) for r in RANKS)
 
     # --- run --------------------------------------------------------------
 
@@ -161,19 +136,22 @@ class J54Table(TableMechanics):
                 "into the deck, then draw it yourself. If I draw it, I keep it a little longer.",
                 fee]
 
+    def joker_state(self) -> str:
+        if self.protocol != "capture":
+            return "none"
+        if self.captured >= self.jokers_needed:
+            return "captured"
+        return "in the deck" if self.jokers_in_deck else "sealed"
+
     def info(self, run: "RunState") -> tuple[tuple[str, str], ...]:
         rows: list[tuple[str, str]] = [("Protocol", PROTOCOLS[self.protocol])]
         if self.protocol == "capital":
             rows.append(("Goal", f"Reach {self.capital_target} chips"))
         else:
-            if self.captured >= self.jokers_needed:
-                state = "captured"
-            elif self.jokers_in_deck:
-                state = "in the deck"
-            else:
-                state = "sealed"
-            rows.append(("Joker", state))
+            rows.append(("Joker", self.joker_state()))
         rows.append(("Deck", _plural(self.deck_size, "card")))
+        if self.removed:
+            rows.append(("Removed", _plural(len(self.removed), "card")))
         rows.append(("Fee", f"{self.fee(run.round)} per round"))
         if self.pending:
             rows.append(("Contracts", ", ".join(CONTRACTS[c].name for c in self.pending)))
@@ -217,36 +195,29 @@ class J54Table(TableMechanics):
         return describe(item_id, self.config.item_params)
 
     def buy(self, item_id: str, run: "RunState") -> str:
-        params = contract_params(item_id, self.config.item_params)
+        spec = contract_spec(item_id, self.config.item_params)
         name = CONTRACTS[item_id].name
-        if params["trigger"] == "now":
-            self._fire(item_id, params)
+        if spec.trigger == "now":
+            self._fire(item_id)
             return f"Signed {name}."
         self.pending.append(item_id)
-        return f"Signed {name}: it takes effect on your next {params['trigger']}."
+        return f"Signed {name}: it takes effect on your next {spec.trigger}."
 
-    def _fire(self, item_id: str, params: dict[str, Any]) -> None:
-        effect, count = params["effect"], int(params.get("count", 1))
+    def _fire(self, item_id: str) -> None:
+        spec = contract_spec(item_id, self.config.item_params)
         name = CONTRACTS[item_id].name
-        if effect == "delete_random":
-            gone = self._delete_random(count)
-            self._say(f"{name}: deleted {self._names(gone)}.", effect=effect, cards=len(gone))
-        elif effect == "delete_low":
-            gone = self._delete_random(count, LOW_RANKS)
-            self._say(f"{name}: deleted {self._names(gone)}.", effect=effect, cards=len(gone))
-        elif effect == "add_high":
-            added = self._add(HIGH_RANKS, count)
-            self._say(f"{name}: added {self._names(added)}.", effect=effect, cards=len(added))
-        elif effect == "freeze":
-            self.freeze += int(params.get("rounds", 1))
-            self._say(f"{name}: J-54 adds no cards for {_plural(self.freeze, 'round')}.", effect=effect)
-        elif effect == "release_jokers":
+        if spec.effect == "freeze":
+            self.freeze += spec.rounds
+            self._say(f"{name}: J-54 adds no cards for {_plural(self.freeze, 'round')}.", effect="freeze")
+        elif spec.effect == "release_jokers":
             self.jokers_in_deck += self.jokers_sealed
             self.jokers_sealed = 0
             self.experiment = True
-            self._say("Experiment started: the Joker is in the deck.", effect=effect)
+            self._say("Experiment started: the Joker is in the deck.", effect="release_jokers")
         else:
-            raise ValueError(f"{name}: cannot {effect_text(params)}")
+            assert spec.op is not None
+            result = self._run(spec.op)
+            self._say(f"{name}: {result.summary(spec.op)}.", effect=spec.op.op, cards=len(result.cards))
 
     # --- round ------------------------------------------------------------
 
@@ -275,9 +246,9 @@ class J54Table(TableMechanics):
                 dealer[i] = self._take(deck)
                 deck.insert(self._rng().randint(min(1, len(deck)), len(deck)), card)  # not back on top
                 penalty = int(self.settings["dealer_joker_penalty"])
-                added = self._add(LOW_RANKS, penalty)
-                self._say(f"The dealer drew the Joker. J-54 shuffles it back and adds {self._names(added)}.",
-                          effect="dealer_joker")
+                added = self._run(DeckOp("add", "low", penalty)).cards if penalty else []
+                extra = f" and adds {', '.join(str(c.rank) for c in added)}" if added else ""
+                self._say(f"The dealer drew the Joker. J-54 shuffles it back{extra}.", effect="dealer_joker")
         return replace(state, player_hand=tuple(player), dealer_hand=tuple(dealer), deck=tuple(deck))
 
     @staticmethod
@@ -295,50 +266,37 @@ class J54Table(TableMechanics):
             m = items[i]
             if not getattr(m, "deck_rule", False):
                 continue
-            rid, count = str(m.id), int(getattr(m, "count", 1))
-            if rid in ("j54_sample_injection", "j54_ace_injection"):
-                rank = getattr(m, "rank", None) or self._rng().choice(RANKS)
-                added = self._add(RANKS, count, rank)
-                rng = self._rng()
-                for card in added:
-                    deck.insert(rng.randint(0, len(deck)), card)
-                items[i] = replace(m, rank=rank)
-                label = "Ace injection" if rid == "j54_ace_injection" else "Sample injection"
-                self._say(f"{label}: {self._names(added)} added to the deck.", effect=rid)
-            elif rid == "j54_redundancy_purge":
-                present = sorted({str(c.rank) for c in deck if not is_joker(c)}, key=RANKS.index)
-                rank = getattr(m, "rank", None) or (self._rng().choice(present) if present else "2")
-                victims = [c for c in deck if str(c.rank) == rank][:count]
-                gone = self._delete(victims)
-                for card in gone:
-                    deck.remove(card)
-                items[i] = replace(m, rank=rank)
-                self._say(f"Redundancy purge: {self._names(gone)} removed from the deck.", effect=rid)
+            if m.op.when != "now":
+                self._say(f"{m.name}: {m.op.describe()}.", effect=m.id)
+                continue
+            result = self._run(m.op, state, deck)
+            items[i] = m.with_rank(result.rank or m.rank)
+            self._say(f"{m.name}: {result.summary(m.op)}.", effect=m.id, cards=len(result.cards))
         self._applied_rules = len(items)
         return replace(state, deck=tuple(deck)), ActiveModifiers(items=tuple(items))
 
     def after_settle(self, state: GameState, outcome: str, modifiers: ActiveModifiers, run: "RunState") -> None:
         if self.won:
             return
-        if BURN_FLAG in modifiers.chaos_flags():
-            gone = self._delete([c for c in (*state.player_hand, *state.dealer_hand) if not is_joker(c)])
-            self._say(f"Burn protocol: {self._names(gone)} leave the deck.", effect="burn")
+        for m in modifiers.items:  # rules that act after the hand (e.g. Burn Protocol)
+            if getattr(m, "deck_rule", False) and m.op.when == "round_end":
+                result = self._run(m.op, state)
+                self._say(f"{m.name}: {result.summary(m.op)}.", effect=m.id, cards=len(result.cards))
         happened = {"win"} if outcome in ("player", "blackjack") else {"loss"} if outcome == "dealer" else set()
         if outcome == "blackjack":
             happened.add("natural")
         for item_id in list(self.pending):
-            params = contract_params(item_id, self.config.item_params)
-            if params["trigger"] in happened:
+            if contract_spec(item_id, self.config.item_params).trigger in happened:
                 self.pending.remove(item_id)
-                self._fire(item_id, params)
+                self._fire(item_id)
         if self.freeze:
             self.freeze -= 1
             self._say("Freeze contract: J-54 adds no cards this round.", effect="freeze")
             return
         n = int(self.settings["entropy_experiment" if self.experiment else "entropy"])
         if n:
-            added = self._add(LOW_RANKS, n)
-            self._say(f"Entropy: J-54 adds {self._names(added)} to the deck.", effect="entropy")
+            op = DeckOp("add", "low", n)
+            self._say(f"Entropy: J-54 {self._run(op).summary(op)}.", effect="entropy")
 
     # --- save -------------------------------------------------------------
 
@@ -346,6 +304,7 @@ class J54Table(TableMechanics):
         return {
             "protocol": self.protocol,
             "cards": [[str(c.rank), c.suit] for c in self.cards],
+            "removed": [[str(c.rank), c.suit] for c in self.removed],
             "jokers_sealed": self.jokers_sealed,
             "jokers_in_deck": self.jokers_in_deck,
             "jokers_needed": self.jokers_needed,
@@ -361,6 +320,7 @@ class J54Table(TableMechanics):
     def restore(self, data: dict[str, Any]) -> None:
         self.protocol = str(data.get("protocol", self.protocol))
         self.cards = [Card(Rank(r), s) for r, s in data.get("cards", [])]
+        self.removed = [Card(Rank(r), s) for r, s in data.get("removed", [])]
         self.jokers_sealed = int(data.get("jokers_sealed", 0))
         self.jokers_in_deck = int(data.get("jokers_in_deck", 0))
         self.jokers_needed = int(data.get("jokers_needed", 0))
@@ -371,3 +331,6 @@ class J54Table(TableMechanics):
         self.won = bool(data.get("won", False))
         self._ops = int(data.get("ops", 0))
         self._applied_rules = int(data.get("applied_rules", 0))
+
+
+register_table("j54", J54Table)

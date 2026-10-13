@@ -144,7 +144,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             "active_rules": [{"id": r.id, "help": r.description} for r in v.active_rules],
         },
         # A mode's own mechanics (J-54: protocol, Joker, deck size, fee, contracts); None elsewhere.
-        "table": {"info": dict(v.table_info), "fee": v.fee} if v.table_info else None,
+        "table": {"info": dict(v.table_info), "fee": v.fee, "deck": dict(v.deck_counts)} if v.table_info else None,
         "action_help": {a: ACTION_HELP[a] for a in acts if a in ACTION_HELP},
         "last_round": last_round,
         "run_end": {"kind": v.run_end.kind, "message": v.run_end.message} if v.run_end else None,
