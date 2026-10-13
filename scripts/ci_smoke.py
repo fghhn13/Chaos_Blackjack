@@ -55,6 +55,10 @@ def main() -> None:
     assert load_permission_profile("easy")
     assert load_prompt("chaotic")
     assert validate_assets()["ok"]
+    from chaos_blackjack.content.builtin_persona import HOSTS, host_persona
+    for host in HOSTS:
+        assert all(path.is_file() for path in host_persona(host).portraits.values()), f"Missing portraits: {host}"
+    tables_smoke()
     agent = AgentSession.new(seed=7, chaos=True)
     assert agent.execute({"cmd": "bet", "amount": 10})["ok"]
     assert AgentSession.from_state(agent.to_state()).observe() == agent.observe()
@@ -156,9 +160,55 @@ def gui_smoke(player_id: int, config) -> None:
         app.scenes.apply_pending()
         assert app.scenes.top is home
         app.scenes.draw(app.canvas)
+        tables_smoke(app)
     finally:
         app.audio.close()
         pygame.quit()
+
+
+def tables_smoke(app=None) -> None:
+    """Round-trip every table, including a saved unanswered opening choice."""
+    from types import SimpleNamespace
+    from chaos_blackjack.app.config import RunConfig
+    from chaos_blackjack.app.controller import GameController
+    from chaos_blackjack.app.layout import layout_for
+    from chaos_blackjack.core.run_state import RunSaveData
+    from chaos_blackjack.data.balance import default_balance
+    from chaos_blackjack.gui.browser import BrowserStore
+    from chaos_blackjack.modes import get_mode
+
+    bridge = BrowserStore(SimpleNamespace(chaosInitialSave="", chaosTouchInput=False)) if app else None
+    if bridge:
+        bridge.flush = lambda: None  # No account database is involved in these standalone runs.
+    for mode in ("normal", "chaos", "j54"):
+        config = get_mode(mode).apply(RunConfig.from_balance(default_balance(), seed=7, use_llm=False))
+        controller = GameController(config, save_fn=lambda data, name: name)
+        for _ in range(2):
+            saved = controller.save("ci-table")
+            restored = GameController.from_save(RunSaveData.from_dict(saved.to_dict()), save_fn=lambda data, name: name)
+            assert restored.view() == controller.view(), f"Table restore changed visible state: {mode}"
+            controller = restored
+            if app:
+                app.scenes.reset("table", controller=controller)
+                app.scenes.apply_pending()
+                app.scenes.update(0.05)
+                app.scenes.apply_pending()
+                app.scenes.draw(app.canvas)
+                bridge.frame(app)
+            if controller.view().choice is not None:
+                controller.choose(controller.view().choice.options[0].id)
+        if app:
+            for tab in layout_for(mode).panel:
+                app.scenes.push("run_panel", controller=controller, layout=layout_for(mode), tab=tab.id)
+                app.scenes.apply_pending()
+                app.scenes.draw(app.canvas)
+                bridge.frame(app)
+                app.scenes.pop()
+                app.scenes.apply_pending()
+            app.scenes.push("shop", controller=controller)
+            app.scenes.apply_pending()
+            app.scenes.draw(app.canvas)
+            bridge.frame(app)
 
 
 def meta_avatar(player_id: int) -> str:

@@ -20,6 +20,7 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD, asset_name
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, fit_text, wrap_text
 
 W, H = LOGICAL_SIZE
@@ -162,6 +163,11 @@ class ShopScene(Scene):
         if event.type == pygame.MOUSEWHEEL and self.grid:
             self.scroll = max(0, self.scroll - event.y * SCROLL_STEP)
             self._build()
+            return
+        if event.type == TOUCH_SCROLL:
+            if self.grid and self.area.collidepoint(event.pos):
+                self.scroll = max(0, self.scroll + event.dy)
+                self._build()
             return
         self.ui.handle_event(event)
 

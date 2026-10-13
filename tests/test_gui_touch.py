@@ -168,3 +168,31 @@ def test_history_swipe_accumulates_small_motion_and_clamps(app):
     assert scene.detail_scroll == 40 - 222 // height
     scene.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=DETAIL_RECT.center, dy=-10000))
     assert scene.detail_scroll == 0
+
+
+def test_new_table_shop_swipes_without_buying_a_product(app):
+    from dataclasses import replace
+    from chaos_blackjack.app.config import RunConfig
+    from chaos_blackjack.app.controller import GameController
+    from chaos_blackjack.data.balance import default_balance
+    from chaos_blackjack.gui.scenes.shop import ShopScene
+    from chaos_blackjack.modes import get_mode
+
+    config = get_mode("chaos").apply(RunConfig.from_balance(default_balance(), seed=7, use_llm=False))
+    controller = GameController(replace(config, mode_settings={**config.mode_settings, "chaos.unlock_all": 1}))
+    controller.choose(controller.view().choice.options[0].id)
+    scene = ShopScene(app)
+    scene.on_enter(controller=controller)
+    app.scenes.stack = [scene]
+    assert scene.grid and scene.content_h > scene.area.h
+    before = controller.view()
+    scene.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=(0, 0), dy=100))
+    assert scene.scroll == 0
+    x, y = scene.area.centerx / 2, scene.area.centery / 2
+    finger(app, pygame.FINGERDOWN, x, y)
+    finger(app, pygame.FINGERUP, x, y - 80)
+    assert scene.scroll == 160 and controller.view() == before
+    scene.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=scene.area.center, dy=100000))
+    assert scene.scroll == scene.content_h - scene.area.h
+    scene.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=scene.area.center, dy=-100000))
+    assert scene.scroll == 0 and controller.view() == before

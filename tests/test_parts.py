@@ -259,6 +259,39 @@ def test_log_filter_and_scroll(app) -> None:
     assert panel.scroll >= 0
 
 
+def test_browser_frame_and_swipes_work_with_the_widget_panel(app, monkeypatch) -> None:
+    import json
+    from types import SimpleNamespace
+    from chaos_blackjack.gui.browser import BrowserStore
+    from chaos_blackjack.gui.touch import TOUCH_SCROLL
+
+    c = _controller("j54")
+    _open(app, c)
+    _key(app, pygame.K_TAB)
+    panel = app.scenes.top
+    register_part("test.touch_panel", lambda ctx, variant: (Progress("Visible meter", 1, 2),) * 40)
+    panel.layout = Layout(left=(), right=(), panel=(PanelTab("long", "Long", ("test.touch_panel",)),))
+    panel.tabs = panel.layout.panel
+    panel.index = 0
+    panel.tab_buttons = panel.tab_buttons[:1]
+    panel._build()
+    app._render()
+    assert panel.view.measure() > panel.content.h
+    panel.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=(0, 0), dy=100))
+    assert panel.scroll == 0
+    panel.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=panel.content.center, dy=100000))
+    assert panel.scroll == panel.view.measure() - panel.content.h
+    window = SimpleNamespace(chaosInitialSave="", chaosTouchInput=False)
+    bridge = BrowserStore(window)
+    monkeypatch.setattr(bridge, "flush", lambda: None)
+    bridge.frame(app)  # WidgetView has no GameView fields; this used to crash.
+    state = json.loads(window.chaosState)
+    assert state["scene"] == "RunPanelScene" and state["phase"] == c.view().phase.value
+    assert state["scroll_regions"][0]["max"] == panel.scroll
+    panel.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=panel.content.center, dy=-100000))
+    assert panel.scroll == 0
+
+
 def test_columns_hide_what_does_not_fit(app) -> None:
     from chaos_blackjack.gui.components.side_column import SideColumn
 

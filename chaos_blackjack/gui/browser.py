@@ -40,10 +40,23 @@ class BrowserStore:
             {"rect": list(widget.rect), "offset": widget.scroll, "max": widget.max_scroll}
             for widget in getattr(getattr(top, "ui", None), "widgets", ())
             if isinstance(widget, ScrollColumn)]
+        if type(top).__name__ == "RunPanelScene":
+            state["tab"] = top.tab.id
+            state["scroll_regions"].append({"rect": list(top.content), "offset": top.scroll,
+                                             "max": max(0, top.view.measure() - top.content.h)})
+        elif type(top).__name__ == "ShopScene" and top.grid:
+            state["scroll_regions"].append({"rect": list(top.area), "offset": top.scroll,
+                                             "max": max(0, top.content_h - top.area.h)})
+        elif type(top).__name__ == "ChoiceScene" and top.choice is not None:
+            state["scroll_regions"].append({"rect": list(top.area), "offset": top.scroll, "max": top.max_scroll})
         if type(top).__name__ == "NameDialog":
             state.update(text=top.value, message=top.message)
+        from chaos_blackjack.app.view import GameView
         view = getattr(top, "view", None)
-        if view is not None:
+        if not isinstance(view, GameView):
+            controller = getattr(top, "controller", None)
+            view = controller.view() if controller is not None else None
+        if isinstance(view, GameView):
             state.update(phase=view.phase.value, money=view.money, round=view.round)
         self.window.chaosState = json.dumps(state)
         if time.monotonic() >= self.next_save:

@@ -24,6 +24,7 @@ from chaos_blackjack.gui.components.widget_view import WidgetView
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
 
 W, H = LOGICAL_SIZE
@@ -131,6 +132,10 @@ class RunPanelScene(Scene):
         if event.type == pygame.MOUSEWHEEL:
             self._scroll_by(-event.y * 48)
             return
+        if event.type == TOUCH_SCROLL:
+            if self.content.collidepoint(event.pos):
+                self._scroll_by(event.dy)
+            return
         if self.ui.handle_event(event):
             return
         if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONUP) and hasattr(event, "pos"):
@@ -158,7 +163,7 @@ class RunPanelScene(Scene):
             k = area.h / total
             bar = pygame.Rect(area.right + 10, area.y + round(self.scroll * k), 4, max(24, round(area.h * k)))
             pygame.draw.rect(surface, theme.GOLD_DIM, bar, border_radius=2)
-        hint = "Tab / Esc close  ·  Left / Right switch tabs  ·  wheel scrolls"
+        hint = "Tab / Esc close  ·  Left / Right switch tabs  ·  swipe or wheel to scroll"
         if self.message is not None:
             text, color = self.message
         else:

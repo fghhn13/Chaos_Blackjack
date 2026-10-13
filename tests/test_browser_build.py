@@ -79,3 +79,13 @@ def test_browser_import_failure_notifies_host_and_closes(monkeypatch):
     with pytest.raises(ModuleNotFoundError):
         runpy.run_path(str(entry))
     assert events == ["failed", "closed"]
+
+
+def test_new_table_art_and_host_resources_are_selected():
+    root = Path(__file__).resolve().parents[1]
+    selected = set(build_browser.package_files())
+    for folder in ("assets/poker_head", "assets/cosmetics/j54", "chaos_blackjack/ai/assets/j54"):
+        shipped = list((root / folder).glob("*.png"))
+        assert shipped, folder
+        assert {p.relative_to(root).as_posix() for p in shipped} <= selected
+    assert all((root / name).is_file() for name in selected)

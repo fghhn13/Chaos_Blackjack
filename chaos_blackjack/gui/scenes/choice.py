@@ -19,6 +19,7 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.texts import BAD
+from chaos_blackjack.gui.touch import TOUCH_SCROLL
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, fit_text, wrap_text
 
 W, H = LOGICAL_SIZE
@@ -37,6 +38,7 @@ class ChoiceScene(Scene):
         self.controller = controller
         self.on_change = on_change
         self.message: tuple[str, theme.Color] | None = None
+        self.scroll = 0
         self._build()
 
     def _build(self) -> None:
@@ -48,15 +50,20 @@ class ChoiceScene(Scene):
         height = 150 + len(options) * (OPTION_H + OPTION_GAP) + (70 if self.choice.cancellable else 10)
         self.box = pygame.Rect(0, 0, BOX_W, min(H - 60, height))
         self.box.center = (W // 2, H // 2)
+        self.area = pygame.Rect(self.box.x + 32, self.box.y + 110, self.box.w - 64,
+                                self.box.h - 110 - (80 if self.choice.cancellable else 20))
+        self.max_scroll = max(0, len(options) * (OPTION_H + OPTION_GAP) - OPTION_GAP - self.area.h)
+        self.scroll = max(0, min(self.scroll, self.max_scroll))
         self.option_rects: list[pygame.Rect] = []
         buttons: list[Button] = []
-        y = self.box.y + 110
+        y = self.area.y - self.scroll
         for i, option in enumerate(options):
             rect = pygame.Rect(self.box.x + 32, y, self.box.w - 64, OPTION_H)
             self.option_rects.append(rect)
             buttons.append(Button(a, (rect.right - 150, rect.y + (OPTION_H - 44) // 2, 136, 44), "Choose",
                                   self._chooser(option.id), font_size=theme.FONT_BODY,
                                   hotkey=pygame.K_1 + i if i < 9 else None))
+            buttons[-1].visible = self.area.contains(buttons[-1].rect)
             y += OPTION_H + OPTION_GAP
         if self.choice.cancellable:
             buttons.append(Button(a, (self.box.centerx - 90, self.box.bottom - 64, 180, 48), "Cancel",
@@ -79,10 +86,20 @@ class ChoiceScene(Scene):
         if self.controller.view().choice is None:
             self.app.scenes.pop()
         else:  # nothing applied, or the answer asked a new question
+            self.scroll = 0
             self._build()
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if self.choice is not None:
+            if event.type == pygame.MOUSEWHEEL:
+                self.scroll -= event.y * 48
+                self._build()
+                return
+            if event.type == TOUCH_SCROLL:
+                if self.area.collidepoint(event.pos):
+                    self.scroll += event.dy
+                    self._build()
+                return
             self.ui.handle_event(event)
 
     def update(self, dt: float) -> None:
@@ -104,6 +121,8 @@ class ChoiceScene(Scene):
         for i, line in enumerate(wrap_text(body, self.choice.prompt, self.box.w - 64, max_lines=2)):
             surface.blit(body.render(line, True, theme.TEXT), (self.box.x + 32, self.box.y + 62 + i * body.get_linesize()))
         name_font, tiny = a.font(theme.FONT_BODY, bold=True), a.font(theme.FONT_TINY)
+        previous_clip = surface.get_clip()
+        surface.set_clip(self.area)
         for rect, option in zip(self.option_rects, self.choice.options):
             pygame.draw.rect(surface, theme.DARK, rect, border_radius=10)
             row = self.controller.product(option.id)  # a product option is framed in its group's colour
@@ -117,6 +136,12 @@ class ChoiceScene(Scene):
             surface.blit(name_font.render(fit_text(name_font, option.label, width), True, theme.IVORY), (x, rect.y + 10))
             for j, line in enumerate(wrap_text(tiny, option.description, width, max_lines=2)):
                 surface.blit(tiny.render(line, True, theme.TEXT_MUTED), (x, rect.y + 36 + j * tiny.get_linesize()))
+        surface.set_clip(previous_clip)
+        if self.max_scroll:
+            k = self.area.h / (self.area.h + self.max_scroll)
+            bar = pygame.Rect(self.area.right + 10, self.area.y + round(self.scroll * k), 4,
+                              max(24, round(self.area.h * k)))
+            pygame.draw.rect(surface, theme.GOLD_DIM, bar, border_radius=2)
         if self.message is not None:
             text, color = self.message
             img = a.font(theme.FONT_SMALL).render(text, True, color)

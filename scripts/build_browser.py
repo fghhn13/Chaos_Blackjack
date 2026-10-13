@@ -59,10 +59,11 @@ def main():
             shutil.rmtree(target)
     for name in package_files():
         source = ROOT / name
-        if source.is_file():
-            dest = STAGE / name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, dest)
+        if not source.is_file():
+            raise RuntimeError(f"Selected browser resource is missing: {name}")
+        dest = STAGE / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, dest)
     shutil.copyfile(ROOT / "browser/main.py", STAGE / "main.py")
     # The compact WASM stdlib omits sqlite3.dump; ship the matching pure Python helper.
     helper = STAGE / "stdlib/sqlite3/dump.py"

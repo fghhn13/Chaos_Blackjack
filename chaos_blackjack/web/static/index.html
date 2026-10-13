@@ -9,13 +9,13 @@
   <header><a class="brand" href="/">♠ <span>CHAOS <b>BLACKJACK</b></span></a><div id="identity" hidden><span id="username"></span><button id="account-open" class="quiet">Account</button><button id="logout" class="quiet">Sign out</button></div></header>
   <main>
     <section id="auth" class="entry">
-      <div class="intro"><p class="eyebrow">THE HOUSE HAS A FEW NEW RULES</p><h1>Play your hand.<br><em>Expect chaos.</em></h1><p>A familiar table. An unpredictable dealer. Build your bankroll from 100 to 400 chips while the house bends the rules.</p><div class="intro-cards" aria-hidden="true"><div class="card red">A<span>♥</span></div><div class="card">K<span>♠</span></div></div><small>Original Pygame game · No real money · Account saves</small></div>
+      <div class="intro"><p class="eyebrow">THE HOUSE HAS A FEW NEW RULES</p><h1>Play your hand.<br><em>Expect chaos.</em></h1><p>Choose your table. Play Classic blackjack, build your edge with Poker Head, or challenge J-54's changing deck.</p><div class="intro-cards" aria-hidden="true"><div class="card red">A<span>♥</span></div><div class="card">K<span>♠</span></div></div><small>Original Pygame game · No real money · Account saves</small></div>
       <form id="auth-form" class="panel auth-panel"><p class="eyebrow">YOUR SEAT AT THE TABLE</p><h2 id="auth-title">Welcome back</h2><div class="tabs"><button type="button" id="login-tab" class="selected">Sign in</button><button type="button" id="register-tab">Register</button></div><label>Username<input id="auth-username" autocomplete="username" pattern="[A-Za-z0-9_]{3,32}" minlength="3" maxlength="32" required placeholder="Your player name"></label><label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required placeholder="At least 10 characters"></label><label id="token-field" hidden>Invitation token<input id="auth-token" autocomplete="off" inputmode="numeric" pattern="[0-9]{16}" minlength="16" maxlength="16" placeholder="16-digit invitation"></label><button class="primary" type="submit" id="auth-submit" disabled>Take your seat</button><p id="auth-error" class="error" role="alert"></p><small>Registration is invitation-only. Ask the host for a token.</small></form>
     </section>
     <section id="game" hidden>
       <div class="game-top"><p id="save-status" role="status">Loading your save…</p><div><button id="launch" class="primary">Play</button><button id="fullscreen" class="outline">Fullscreen</button></div></div>
       <p id="game-error" class="error" role="alert"></p>
-      <div id="game-container"><iframe id="pygame" title="Chaos Blackjack game" allow="autoplay; fullscreen" hidden></iframe>
+      <div id="game-container"><button id="exit-fullscreen" class="outline" hidden>Exit expanded view</button><iframe id="pygame" title="Chaos Blackjack game" allow="autoplay; fullscreen" hidden></iframe>
         <dialog id="player-name-dialog" aria-labelledby="player-name-title">
           <h2 id="player-name-title" tabindex="-1">Player name</h2>
           <form id="player-name-form">
@@ -26,7 +26,7 @@
           </form>
         </dialog>
       </div>
-      <small>H hit · S stand · D double · R surrender · M mute. Saves sync to your account. Landscape works best on phones.</small>
+      <small>H hit · S stand · D double · R surrender · M mute. Tap Panel for table details; swipe inside lists to scroll. Saves sync to your account. Landscape works best on phones.</small>
     </section>
   </main>
   <dialog id="account-dialog"><h2>Your account</h2><form id="password-form"><label>Current password<input id="current-password" type="password" autocomplete="current-password" required maxlength="128"></label><label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label><button class="outline" type="submit">Change password</button><p id="account-error" class="error" role="alert"></p></form><p>Your players, upgrades and run history are available inside the game.</p><section id="admin-panel" hidden><h3>Account management</h3><div id="accounts"></div><button id="rotate-token" class="outline">Generate new invitation</button><p id="invitation-output"></p></section><div class="dialog-actions"><button type="button" data-close="account-dialog" class="primary">Done</button></div></dialog>

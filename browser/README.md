@@ -15,10 +15,13 @@ python -m chaos_blackjack.web
 ```
 
 Open http://127.0.0.1:8000, register, click Play, then tap Start game when prompted
-to unlock browser audio. The original menu, three player slots, Classic/Chaos,
+to unlock browser audio. The original menu, three player slots, Classic/Poker Head/J-54,
 upgrades, Collection, history, settings and animations are used directly.
 Keyboard and mouse work on desktop. Phones can use touch controls; landscape and
-the Fullscreen button offer more room for the fixed 1280x720 layout.
+the Fullscreen button offer more room for the fixed 1280x720 layout. Browsers
+without element fullscreen (including iPhone Safari) use an expanded page view
+with an Exit button. Safari's browser bars may remain visible. The expanded view
+fits viewport changes and keeps the native name editor available.
 Swipe up or down inside a list or reference text panel to scroll its content.
 Short taps select buttons; a drag does not select a row when released. Game
 canvas gestures stay inside the game, while the surrounding page can scroll.
