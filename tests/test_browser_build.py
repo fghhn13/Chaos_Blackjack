@@ -81,11 +81,18 @@ def test_browser_import_failure_notifies_host_and_closes(monkeypatch):
     assert events == ["failed", "closed"]
 
 
-def test_new_table_art_and_host_resources_are_selected():
+def test_shipped_art_and_host_resources_are_selected():
+    pytest.importorskip("pygame")
+    from chaos_blackjack.gui.assets.manifest import MANIFEST
+
     root = Path(__file__).resolve().parents[1]
     selected = set(build_browser.package_files())
-    for folder in ("assets/poker_head", "assets/cosmetics/j54", "chaos_blackjack/ai/assets/j54"):
-        shipped = list((root / folder).glob("*.png"))
+    for folder in ("assets", "chaos_blackjack/ai/assets"):
+        # Only catalogued exports are game art. Local candidate images under
+        # assets/ must not accidentally become browser resources.
+        shipped = [p for p in (root / folder).rglob("*.png")
+                   if folder != "assets" or p.stem in MANIFEST]
         assert shipped, folder
-        assert {p.relative_to(root).as_posix() for p in shipped} <= selected
+        missing = {p.relative_to(root).as_posix() for p in shipped} - selected
+        assert not missing, f"Shipped art missing from the browser package: {sorted(missing)}"
     assert all((root / name).is_file() for name in selected)
