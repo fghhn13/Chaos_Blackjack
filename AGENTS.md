@@ -29,7 +29,8 @@ python -m chaos_blackjack.agent --brief act stand     # smaller reply (recommend
 (the Chaos AI changes rules each round), `--llm` (the Chaos AI is a real,
 **billed** model instead of the offline stub — only use when told to),
 `--start-money N`, `--target-money N`, `--max-steps N`, `--profile NAME` (a balance
-profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`).
+profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`), `--mode ID`
+(a game mode; `j54` is J-54's deck table, a demo — see below).
 
 Global flags: `--brief` (only summary / hint / legal actions / results),
 `--compact` (single-line JSON), `--state PATH`.
@@ -94,6 +95,19 @@ drawing, moving to the next round) happens automatically inside your command:
 - Shop (betting phase only): 3 different items, each buyable once; restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, with a one-chip minimum). `reroll` rolls the current stock again once per stock for 3 chips. A purchase or reroll must leave at least 10 chips. `buy` / `reroll` are in `legal_actions` only when allowed.
 - With `--chaos`, the Chaos AI may apply one rule per round, or leave the round calm (e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push). Active rules are listed in `obs.chaos.active_rules` with a plain-English `help`.
 
+### J-54's table (`--mode j54`, demo)
+
+The deck lasts the whole run (every round reshuffles all of its cards) and
+J-54's Chaos rules add or remove cards instead of changing values. A random
+**protocol** is the goal: *Single Capture* (draw the Joker yourself; it starts
+sealed until you buy `j54_start_experiment`) or *Capital* (reach the chip
+target). A **compute fee** is charged before each bet and grows with the
+round; the minimum bet is at least the fee. The shop sells **contracts**
+(`buy j54_low_purge`, ...) that change the deck at once or on your next win;
+they never enter `obs.items`. `obs.table` = `{"info": {"Protocol", "Joker" or
+"Goal", "Deck", "Fee", "Contracts"?}, "fee": n}` (null at other tables); deck
+changes are reported in `events`. Design: [docs/design/J54_TABLE.md](docs/design/J54_TABLE.md).
+
 ### Fair play
 
 Observations contain only what a player at the table can see. The run file
@@ -141,4 +155,4 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 - Game numbers live in SQLite balance profiles (`data/game.db`, git-ignored). Shipped values: `chaos_blackjack/data/seed/default.sql` (the locked `default` profile is re-imported when it changes). Schema changes: new `chaos_blackjack/data/migrations/NNNN_*.sql`. Manage profiles with `python -m chaos_blackjack.data profiles | show | clone | set | diff | export | delete` (never edit the locked `default`; clone it). Saves (`run_save`) and preferences (`preference`) live in the same database; `python -m chaos_blackjack.data saves` lists saves, `import-saves` imports old JSON saves. Tests force `CHAOS_DB=:memory:` (use a tmp file when a test needs data to persist between connections); never commit a `.db` file.
 - Meta progression (players, upgrades, run history, codex) follows `docs/design/META_PROGRESSION.md`; that file is the contract between agents. Cosmetics and achievements follow `docs/design/COSMETICS_ACHIEVEMENTS.md` (adding one is a catalog entry plus seed rows; see its section 2); modes, their hosts and pools follow `docs/design/AI_MODES.md`. The agent CLI does not use meta progression.
 - Balance: the simulator is a separate, git-ignored repo in `black-jack-sim/` (see its README). It only imports the game through `bjsim/adapter.py`; after changing rules, prices or the controller API, run `python -m bjsim check` there and update that adapter if needed.
-- Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController`, `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.
+- Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController` (a mode's own mechanics plug in through `app/table_mechanics.py`; J-54's are `j54/`), `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.

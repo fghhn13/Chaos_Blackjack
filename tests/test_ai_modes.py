@@ -48,7 +48,7 @@ def test_series_put_core_first_then_expansions() -> None:
     from chaos_blackjack.modes import get_series, series_list
 
     assert [(s.id, s.name, s.expansion) for s in series_list()] == [
-        ("core", "Classic Table", False), ("poker_head", "Poker Head", True)]
+        ("core", "Classic Table", False), ("poker_head", "Poker Head", True), ("j54", "J-54", True)]
     assert get_series("unknown_pack").expansion and get_series("unknown_pack").name == "Unknown Pack"
 
 

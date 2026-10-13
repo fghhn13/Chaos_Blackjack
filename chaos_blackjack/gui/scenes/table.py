@@ -102,7 +102,9 @@ class TableScene(Scene):
         self.outro: HostDialog | None = None
         if intro and config.mode:
             try:
-                beats = intro_script(get_mode(config.mode), config)
+                table = self.controller.table
+                beats = intro_script(get_mode(config.mode), config,
+                                     summary=table.summary() if table is not None else None)
             except KeyError:
                 beats = []
             if beats:

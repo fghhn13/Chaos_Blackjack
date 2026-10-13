@@ -81,7 +81,10 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
     ais = [e for e in codex_entries("ai", cfg) if e.id != "default"]
     tables = [(m, m.apply(cfg)) for m in modes()]
 
-    stocked = [sold_items(c) for _, c in tables]
+    # Only items count here: a table's own offers (J-54's contracts) are not items,
+    # and a table that sells no items does not make the others' items table-specific.
+    item_ids = {e.id for e in items}
+    stocked = [s for s in (sold_items(c) & item_ids for _, c in tables) if s]
     everywhere = set.intersection(*stocked) if stocked else set()
     anywhere = set.union(*stocked) if stocked else set()
     rule_ids = [e.id for e in rules]
@@ -100,6 +103,7 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
         own, used, sold = pools(series.id)
         if not own:
             continue
+        sells_items = any(i in item_ids for _, c in own for i in sold_items(c))
         claimed_rules |= used
         first = own[0][0]
         host, portrait, profile, signature = _host_look(first.host)
@@ -107,7 +111,8 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
             CodexGroup("rules", "Chaos rules", tuple(e for e in rules if e.id in used),
                        empty=f"{host} never bends the rules here."),
             CodexGroup("items", "Table items", tuple(e for e in items if e.id in sold),
-                       empty="Only the Classic Table's items are sold here."),
+                       empty="Only the Classic Table's items are sold here." if sells_items
+                       else "No items are sold here."),
         ]
         if len(own) > 1:
             groups.insert(0, CodexGroup("tables", "Tables", tuple(mode_entries[m.id] for m, _ in own

@@ -128,7 +128,9 @@ def test_upgrades_shape_the_run(svc) -> None:
     cfg = run.config
     base = RunConfig()
     assert cfg.start_money == base.start_money + 20 and cfg.bring_kinds == base.bring_kinds + 1
-    assert cfg.free_rerolls == 1 and cfg.shop_prices == base.shop_prices
+    # Classic sells every profile item except other tables' own offers (J-54's contracts).
+    assert cfg.free_rerolls == 1
+    assert cfg.shop_prices == {k: v for k, v in base.shop_prices.items() if not k.startswith("j54_")}
     assert cfg.starting_items == ("peek", "shield") and not cfg.enable_chaos
     assert sorted(i.id for i in run.controller.view().items) == ["peek", "shield"]
     assert run.controller.view().money == base.start_money + 20

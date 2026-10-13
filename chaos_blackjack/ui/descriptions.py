@@ -53,6 +53,16 @@ def _describe_one(tid: str, m: Any) -> str:
         if "dealer_wins_ties" in flags:
             return "Tiebreaker Shift: ties go to Dealer (instead of Push)."
         return "Tiebreaker Shift: ties go to Player (instead of Push)."
+    # J-54's deck rules: they change the deck for the rest of the run.
+    if tid == "j54_burn":
+        return "Burn Protocol: every card drawn this round leaves the deck for good."
+    if tid in ("j54_sample_injection", "j54_ace_injection"):
+        count, rank = getattr(m, "count", 1), getattr(m, "rank", None) or "?"
+        name = "Ace Injection" if tid == "j54_ace_injection" else "Sample Injection"
+        return f"{name}: {count} more {rank}{'s' if count != 1 else ''} added to the deck."
+    if tid == "j54_redundancy_purge":
+        count, rank = getattr(m, "count", 1), getattr(m, "rank", None) or "?"
+        return f"Redundancy Purge: up to {count} {rank}{'s' if count != 1 else ''} removed from the deck."
     return f"Active rule: {tid}"
 
 

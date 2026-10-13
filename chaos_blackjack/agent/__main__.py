@@ -2,7 +2,7 @@
 
 One-shot commands (state kept in a file between calls):
 
-  python -m chaos_blackjack.agent new [--seed N] [--chaos] [--llm]
+  python -m chaos_blackjack.agent new [--seed N] [--chaos] [--llm] [--mode j54]
   python -m chaos_blackjack.agent observe
   python -m chaos_blackjack.agent buy peek
   python -m chaos_blackjack.agent reroll
@@ -31,7 +31,7 @@ from chaos_blackjack.agent.session import AgentSession, LlmUnavailable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE = PROJECT_ROOT / ".agent_runs" / "current.json"
-BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "bet_range", "shop", "last_round", "run_end")
+BRIEF_OBS_KEYS = ("phase", "summary", "hint", "legal_actions", "bet_range", "shop", "table", "last_round", "run_end")
 
 
 def _emit(reply: dict[str, Any], *, brief: bool, compact: bool) -> None:
@@ -83,7 +83,8 @@ def _new_session(args: argparse.Namespace) -> AgentSession:
     config["content_packs"] = tuple(args.pack)
     config["ai_id"] = args.ai
     return AgentSession.new(seed=args.seed, chaos=args.chaos, use_llm=args.llm,
-                            max_steps=args.max_steps, profile=args.profile, **config)
+                            max_steps=args.max_steps, profile=args.profile, mode=getattr(args, "mode", None),
+                            **config)
 
 
 def _add_new_options(p: argparse.ArgumentParser) -> None:
@@ -98,6 +99,8 @@ def _add_new_options(p: argparse.ArgumentParser) -> None:
                    help="balance profile in data/game.db (default: $CHAOS_PROFILE or 'default')")
     p.add_argument("--pack", action="append", default=[], help="load a local content pack (repeatable)")
     p.add_argument("--ai", default="default", help="registered Chaos AI id")
+    p.add_argument("--mode", default=None,
+                   help="game mode, e.g. j54 (J-54's deck table, demo); sets chaos itself. Default: none")
 
 
 def _play_stream(args: argparse.Namespace) -> int:

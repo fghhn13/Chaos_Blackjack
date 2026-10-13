@@ -54,6 +54,11 @@ def serialize_modifier_params(mod: object) -> dict[str, object]:
         except Exception:
             pass
 
+    for key in ("count", "rank"):  # J-54 deck rules
+        value = getattr(mod, key, None)
+        if value is not None:
+            params[key] = value
+
     mid = getattr(mod, "id", None)
     if mid == "tiebreaker_shift" and hasattr(mod, "chaos_flags"):
         flags = getattr(mod, "chaos_flags") or frozenset()
@@ -101,6 +106,7 @@ def build_save_data(
     hole_revealed: bool = False,
     chaos_memory: list[dict] | None = None,
     config: dict | None = None,
+    table: dict | None = None,
 ) -> RunSaveData:
     """`state=None` saves between rounds (resume starts at the bet prompt)."""
     active = serialize_active_modifiers(loop) if state is not None else []
@@ -125,4 +131,5 @@ def build_save_data(
         hole_revealed=bool(hole_revealed and state is not None),
         chaos_memory=chaos_memory,
         config=config,
+        table=table,
     )

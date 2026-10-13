@@ -18,7 +18,7 @@ OBS_SCHEMA = 2
 # Plain-English help so an LLM does not have to guess what ids mean.
 ACTION_HELP: dict[str, str] = {
     Action.BET: "start the round: bet <amount>",
-    Action.BUY: "buy a shop item before betting: buy <item_id>",
+    Action.BUY: "buy a shop offer (an item, or a contract at J-54's table) before betting: buy <item_id>",
     Action.REROLL: "roll the shop's stock again (once per stock; obs.shop.reroll_price chips)",
     Action.HIT: "take one more card",
     Action.STAND: "end your turn; the dealer plays",
@@ -87,7 +87,10 @@ def next_step_hint(v: GameView, acts: list[str]) -> str:
 
 def summary(v: GameView) -> str:
     """One readable paragraph describing the table."""
-    lines = [f"Round {v.round}. Bankroll {v.money}/{v.target_money}."]
+    bankroll = f"{v.money}/{v.target_money}" if v.target_money > 0 else str(v.money)
+    lines = [f"Round {v.round}. Bankroll {bankroll}."]
+    if v.table_info:
+        lines.append(" ".join(f"{label}: {value}." for label, value in v.table_info))
     if v.player_cards:
         lines.append(f"Bet {v.current_bet}. You: {' '.join(card_str(c) for c in v.player_cards)} = {v.player_total}.")
         dealer = " ".join(card_str(c) for c in v.dealer_cards)
@@ -128,7 +131,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
         "shop": {
             "offers": [
                 {"item": o.item, "price": o.price, "sold": o.sold, "affordable": o.affordable,
-                 "help": ITEM_HELP.get(o.item, "")}
+                 "help": o.description or ITEM_HELP.get(o.item, "")}
                 for o in v.shop_offers
             ],
             "restock_in": v.shop_restock_in,
@@ -140,6 +143,8 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             "budget": v.chaos_budget,
             "active_rules": [{"id": r.id, "help": r.description} for r in v.active_rules],
         },
+        # A mode's own mechanics (J-54: protocol, Joker, deck size, fee, contracts); None elsewhere.
+        "table": {"info": dict(v.table_info), "fee": v.fee} if v.table_info else None,
         "action_help": {a: ACTION_HELP[a] for a in acts if a in ACTION_HELP},
         "last_round": last_round,
         "run_end": {"kind": v.run_end.kind, "message": v.run_end.message} if v.run_end else None,

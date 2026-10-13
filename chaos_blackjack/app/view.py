@@ -54,6 +54,7 @@ class ShopOfferView:
     price: int
     sold: bool
     affordable: bool  # unsold and the bankroll can still place a bet afterwards
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,10 @@ class GameView:
     run_end: RunEndResult | None
     # Chips the next reroll costs (0 = free), or None when this stock cannot be rerolled.
     shop_reroll_price: int | None = None
+    # A mode's own mechanics (e.g. J-54): (label, value) rows to show, and the
+    # chips charged before this round's bet.
+    table_info: tuple[tuple[str, str], ...] = ()
+    fee: int = 0
 
     def can(self, action: str) -> bool:
         return action in self.available_actions

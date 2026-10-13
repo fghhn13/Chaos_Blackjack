@@ -374,6 +374,7 @@ Black_jack/
 │   ├── app/                  # GameController, views, notices, config
 │   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── meta/  modes/          # players, upgrades, run tracking, rewards and mode registry
+│   ├── j54/                  # J-54's deck table (demo): persistent deck, protocols, contracts
 │   ├── codex/                 # providers, live descriptions and controller demos
 │   ├── cosmetics/  achievements/  # look catalog; stats and achievement registries
 │   ├── content/  audio/       # content packs and casino sound catalog

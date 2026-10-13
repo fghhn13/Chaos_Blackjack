@@ -89,13 +89,15 @@ class GameLoop:
         seed: int | None = None,
         *,
         inventory_override: tuple[str, ...] | None = None,
+        cards: tuple[Card, ...] | None = None,
     ) -> GameState:
+        """Shuffle and deal a fresh round from `cards` (default: a standard 52-card deck)."""
         if seed is not None:
             self.rng.seed(seed)
         self._chaos_actions_this_turn = 0
         self.last_chaos_narration = None
         self.modifiers = self.modifiers.with_cleared()
-        deck = list(_standard_deck())
+        deck = list(cards) if cards is not None else _standard_deck()
         deck_t = _shuffle(deck, self.rng)
         p1, p2, d1, d2, *rest = deck_t
         return GameState(

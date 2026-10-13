@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from chaos_blackjack.content.builtin_persona import default_persona
+from chaos_blackjack.content.builtin_persona import default_persona, host_persona
 from chaos_blackjack.cosmetics import cosmetics
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.assets import placeholders as ph
@@ -48,6 +48,7 @@ BG = (1920, 1080)
 CARD = (512, 768)
 ICON = (256, 256)
 PORTRAIT = (512, 512)
+_J54_RED = (0xC8, 0x3A, 0x3A)  # J-54's jester red
 
 for _spec in (
     AssetSpec("table_background", "background", BG, ph.table_background, "Table background"),
@@ -85,6 +86,17 @@ for _spec in (
     AssetSpec("reverse_bust", "rule", ICON, ph.icon("RB", theme.CHAOS_MAGENTA), "Reverse Bust"),
     AssetSpec("suit_power", "rule", ICON, ph.icon("SP", theme.CHAOS_MAGENTA), "Suit Power"),
     AssetSpec("tiebreaker_shift", "rule", ICON, ph.icon("TB", theme.CHAOS_MAGENTA), "Tiebreaker Shift"),
+    # J-54's table (demo; placeholders): mode icon, deck rules and contracts.
+    AssetSpec("mode_j54", "mode", ICON, ph.fitted_image(host_persona("j54").portraits["resting_mania"]), "J-54"),
+    AssetSpec("j54_burn", "rule", ICON, ph.icon("BN", _J54_RED), "Burn Protocol"),
+    AssetSpec("j54_sample_injection", "rule", ICON, ph.icon("S+", _J54_RED), "Sample Injection"),
+    AssetSpec("j54_redundancy_purge", "rule", ICON, ph.icon("R-", _J54_RED), "Redundancy Purge"),
+    AssetSpec("j54_ace_injection", "rule", ICON, ph.icon("A+", _J54_RED), "Ace Injection"),
+    AssetSpec("j54_streamline", "item", ICON, ph.icon("ST", _J54_RED), "Streamline Contract"),
+    AssetSpec("j54_low_purge", "item", ICON, ph.icon("LP", _J54_RED), "Low Purge Contract"),
+    AssetSpec("j54_high_injection", "item", ICON, ph.icon("HI", _J54_RED), "High Injection Contract"),
+    AssetSpec("j54_freeze", "item", ICON, ph.icon("FZ", _J54_RED), "Freeze Contract"),
+    AssetSpec("j54_start_experiment", "item", ICON, ph.icon("JK", _J54_RED), "Start Experiment"),
 ):
     register(_spec)
 

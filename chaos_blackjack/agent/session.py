@@ -87,13 +87,19 @@ class AgentSession:
         use_llm: bool = False,
         max_steps: int = DEFAULT_MAX_STEPS,
         profile: str | None = None,
+        mode: str | None = None,
         **config: Any,
     ) -> "AgentSession":
         """`profile` names a balance profile (default: $CHAOS_PROFILE or "default");
-        `config` overrides any RunConfig field (start_money, target_money, ...)."""
+        `mode` a game mode (e.g. "j54"; it sets chaos itself); `config` overrides
+        any RunConfig field (start_money, target_money, ...)."""
         if seed is None:
             seed = random.randrange(2**31)
         cfg = RunConfig.from_balance(load_balance(profile), enable_chaos=chaos, seed=seed, use_llm=use_llm, **config)
+        if mode:
+            from chaos_blackjack.modes import get_mode
+
+            cfg = get_mode(mode).apply(cfg)
         try:
             ctrl = GameController(cfg, save_fn=lambda d, n: n)
         except ValueError as exc:
@@ -224,6 +230,7 @@ class AgentSession:
             hole_revealed=c.hole_revealed,
             chaos_memory=c.chaos_memory.export(),
             config=c.config.to_dict(),
+            table=c.table.to_dict() if c.table is not None else None,
         )
         hidden = {
             "save": save.to_dict(),

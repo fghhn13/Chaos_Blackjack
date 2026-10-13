@@ -36,17 +36,19 @@ def draw_status_bar(surface: pygame.Surface, assets: "AssetManager", v: GameView
     # Bankroll progress toward the target, aligned with the left column.
     x, y, pw, ph = 16, 10, 240, 28
     pygame.draw.rect(surface, theme.PANEL, (x, y, pw, ph), border_radius=6)
-    k = max(0.0, min(1.0, shown / max(1, v.target_money)))
+    # A table without a chip target (J-54's capture protocol) shows the bankroll alone.
+    k = max(0.0, min(1.0, shown / max(1, v.target_money))) if v.target_money > 0 else 0.0
     if k > 0:
         pygame.draw.rect(surface, theme.GOLD_DIM, (x, y, max(12, int(pw * k)), ph), border_radius=6)
     pygame.draw.rect(surface, theme.GOLD, (x, y, pw, ph), 1, border_radius=6)
     color = theme.IVORY if shown == v.money else (GAIN if shown < v.money else LOSS)
-    money = body.render(f"{shown} / {v.target_money}", True, color)
+    money = body.render(f"{shown} / {v.target_money}" if v.target_money > 0 else f"{shown}", True, color)
     surface.blit(money, money.get_rect(center=(x + pw // 2, y + ph // 2)))
     surface.blit(tiny.render("BANKROLL", True, theme.GOLD_DIM), (x + pw + 12, y + 7))
 
     bet = v.current_bet if v.player_cards else "-"
-    mid = body.render(f"Round {v.round}     Bet {bet}", True, theme.TEXT)
+    fee = f"     Fee {v.fee}" if v.fee else ""
+    mid = body.render(f"Round {v.round}     Bet {bet}{fee}", True, theme.TEXT)
     surface.blit(mid, mid.get_rect(center=(W // 2, BAR_H // 2)))
 
     hint = small.render("Esc  menu", True, theme.TEXT_MUTED)

@@ -35,7 +35,6 @@ from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.economy import (
     RunState,
     bet_limits,
-    can_bet,
     settlement_delta,
     update_streak,
 )
@@ -46,7 +45,11 @@ from chaos_blackjack.app.persistence import (
     deserialize_active_modifiers,
     snapshot_to_game_state,
 )
-from chaos_blackjack.app.shop import ShopState, needs_restock, roll_stock, rounds_until_restock, shop_prices
+from chaos_blackjack.app.help_text import ITEM_HELP
+from chaos_blackjack.app.shop import (
+    ShopOffer, ShopState, needs_restock, roll_stock, rounds_until_restock, shop_prices,
+)
+from chaos_blackjack.app.table_mechanics import TableMechanics, make_table
 from chaos_blackjack.app.view import (
     Action,
     CardView,
@@ -161,6 +164,10 @@ class GameController:
         # Shop rolls (and the offline Chaos AI) are seeded apart from the deal,
         # so buying never changes the cards.
         self.shop_seed = self.config.seed if self.config.seed is not None else random.randrange(2**31)
+        # The mode's own mechanics (docs/design/J54_TABLE.md), None for a plain table.
+        self.table: TableMechanics | None = make_table(self.config, self.shop_seed, self._notify)
+        if self.table is not None:
+            self.table.start(self.run)
         self.shop = self._roll_shop()
         self._check_can_bet()
 
@@ -197,6 +204,9 @@ class GameController:
         c.loop._chaos_actions_this_turn = int(data.chaos_actions_this_turn)
         if data.shop_seed is not None:
             c.shop_seed = data.shop_seed
+        if c.table is not None and data.table is not None:
+            c.table.restore(data.table)
+            c.run.objective, c.run.target_money = data.objective, data.target_money
         c.shop = ShopState.from_dict(data.shop) if data.shop else c._roll_shop()
         c.hole_revealed = data.hole_revealed
         c.chaos_memory.restore(data.chaos_memory)
@@ -227,16 +237,24 @@ class GameController:
         lo, hi = self.bet_limits(self.run.money)
         if not lo <= amount <= hi:
             raise ActionError(f"Invalid bet. Allowed range: {lo}~{hi}")
+        fee = self._fee()
+        if fee:
+            self.run.money -= fee
+            self._notify(NoticeKind.FEE_PAID, f"Compute fee: {fee} chips.", {"fee": fee})
         self.run.current_bet = amount
         self.last_result = None
+        cards = self.table.round_cards() if self.table is not None else None
         self.state = self.loop.new_round(
             seed=self.rng.randint(0, 2**30),
             inventory_override=self.run.items,
+            **({"cards": cards} if cards is not None else {}),
         )
         self._doubled = False
         self._dealer_blackjack = False
         self.hole_revealed = False
         self._notify(NoticeKind.ROUND_STARTED, data={"round": self.run.round, "bet": amount})
+        if self._table_cards():
+            return
         if self._settle_naturals():
             return
         if self.config.enable_chaos:
@@ -253,8 +271,14 @@ class GameController:
         if not self.can_bet(self.run.money - offer.price):
             raise ActionError(f"Not enough chips: {item_id} costs {offer.price} and you must keep enough to bet")
         self.run.money -= offer.price
-        self.run.items = self.run.items + (item_id,)
         self.shop = self.shop.with_sold(item_id)
+        if self.table is not None and self.table.sells(item_id):
+            # A table's own offer (e.g. a J-54 contract) takes effect; it is not carried.
+            text = self.table.buy(item_id, self.run)
+            self._notify(NoticeKind.ITEM_BOUGHT, f"{text} ({offer.price} chips)",
+                         {"item": item_id, "price": offer.price, "table": True})
+            return
+        self.run.items = self.run.items + (item_id,)
         self._notify(
             NoticeKind.ITEM_BOUGHT,
             f"Bought {item_id} for {offer.price}.",
@@ -271,6 +295,8 @@ class GameController:
         if isinstance(llm, OfflineChaosStub):
             llm.reseed(f"{self.shop_seed}:chaos:{self.run.round}")
         self.state = self.loop.maybe_apply_chaos_phase(self._st, context_json=build_chaos_context(self))
+        if self.table is not None:
+            self.state, self.loop.modifiers = self.table.after_chaos(self._st, self.loop.modifiers)
         narration = self.loop.last_chaos_narration
         if narration:
             self._notify(NoticeKind.CHAOS_NARRATION, narration, {"text": narration})
@@ -295,7 +321,8 @@ class GameController:
     def hit(self) -> None:
         self._require(Action.HIT)
         self.state = self.loop.draw_for_player(self._st)
-        self._settle_if_player_bust()
+        if not self._table_cards():
+            self._settle_if_player_bust()
 
     def stand(self) -> None:
         self._require(Action.STAND)
@@ -312,6 +339,8 @@ class GameController:
             {"bet": self.run.current_bet},
         )
         self.state = self.loop.draw_for_player(self._st)
+        if self._table_cards():
+            return
         if not self._settle_if_player_bust():
             self._to_dealer()
 
@@ -337,7 +366,7 @@ class GameController:
         )
         if result.ok and extra.get("dispel_chaos_rules"):
             self._notify(NoticeKind.CHAOS_DISPELLED, "Chaos rules dispelled for this round.")
-        if result.ok:
+        if result.ok and not self._table_cards():
             # Swapping a card or dropping a rule can push the hand over.
             self._settle_if_player_bust()
         return result
@@ -354,6 +383,7 @@ class GameController:
             self._notify(NoticeKind.DEALER_STANDS, f"Dealer stands at {dv}.", {"total": dv})
         elif self._st.deck:
             self.state = self.loop.draw_for_dealer(self._st)
+            self._table_cards()
             return True
         self.state = self._st.with_phase(GamePhase.RESOLVED)
         self._settle()
@@ -417,6 +447,7 @@ class GameController:
             hole_revealed=self.hole_revealed,
             chaos_memory=self.chaos_memory.export(),
             config=self.config.to_dict(),
+            table=self.table.to_dict() if self.table is not None else None,
         )
         path = self._save_fn(data, name)
         self._notify(NoticeKind.GAME_SAVED, "Game saved successfully.", {"path": str(path)})
@@ -426,14 +457,17 @@ class GameController:
 
     def bet_limits(self, money: int | None = None) -> tuple[int, int]:
         """Allowed bet range for `money` (default: the current bankroll) under this run's config."""
-        m = self.run.money if money is None else money
-        return bet_limits(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+        m = (self.run.money if money is None else money) - self._fee()
+        lo, hi = bet_limits(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+        if self.table is not None:
+            lo = max(lo, self.table.min_bet(self.run.round))
+        return lo, hi
 
     def can_bet(self, money: int | None = None) -> bool:
         """Whether `money` (default: the bankroll) still allows a minimum bet; shop
         purchases must leave this true."""
-        m = self.run.money if money is None else money
-        return can_bet(m, min_bet=self.config.min_bet, max_fraction=self.config.max_bet_fraction)
+        lo, hi = self.bet_limits(money)
+        return hi >= lo
 
     def add_listener(self, fn: Callable[[Notice], None]) -> None:
         """Call `fn` with every notice as it happens, without consuming it
@@ -485,7 +519,8 @@ class GameController:
             deck_count=len(st.deck) if st is not None else 0,
             items=tuple(ItemView(i, n, self.registry.describe_item(i)) for i, n in inventory_counts(inventory)),
             shop_offers=tuple(
-                ShopOfferView(o.item, o.price, o.sold, not o.sold and self.can_bet(self.run.money - o.price))
+                ShopOfferView(o.item, o.price, o.sold, not o.sold and self.can_bet(self.run.money - o.price),
+                              self._describe_offer(o.item))
                 for o in self.shop.offers
             ),
             shop_restock_in=rounds_until_restock(self.shop, self.run.round, self.config.shop_refresh_rounds),
@@ -502,6 +537,8 @@ class GameController:
             last_result=self.last_result,
             run_end=self.run_end,
             shop_reroll_price=self.reroll_price() if self.phase == TablePhase.BETTING else None,
+            table_info=self.table.info(self.run) if self.table is not None else (),
+            fee=self._fee(),
         )
 
     # -------------------------------------------------------------- internal
@@ -621,7 +658,12 @@ class GameController:
         )
         self._notify(NoticeKind.ROUND_SETTLED, data={"result": self.last_result})
 
-        self.run_end = self.run_end_policy.check(self.run)
+        if self.table is not None:
+            self.table.after_settle(st, out, self.loop.modifiers, self.run)
+            won = self.table.victory(self.run)
+            self.run_end = RunEndResult(kind="victory", message=won) if won else None
+        else:
+            self.run_end = self.run_end_policy.check(self.run)
         if self.run_end is None and not self.can_bet(self.run.money):
             self.run_end = RunEndResult(kind='defeat', message=NO_VALID_BET_MESSAGE)
         if self.run_end is not None:
@@ -646,12 +688,43 @@ class GameController:
             pipeline.llm.choices = tuple(self.config.chaos_stub)
 
     def _roll_shop(self, *, reroll: bool = False) -> ShopState:
-        listed = {item: price for item, price in self.config.shop_prices.items()
-                  if self.registry.resolve_item(item) is not None
-                  and (item != 'shield' or self.config.enable_chaos)}
+        table = self.table
+        pinned = table.pinned() if table is not None else ()
+
+        def stocked(item: str) -> bool:
+            if table is not None and table.sells(item):
+                return item not in pinned and table.stockable(item)
+            return self.registry.resolve_item(item) is not None and (item != 'shield' or self.config.enable_chaos)
+
+        listed = {item: price for item, price in self.config.shop_prices.items() if stocked(item)}
         prices = shop_prices(listed, frozenset(self.config.shop_bankroll_pct), self.run.money,
                              self.config.shop_price_floor)
-        return roll_stock(self.shop_seed, self.run.round, prices, self.config.shop_slots, reroll=reroll)
+        # A table's pinned offers (e.g. J-54's Start Experiment) always take a slot.
+        extra = tuple(ShopOffer(item, int(self.config.shop_prices[item]))
+                      for item in pinned if item in self.config.shop_prices)
+        slots = max(0, self.config.shop_slots - len(extra))
+        stock = roll_stock(self.shop_seed, self.run.round, prices, slots, reroll=reroll)
+        return replace(stock, offers=stock.offers + extra) if extra else stock
+
+    def _fee(self) -> int:
+        """Chips the table charges before this round's bet (0 on a plain table)."""
+        return self.table.fee(self.run.round) if self.table is not None else 0
+
+    def _describe_offer(self, item_id: str) -> str:
+        if self.table is not None and self.table.sells(item_id):
+            return self.table.describe(item_id)
+        return self.registry.describe_item(item_id) or ITEM_HELP.get(item_id, "")
+
+    def _table_cards(self) -> bool:
+        """Let the table react to dealt or drawn cards; True when it ended the hand."""
+        if self.table is None or self.state is None:
+            return False
+        self.state = self.table.after_cards(self._st)
+        if not self.table.ends_hand:
+            return False
+        self.state = self._st.with_phase(GamePhase.RESOLVED)
+        self._settle("push")
+        return True
 
     def _check_can_bet(self) -> None:
         if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):

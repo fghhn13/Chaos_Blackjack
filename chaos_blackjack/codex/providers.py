@@ -20,6 +20,8 @@ _RULE_NAMES = {
     "odd_even_chaos": "Odd-Even Chaos", "suit_power": "Suit Power",
     "fragile_bust": "Fragile Bust", "reverse_bust": "Reverse Bust",
     "tiebreaker_shift": "Tiebreaker Shift",
+    "j54_burn": "Burn Protocol", "j54_sample_injection": "Sample Injection",
+    "j54_redundancy_purge": "Redundancy Purge", "j54_ace_injection": "Ace Injection",
 }
 _RULE_SUMMARIES = {
     "modify_card_value": "Shift the value of every card.",
@@ -29,6 +31,10 @@ _RULE_SUMMARIES = {
     "fragile_bust": "The table's bust threshold falls.",
     "reverse_bust": "A player bust becomes a push.",
     "tiebreaker_shift": "Equal totals award a win instead of a push.",
+    "j54_burn": "Every card drawn this round leaves the deck for good.",
+    "j54_sample_injection": "Copies of one rank join the deck.",
+    "j54_redundancy_purge": "Some cards of one rank leave the deck.",
+    "j54_ace_injection": "An ace joins the deck.",
 }
 _ITEM_SUMMARIES = {
     "peek": "Reveal the next card's rank.",
@@ -159,7 +165,10 @@ def _mode_detail(mode_id: str, config: RunConfig) -> str:
     text = mode.description
     if host:
         text += f" Your host: {host}."
-    text += (f" Turn {cfg.start_money} chips into {cfg.target_money}. Bet {cfg.min_bet} up to "
+    from chaos_blackjack.app.table_mechanics import table_goal
+
+    goal = table_goal(cfg) or f"Turn {cfg.start_money} chips into {cfg.target_money}"
+    text += (f" {goal}. Bet {cfg.min_bet} up to "
              f"{cfg.max_bet_fraction * 100:g}% of your bankroll; the dealer stands on {cfg.dealer_stand_on} and "
              f"blackjack pays {num}:{den}.")
     banned = " or ".join(m for m, on in (("double down", cfg.allow_double), ("surrender", cfg.allow_surrender))

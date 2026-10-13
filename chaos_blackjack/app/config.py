@@ -71,6 +71,8 @@ class RunConfig:
     mode: str = ""
     host: str | None = None
     rule_pool: tuple[str, ...] | None = None
+    # Numbers of a mode's own mechanics ("<mode id>.<name>", e.g. "j54.capital_target").
+    mode_settings: dict[str, Any] = field(default_factory=lambda: dict(_DEFAULTS.mode_settings))
 
     def __post_init__(self) -> None:
         if not 0 <= self.chaos_guidance_probability <= 1:
@@ -107,6 +109,7 @@ class RunConfig:
             "chaos_memory_enabled": balance.chaos_memory_enabled,
             "chaos_memory_limit": balance.chaos_memory_limit,
             "balance_profile": balance.profile,
+            "mode_settings": dict(balance.mode_settings),
         }
         values.update(overrides)
         return cls(**values)

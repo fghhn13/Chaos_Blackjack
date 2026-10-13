@@ -13,6 +13,16 @@ def _rule(rule_id, player, dealer=("10♣", "7♦"), deck=("2♣", "3♠", "K♦
     ))
 
 
+def _deck_rule(rule_id):
+    """J-54's rules change the deck, not this hand's totals."""
+    return DemoScript(("10♠", "8♥"), ("10♣", "7♦"), ("2♣", "3♠", "K♦"), True, (
+        Step("deal", caption="A fixed deal at J-54's table."),
+        Step("apply_rule", rule_id, "J-54 rewrites the deck. At its table the change lasts the whole run."),
+        Step("stand", caption="This hand plays as usual; later rounds deal from the changed deck."),
+        Step("dealer", caption="The controller plays the dealer and settles the hand."),
+    ))
+
+
 RULE_DEMOS = {
     "modify_card_value": _rule("modify_card_value", ("K♠", "8♥")),
     "great_crash": _rule("great_crash", ("K♠", "Q♥")),
@@ -21,6 +31,8 @@ RULE_DEMOS = {
     "fragile_bust": _rule("fragile_bust", ("10♠", "7♥"), deck=("3♣",), hit=True),
     "reverse_bust": _rule("reverse_bust", ("10♠", "9♥"), deck=("5♣",), hit=True),
     "tiebreaker_shift": _rule("tiebreaker_shift", ("10♠", "8♥"), dealer=("K♣", "8♦")),
+    **{rid: _deck_rule(rid) for rid in ("j54_burn", "j54_sample_injection", "j54_redundancy_purge",
+                                        "j54_ace_injection")},
 }
 
 

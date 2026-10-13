@@ -31,6 +31,22 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'meta.loss_per_peak_gain', '4',            'float',0,    NULL, 'Consolation tokens per 100% of the start bankroll gained at the peak'),
     (:profile, 'meta.loss_cap',           '5',            'int',  0,    NULL, 'Most consolation tokens for a lost run');
 
+-- J-54's table (demo, docs/design/J54_TABLE.md). First pass from a scripted bot:
+-- a focused contract player wins ~17 % (capture) / ~11 % (capital), never
+-- buying wins ~0 % / ~5 % and dies around round 18. Not balanced yet.
+-- `mode.j54.config.<field>` overrides a RunConfig field at this table only.
+INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
+    (:profile, 'mode.j54.protocols',        'capture,capital', 'str', NULL, NULL, 'Protocols (win conditions) a J-54 run draws from'),
+    (:profile, 'mode.j54.capital_target',   '250',   'int', 1,    NULL, 'Capital protocol: bankroll that wins the run'),
+    (:profile, 'mode.j54.experiment_jokers','1',     'int', 1,    NULL, 'Capture protocol: Jokers released by Start Experiment (all must be drawn)'),
+    (:profile, 'mode.j54.fee_steps',        '0,1,2,4,8', 'str', NULL, NULL, 'Compute fee per round, one value per fee step; doubles after the last'),
+    (:profile, 'mode.j54.fee_step_rounds',  '4',     'int', 1,    NULL, 'Rounds per compute fee step'),
+    (:profile, 'mode.j54.entropy',          '1',     'int', 0,    NULL, 'Low cards J-54 adds to the deck after each round'),
+    (:profile, 'mode.j54.entropy_experiment','2',    'int', 0,    NULL, 'Low cards J-54 adds after each round once the experiment started'),
+    (:profile, 'mode.j54.dealer_joker_penalty','1',  'int', 0,    NULL, 'Low cards J-54 adds when it takes a Joker back from the dealer'),
+    (:profile, 'mode.j54.min_deck',         '12',    'int', 8,    NULL, 'Deletions never shrink the deck below this many cards'),
+    (:profile, 'mode.j54.config.shop_refresh_rounds', '1', 'int', 1, NULL, 'J-54 restocks its contracts every round');
+
 -- Prices revised from agent playtest feedback. `params` is item tuning (JSON).
 -- `bankroll_pct`: `price` is a percentage of the bankroll when the stock is
 -- rolled, rounded half up with a minimum price of one chip.
@@ -47,6 +63,15 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
 INSERT INTO shop_item (profile_id, item_id, price_mode, price) VALUES
     (:profile, 'example_trim', 'fixed', 20);
 
+-- J-54's run contracts (sold only at its table). `params`: trigger (win, loss,
+-- natural, now), effect and its numbers; read by chaos_blackjack/j54/contracts.py.
+INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
+    (:profile, 'j54_streamline',        'fixed',  20, '{"trigger": "win", "effect": "delete_random", "count": 5}'),
+    (:profile, 'j54_low_purge',         'fixed',  10, '{"trigger": "now", "effect": "delete_low", "count": 6}'),
+    (:profile, 'j54_high_injection',    'fixed',  20, '{"trigger": "now", "effect": "add_high", "count": 3}'),
+    (:profile, 'j54_freeze',            'fixed',  15, '{"trigger": "now", "effect": "freeze", "rounds": 3}'),
+    (:profile, 'j54_start_experiment',  'fixed',  50, '{"trigger": "now", "effect": "release_jokers"}');
+
 -- Chaos rules. `params`: fixed tuning that wins over the AI's params.
 -- `stub_weight` / `stub_params`: how often the offline Chaos AI (no LLM) picks
 -- the rule and what it sends; `chaos.stub_calm_weight` is the weight of a calm
@@ -59,7 +84,12 @@ INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_
     (:profile, 'odd_even_chaos',    1, '{"even_delta": 2, "odd_delta": -1}',  22, NULL),                   --  +4 %
     (:profile, 'suit_power',        1, '{"red_delta": 1, "black_delta": -1}', 20, NULL),                   --  -5 %
     (:profile, 'fragile_bust',      1, '{"bust_limit": 19}',                  15, NULL),                   --  +8 %
-    (:profile, 'tiebreaker_shift',  1, NULL,                                  15, '{"ties_to": "dealer"}'); --  -9 %
+    (:profile, 'tiebreaker_shift',  1, NULL,                                  15, '{"ties_to": "dealer"}'), --  -9 %
+    -- J-54's deck rules (its table only); a rank is drawn when none is given.
+    (:profile, 'j54_burn',              1, NULL,                              20, NULL),
+    (:profile, 'j54_sample_injection',  1, NULL,                              25, '{"count": 3}'),
+    (:profile, 'j54_redundancy_purge',  1, NULL,                              25, '{"count": 3}'),
+    (:profile, 'j54_ace_injection',     1, NULL,                              10, '{"count": 1}');
 
 -- Meta upgrades bought with tokens between runs (tuned with black-jack-sim). Effects
 -- are code (chaos_blackjack/meta/effects.py); each row is one upgrade.

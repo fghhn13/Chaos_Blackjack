@@ -46,7 +46,7 @@ def click(app, pos):
 
 def test_gallery_core_series_then_expansions_and_detail_back_preserve_section(app):
     gallery = open_scene(app)
-    assert [s.label for s in gallery.sections] == ["Classic Table", "Poker Head"]
+    assert [s.label for s in gallery.sections] == ["Classic Table", "Poker Head", "J-54"]
     assert gallery.current == "core" and gallery.expansions_label_x is not None
     assert {e.kind for _, e in gallery.tiles} == {"mode", "item"} and not gallery.about.visible
     key(app, pygame.K_TAB)
@@ -191,14 +191,15 @@ def test_sections_place_every_entry_by_series():
     from chaos_blackjack.codex import codex_sections
 
     sections = {s.id: s for s in codex_sections(RunConfig())}
-    assert list(sections) == ["core", "poker_head"]
+    assert list(sections) == ["core", "poker_head", "j54"]
     core, poker_head = sections["core"], sections["poker_head"]
     assert not core.expansion and poker_head.expansion
     assert [e.id for e in {g.id: g for g in core.groups}["tables"].entries] == ["normal"]
     assert poker_head.host == "poker_head" and poker_head.portrait.startswith("default_poker_head_")
     assert poker_head.mode.id == "chaos" and poker_head.quote
     groups = {g.id: g for g in poker_head.groups}
-    assert {e.id for e in groups["rules"].entries} == {e.id for e in codex_entries("rule")}
+    assert {e.id for e in groups["rules"].entries} == {e.id for e in codex_entries("rule")
+                                                       if not e.id.startswith("j54_")}
     assert [e.id for e in groups["items"].entries] == ["shield"]  # Classic never sells Shield
     assert "shield" not in {e.id for e in core.entries} and "rules" not in {g.id for g in core.groups}
     # Nothing is left out: every rule, item and mode appears somewhere.
@@ -217,7 +218,7 @@ def test_sections_follow_mode_pools(monkeypatch):
     register_mode(GameMode("trial", "Trial", "A narrow table.", icon="mode_chaos", order=5, series="trial_pack",
                            overrides={"enable_chaos": True}, rules=("great_crash",), items=("peek", "fate_oracle")))
     sections = {s.id: s for s in codex_sections(RunConfig())}
-    assert list(sections) == ["core", "poker_head", "trial_pack"]  # a new expansion gets its own tab
+    assert list(sections) == ["core", "poker_head", "j54", "trial_pack"]  # a new expansion gets its own tab
     trial = {g.id: g for g in sections["trial_pack"].groups}
     assert [e.id for e in trial["rules"].entries] == ["great_crash"]
     # Peek and Fate Oracle are sold at the trial table too, so they stay in the core; Swap is

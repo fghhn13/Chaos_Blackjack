@@ -14,9 +14,9 @@ from chaos_blackjack.registry import get_registry
 
 def test_builtins_and_tab_order():
     assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai"]
-    assert len(codex_entries("rule")) == 7
+    assert len(codex_entries("rule")) == 11  # Poker Head's 7 and J-54's 4
     assert len(codex_entries("item")) == 6
-    assert [e.id for e in codex_entries("mode")] == ["normal", "chaos"]
+    assert [e.id for e in codex_entries("mode")] == ["normal", "chaos", "j54"]
     assert [e.id for e in codex_entries("ai")] == ["default"]
     assert codex_entries("missing") == []
     for entry in codex_entries():
@@ -61,7 +61,10 @@ def test_modes_describe_the_supplied_config():
                     allow_surrender=False)
     for entry in codex_entries("mode", cfg):
         detail = entry.detail(cfg)
-        assert "230 chips" in detail and "into 920" in detail
+        if entry.id == "j54":  # J-54's goal is a protocol, not a chip target
+            assert "random protocol" in detail
+        else:
+            assert "230 chips" in detail and "into 920" in detail
         assert "Bet 7 up to 25%" in detail and "stands on 19" in detail
         assert "7:4" in detail and "No double down or surrender" in detail
 
@@ -108,7 +111,7 @@ def test_provider_plugins_override_metadata_and_add_ai_entries(monkeypatch):
     replacement = replace(codex_entries("rule")[0], name="Replacement", order=-1)
     register_codex_provider("rule", lambda cfg: [replacement])
     assert codex_entries("rule")[0] == replacement
-    assert len(codex_entries("rule")) == 7
+    assert len(codex_entries("rule")) == 11
 
 
 def test_provider_receives_config_and_rejects_wrong_kind(monkeypatch):

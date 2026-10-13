@@ -37,14 +37,14 @@ Global flags go **before** the subcommand:
 | Flag | Effect |
 | ---- | ------ |
 | `--state PATH` | run file to read / write |
-| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, bet_range, shop, last_round, run_end}` — recommended to save tokens |
+| `--brief` | reply contains only `ok`, `events`, `error` and `obs.{phase, summary, hint, legal_actions, bet_range, shop, table, last_round, run_end}` — recommended to save tokens |
 | `--compact` | single-line JSON |
 
 Subcommands:
 
 | Subcommand | Purpose |
 | ---------- | ------- |
-| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N] [--profile NAME]` | start a run; **overwrites** the state file and its log |
+| `new [--seed N] [--chaos] [--llm] [--start-money N] [--target-money N] [--max-steps N] [--profile NAME] [--mode ID]` | start a run; **overwrites** the state file and its log |
 | `observe` | current observation; changes nothing, not logged |
 | `help` | list game commands |
 | `buy <item_id>` | buy an item from the shop (phase `betting`, before you bet) |
@@ -62,6 +62,7 @@ Subcommands:
 - `--start-money N`, `--target-money N` — change the economy (defaults 100 → 300).
 - `--profile NAME` — use a balance profile from `data/game.db` (default: `$CHAOS_PROFILE` or `default`). The reply's `run.profile` names it; a resumed run keeps its numbers even if the profile changes.
 - `--max-steps N` — cap on accepted `bet` / `act` commands (default 2000).
+- `--mode ID` — play a game mode's table, e.g. `j54` (J-54's deck table, a demo; §8a). The mode turns chaos on itself.
 
 Exit codes: `0` accepted, `1` rejected by the game (`ok: false`), `2` usage problem (no run file, bad state file, `--llm` without a key).
 
@@ -238,6 +239,28 @@ Buy them in the shop, use with `act use_item <id>` during `player_turn`. Each us
 
 If an item pushes your total over the limit (a `swap`, or a `shield` removing a rule that kept you under), you bust and the round settles at once.
 What `peek`, `fate_oracle` and `danger_radar` reveal only appears in `events`; remember it yourself.
+
+## 8a. J-54's table (`--mode j54`, demo)
+
+J-54 changes the **cards**, not the rules. Design: `docs/design/J54_TABLE.md`.
+
+- **Persistent deck.** The deck's cards last the whole run; each round shuffles all of them. `obs.table.info.Deck` is its size.
+- **Protocol (goal).** Drawn at random per run, shown in `obs.table.info.Protocol`:
+  - *Single Capture* — draw the Joker yourself (deal, hit or double). It starts **sealed**; `buy j54_start_experiment` (always on the shelf until bought) puts it in the deck. If the dealer would get it, J-54 shuffles it back and adds a low card. `obs.target` is 0.
+  - *Capital* — reach the chip target (`obs.target`).
+- **Compute fee.** Charged before each bet (`events`: "Compute fee: n chips."); grows every few rounds. The minimum bet is at least the fee and `bet_range` already accounts for it.
+- **Entropy.** After every round J-54 adds low cards (more once the experiment started), so waiting makes the deck worse.
+- **Contracts** replace items in the shop. `buy <id>` applies them; they never appear in `obs.items`. Pending ones are listed in `obs.table.info.Contracts`.
+
+| Contract | Effect (profile numbers) |
+| --- | --- |
+| `j54_low_purge` | at once: delete low cards (2-6) |
+| `j54_streamline` | on your next win: delete random cards |
+| `j54_high_injection` | at once: add 10-value cards or aces |
+| `j54_freeze` | at once: J-54 adds no cards for a few rounds |
+| `j54_start_experiment` | at once: release the Joker (Single Capture only) |
+
+- **Chaos rules** (`j54_burn`, `j54_sample_injection`, `j54_redundancy_purge`, `j54_ace_injection`) add or remove cards; Burn removes every card drawn this round after it settles. All changes are announced in `events`.
 
 ## 9. Worked examples
 

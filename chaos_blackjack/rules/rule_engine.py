@@ -52,6 +52,8 @@ class DefaultBlackjackRules:
             return 10
         if r == "A":
             return 11
+        if r == "JK":
+            return 0  # J-54's Joker never stays in a hand; look-ahead helpers may still value it
         return int(r)
 
     def hand_value(self, hand: tuple[Card, ...], ctx: RuleContext) -> int:

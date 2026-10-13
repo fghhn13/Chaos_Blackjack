@@ -1,4 +1,5 @@
-"""Right table column: the shoe, the item inventory and the shop button.
+"""Right table column: the shoe, the item inventory (or a table's own facts,
+e.g. J-54's protocol and deck) and the shop button.
 
 Items are buttons: clicking one calls `on_use(item_id)` while the view allows
 `use_item`. Hovering shows what the item does. The shop button calls
@@ -40,6 +41,7 @@ class ItemPanel(Widget):
         self.items: tuple[ItemView, ...] = ()
         self.can_use = False
         self.restock_in = 0
+        self.table_info: tuple[tuple[str, str], ...] = ()
         self.shop_button = Button(
             assets, (self.rect.x + 14, self.rect.bottom - 62, self.rect.w - 28, 48), "Shop",
             on_shop, hotkey=pygame.K_b, font_size=theme.FONT_BODY,
@@ -65,6 +67,7 @@ class ItemPanel(Widget):
         self.can_use = v.can(Action.USE_ITEM)
         self.shop_button.enabled = v.can(Action.BUY)
         self.restock_in = v.shop_restock_in
+        self.table_info = v.table_info
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if self.shop_button.handle_event(event) and event.type != pygame.MOUSEMOTION:
@@ -85,6 +88,10 @@ class ItemPanel(Widget):
         r = self.rect
         draw_panel(surface, r)
         inner_w = r.w - 28
+        if self.table_info and not self.items:
+            self._draw_table_info(surface)
+            self._draw_shop(surface)
+            return
         y = draw_heading(surface, a, "Items", (r.x + 14, self._items_top()), inner_w)
 
         body = a.font(theme.FONT_SMALL, bold=True)
@@ -116,6 +123,19 @@ class ItemPanel(Widget):
             surface.blit(tiny.render(hint, True, theme.TEXT_MUTED), (r.x + 14, r.bottom - 112))
 
         self._draw_shop(surface)
+
+    def _draw_table_info(self, surface: pygame.Surface) -> None:
+        """The table's own facts (label over value), in place of an empty inventory."""
+        a, r = self.assets, self.rect
+        y = draw_heading(surface, a, "Experiment", (r.x + 14, self._items_top()), r.w - 28)
+        label_font, value_font = a.font(theme.FONT_TINY, bold=True), a.font(theme.FONT_SMALL)
+        for label, value in self.table_info:
+            if y + 40 > r.bottom - 100:
+                break
+            surface.blit(label_font.render(label.upper(), True, theme.GOLD_DIM), (r.x + 14, y))
+            y += label_font.get_linesize()
+            surface.blit(value_font.render(fit_text(value_font, value, r.w - 28), True, theme.IVORY), (r.x + 14, y))
+            y += value_font.get_linesize() + 6
 
     def _draw_shop(self, surface: pygame.Surface) -> None:
         """Shop button (usable while betting) and the restock countdown."""

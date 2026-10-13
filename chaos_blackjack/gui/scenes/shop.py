@@ -164,7 +164,8 @@ class ShopScene(Scene):
                                                           theme.IVORY if live else theme.TEXT_MUTED)
         surface.blit(name, name.get_rect(midtop=(rect.centerx, rect.y + ICON + 26)))
         font = a.font(theme.FONT_TINY)
-        for i, line in enumerate(wrap_text(font, self.controller.registry.describe_item(offer.item), rect.w - 32, max_lines=4)):
+        for i, line in enumerate(wrap_text(font, offer.description or self.controller.registry.describe_item(offer.item),
+                                           rect.w - 32, max_lines=4)):
             img = font.render(line, True, theme.TEXT_MUTED)
             surface.blit(img, img.get_rect(midtop=(rect.centerx, rect.y + ICON + 58 + i * font.get_linesize())))
         if live and not offer.affordable:
