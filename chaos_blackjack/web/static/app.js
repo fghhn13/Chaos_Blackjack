@@ -40,7 +40,7 @@ async function api(path,data){
 }
 function setAuthMode(register){registering=register;$('token-field').hidden=!register;$('auth-token').required=register;$('login-tab').classList.toggle('selected',!register);$('register-tab').classList.toggle('selected',register);$('auth-title').textContent=register?'Join the table':'Welcome back';$('auth-password').autocomplete=register?'new-password':'current-password';$('auth-submit').textContent=register?'Create account':'Take your seat';$('auth-error').textContent='';}
 $('login-tab').onclick=()=>setAuthMode(false);$('register-tab').onclick=()=>setAuthMode(true);
-function stopGame(){closeNameInput();launchVersion++;$('pygame').removeAttribute('src');$('pygame').hidden=true;}
+function stopGame(){closeNameInput();exitExpanded();launchVersion++;$('pygame').removeAttribute('src');$('pygame').hidden=true;}
 function signedOut(){stopGame();user=null;csrf='';pendingSave=null;$('auth').hidden=false;$('game').hidden=true;$('identity').hidden=true;document.querySelectorAll('dialog[open]').forEach(d=>d.close());}
 async function signedIn(result){
  user=result.user;csrf=result.csrf;saveKey='chaos-save:'+user.id;
@@ -84,7 +84,26 @@ window.chaosLoading=info=>{
 };
 window.chaosFailed=()=>{closeNameInput();$('save-status').textContent='Game startup failed.';$('game-error').textContent='The game could not load or continue. Check your connection and retry, or reload your latest account save.';$('launch').textContent='Retry';$('launch').hidden=false;};
 $('launch').onclick=async()=>{try{await flushSave();if(conflicted)return;closeNameInput();$('game-error').textContent='';$('pygame').src='/play/?v='+Date.now();$('pygame').hidden=false;$('launch').hidden=true;$('save-status').textContent='Loading game files. First load can take a few minutes on a slow connection.';}catch(e){$('game-error').textContent=e.message;}};
-$('fullscreen').onclick=()=>$('game-container').requestFullscreen().catch(e=>{$('game-error').textContent=e.message;});
+function syncExpanded(){
+ const expanded=document.fullscreenElement===$('game-container')||$('game-container').classList.contains('page-expanded');
+ $('exit-fullscreen').hidden=!expanded;
+}
+async function exitExpanded(){
+ $('game-container').classList.remove('page-expanded');document.body.classList.remove('game-expanded');
+ if(document.fullscreenElement===$('game-container')){try{await document.exitFullscreen();}catch(e){}}
+ syncExpanded();
+}
+$('fullscreen').onclick=async()=>{
+ const container=$('game-container');
+ if(typeof container.requestFullscreen==='function'&&document.fullscreenEnabled){
+  try{await container.requestFullscreen();syncExpanded();return;}catch(e){}
+ }
+ container.classList.add('page-expanded');document.body.classList.add('game-expanded');syncExpanded();
+};
+$('exit-fullscreen').onclick=exitExpanded;
+document.addEventListener('fullscreenchange',syncExpanded);
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('player-name-dialog').open)exitExpanded();});
+if(!document.fullscreenEnabled)$('fullscreen').textContent='Expand game';
 $('logout').onclick=async()=>{try{await flushSave();await api('/api/logout',{});signedOut();}catch(e){$('game-error').textContent=e.message;}};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 async function accounts(){const result=await api('/api/admin/accounts');$('accounts').replaceChildren();for(const account of result.accounts){const row=textNode('div','','account-row');row.append(textNode('span',`${account.username}${account.admin?' · Admin':''}${account.enabled?'':' · Disabled'}`));if(!account.admin){const button=textNode('button',account.enabled?'Disable':'Enable','outline');button.onclick=async()=>{try{await api('/api/admin/account',{id:account.id,enabled:!account.enabled});await accounts();}catch(e){$('account-error').textContent=e.message;}};row.append(button);}$('accounts').append(row);}}

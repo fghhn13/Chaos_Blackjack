@@ -117,3 +117,32 @@ def test_items_show_their_phase_and_a_targeted_item_asks_in_the_bag(app) -> None
     _key(app, pygame.K_1)
     _frame(app)
     assert c.choice is None and c.run.money == 104 and c.run.items == ()
+
+
+def test_long_target_list_scrolls_to_the_last_consumable_without_selecting(app) -> None:
+    from chaos_blackjack.gui.touch import TOUCH_SCROLL
+
+    c = _controller()
+    c.choose(c.choice.options[0].id)
+    c.table.holdings.add("ph_buyback", 6)
+    for _ in range(12):
+        c.table.holdings.add("ph_peek", 4)
+    c.table._sync_items()
+    _open_table(app, c)
+    c.perform("use_item", "ph_buyback")
+    app.scenes.push("choice", controller=c)
+    app.scenes.apply_pending()
+    dialog = app.scenes.top
+    assert dialog.max_scroll > 0
+    before = c.view()
+    dialog.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=(0, 0), dy=10000))
+    assert dialog.scroll == 0
+    dialog.handle_event(pygame.event.Event(TOUCH_SCROLL, pos=dialog.area.center, dy=10000))
+    assert dialog.scroll == dialog.max_scroll and c.view() == before
+    app._render()
+    last = dialog.ui.widgets[11]
+    assert last.visible and dialog.area.contains(last.rect)
+    for kind in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+        app.scenes.handle_event(pygame.event.Event(kind, pos=last.rect.center, button=1))
+    app.scenes.apply_pending()
+    assert c.choice is None and c.run.money == 104 and len(c.run.items) == 11
