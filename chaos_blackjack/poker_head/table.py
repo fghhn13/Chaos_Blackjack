@@ -43,6 +43,7 @@ from chaos_blackjack.poker_head.effects import Effect, Settlement, build_effect
 from chaos_blackjack.poker_head.director import STAGE_NAMES, Director, from_legacy
 from chaos_blackjack.poker_head.environment import EnvRule
 from chaos_blackjack.poker_head.evaluation import BuildRules
+from chaos_blackjack.poker_head import money
 from chaos_blackjack.poker_head.items import build_handler
 from chaos_blackjack.poker_head.ownership import Holding, Holdings, Ledger, Loadout
 from chaos_blackjack.poker_head.public import EntryView, PokerHeadPublic, PositionView
@@ -50,6 +51,7 @@ from chaos_blackjack.poker_head.public import EntryView, PokerHeadPublic, Positi
 SAVE_VERSION = 2
 CASH = "cash"  # the opening invitation's "no core, extra chips" option
 DISCARD = "ph_discard"  # table action: drop an equipped permanent (it can be offered again)
+FULL_HAUL = "ph_full_haul"  # table action: leave with a win once net assets reach the exit multiple
 
 
 def _action_error(text: str):
@@ -90,10 +92,13 @@ class PokerHeadTable(TableMechanics):
 
     @classmethod
     def goal(cls, config):
+        if config.exit_money:
+            return f"Leave with {config.exit_money} to {config.target_money} net assets"
         return f"Reach {config.target_money} net assets"
 
     def __init__(self, config, seed, notify):
-        super().__init__(config, seed, notify)
+        # Every chip amount here is a share of the starting cash (money.py); the controller keeps the profile's.
+        super().__init__(money.scaled(config), seed, notify)
         self.ctx = BuildContext(self)
         self.holdings = Holdings()
         self.loadout = Loadout()
@@ -110,6 +115,7 @@ class PokerHeadTable(TableMechanics):
         self.prepared: tuple[Card, ...] | None = None   # this round's deal (private)
         self.prepared_round = 0
         self.last_settled = 0
+        self.leaving = False                   # Full Haul was confirmed: the goal check ends the run
 
     # --- setup ----------------------------------------------------------------
 
@@ -118,7 +124,7 @@ class PokerHeadTable(TableMechanics):
         controller.loop.rules = BuildRules(self, controller.loop.rules)
         # The environment comes from the offline director (never an LLM, never the registry's Chaos rules).
         settings = {k[len("chaos."):]: v for k, v in self.config.mode_settings.items() if k.startswith("chaos.")}
-        self.director = Director(settings, self.seed, self.setting("rule_slots"))
+        self.director = Director(settings, self.seed, self.setting("rule_slots"), money.factor(self.config))
 
     def setting(self, key):
         value = self.config.mode_settings["chaos." + key]
@@ -153,16 +159,39 @@ class PokerHeadTable(TableMechanics):
         pool = [x for x in CORES if x != self.loadout.core]
         return tuple(random.Random(f"{self.seed}:choice:{self.holdings.sequence + 1}").sample(pool, 2))
 
+    def core_cash(self, core: str) -> int:
+        """Chips this core costs (negative) or brings (positive) when chosen (money.core_cash)."""
+        return money.core_cash(self.config.mode_settings).get(core, 0)
+
+    def core_option(self, core: str) -> ChoiceOption:
+        cash = self.core_cash(core)
+        note = f" (costs {-cash} chips)" if cash < 0 else f" (+{cash} chips)" if cash > 0 else ""
+        return ChoiceOption(core, PRODUCTS[core].name + note, PRODUCTS[core].description)
+
+    def choose_core(self, core: str) -> None:
+        """Take a core (the invitation or Amendment Letter), paying or collecting its chips."""
+        cash = self.core_cash(core)
+        if cash < 0 and not self.c.can_bet(self.c.run.money + cash):
+            raise _action_error(f"{PRODUCTS[core].name} costs {-cash} chips: keep enough to bet.")
+        self.c.run.money += cash
+        self.set_core(core)
+        if cash:
+            self.message(f"{PRODUCTS[core].name}: {cash:+d} chips.")
+
     def _ask_opening(self, gift: Holding) -> None:
-        options = tuple(ChoiceOption(c, PRODUCTS[c].name, PRODUCTS[c].description) for c in gift.choices)
+        options = tuple(self.core_option(c) for c in gift.choices)
         options += (ChoiceOption(CASH, f"Take {self.setting('decline_cash')} chips",
                                  "Play the whole run without a core."),)
         self.c.ask(Choice("opening", "The dealer's invitation: choose your core, or take the chips.",
                           options, cancellable=False, payload={"holding": gift.uid}))
 
     def summary(self):
-        return [f"Reach {self.config.target_money} net assets: cash, plus money invested, minus what you owe. "
-                "Choose a core, build in three slots, and watch the minimum bet rise."]
+        cfg = self.config
+        goal = (f"From {cfg.exit_money} net assets you may leave with them (Full Haul); at {cfg.target_money} "
+                "Poker Head stops playing and pays nothing above it. Net assets" if cfg.exit_money
+                else f"Reach {cfg.target_money} net assets")
+        return [f"{goal}: cash, plus money invested, minus what you owe. "
+                "Choose a core, build in two slots, and watch the minimum bet rise."]
 
     def min_bet(self, round_no):
         levels = self.setting("min_bets")
@@ -178,16 +207,25 @@ class PokerHeadTable(TableMechanics):
         return self.ledger.net_assets((run or self.c.run).money)
 
     def victory(self, run):
-        if self.c.choice is not None or self.ledger.net_assets(run.money) < run.target_money:
+        net = self.ledger.net_assets(run.money)
+        leave = self.leaving and self.config.exit_money and net >= self.config.exit_money
+        if self.c.choice is not None or (net < run.target_money and not leave):
             return None
         # Settle at cost: open principal comes back, owed repayments are paid, no unearned interest.
-        run.money = self.ledger.net_assets(run.money)
+        run.money = net
         self.ledger.close_all()
+        if leave and net < run.target_money:
+            return f"Full Haul: you leave the table with {net} chips."
+        if self.config.target_multiple:
+            return f"Your net assets reached {run.target_money}. Poker Head stops playing: Full Haul."
         return f"Your net assets reached {run.target_money}. Poker Head concedes the table."
 
     def info(self, run):
         core = PRODUCTS[self.loadout.core].name if self.loadout.core else "No core" if self.loadout.no_core else "Not chosen"
-        rows = [("Net assets", f"{self.net_assets(run)}/{run.target_money}"), ("Cash", str(run.money)),
+        rows = [("Net assets", f"{self.net_assets(run)}/{run.target_money}")]
+        if self.config.exit_money:
+            rows.append(("Full Haul from", str(self.config.exit_money)))
+        rows += [("Cash", str(run.money)),
                 ("Invested", str(self.ledger.invested)), ("Debt", str(self.ledger.debt)), ("Core", core),
                 ("Build", f"{len(self.loadout.equipped)}/{self.setting('build_slots')}"),
                 ("Minimum bet", str(self.min_bet(run.round)))]
@@ -224,8 +262,10 @@ class PokerHeadTable(TableMechanics):
         return item_id in SHOP_IDS
 
     def describe(self, item_id):
-        p = product(item_id)
-        return p.description if p else ""
+        from chaos_blackjack.codex.build_reference import effect  # the profile's numbers, as in the codex
+
+        item_id = canonical(item_id)
+        return effect(item_id, self.config) if item_id in PRODUCTS else ""
 
     @property
     def unlock_all(self) -> bool:
@@ -242,7 +282,7 @@ class PokerHeadTable(TableMechanics):
             return "Not sold at this table."
         if p.kind == "permanent" and self.loadout.has(item_id):
             return "Already equipped."
-        if p.kind == "finance":
+        if p.kind == "finance" or item_id == "ph_yield":  # Yield Privilege only changes money products
             if not self._finance_unlocked():
                 return "Needs the Private Account core."
             if item_id == "ph_loan" and self.ledger.has("ph_loan"):
@@ -351,7 +391,11 @@ class PokerHeadTable(TableMechanics):
             free = e.free_rerolls(free)
         if sc.free_used < free:
             return 0
-        return self.config.shop_reroll_price if sc.paid_used == 0 else None
+        if sc.paid_used:
+            return None
+        # The paid reroll grows with the minimum bet's steps.
+        step = (self.c.run.round - 1) // self.setting("bet_step_rounds")
+        return self.config.shop_reroll_price + step * self.setting("reroll_step_add")
 
     def rerolled(self, price):
         sc = self.shop_counters
@@ -419,6 +463,8 @@ class PokerHeadTable(TableMechanics):
             self.purchase(choice.payload["item"], option)
         elif choice.kind == "discard":
             self.discard_permanent(option)
+        elif choice.kind == "full_haul":
+            self.leaving = True  # the controller's goal check (check_terminal) ends the run
         elif choice.kind == "opening":
             self._open_with(choice.payload["holding"], option)
         elif choice.kind == "target":
@@ -439,7 +485,7 @@ class PokerHeadTable(TableMechanics):
             self.c.run.money += self.setting("decline_cash")
             text = f"You took {self.setting('decline_cash')} chips and play without a core."
         else:
-            self.loadout.core = option
+            self.choose_core(option)
             text = f"Core chosen: {PRODUCTS[option].name}."
         if gift is not None:
             self.discard(gift)
@@ -556,9 +602,19 @@ class PokerHeadTable(TableMechanics):
         moves = [m for e in self.effects() for m in e.table_moves()]
         if self.c.phase == TablePhase.BETTING:  # the bag lists these next to each permanent
             moves += [Move(DISCARD, x, f"Discard {PRODUCTS[x].name}", listed=False) for x in self.loadout.equipped]
+            exit_money = self.config.exit_money
+            if exit_money and self.net_assets() >= exit_money:
+                moves.append(Move(FULL_HAUL, "", f"Full Haul: leave with {self.net_assets()} chips"))
         return tuple(moves)
 
     def perform(self, action, arg):
+        if action == FULL_HAUL:
+            net = self.net_assets()
+            self.c.ask(Choice("full_haul", f"Leave the table with {net} chips? Open investments come back at cost "
+                              "and every debt is paid. The run ends as a win.",
+                              (ChoiceOption(FULL_HAUL, f"Leave with {net} chips", "End the run: Full Haul."),),
+                              payload={}))
+            return None
         if action == DISCARD:
             p = PRODUCTS[arg]
             self.c.ask(Choice("discard", f"Discard {p.name}? Its build slot is freed and it may be offered in the "
@@ -584,6 +640,14 @@ class PokerHeadTable(TableMechanics):
         for e in self.effects():
             multiplier = e.double_multiplier(multiplier)
         return multiplier
+
+    def plays_out_bust(self):
+        return any(e.insures_bust for e in self.effects())
+
+    def double_cover(self):
+        # A plain double must be covered; a bigger stake (Fourfold Ticket) may lose more than the cash,
+        # and the rest becomes debt (after_settle).
+        return 2
 
     def surrender_loss(self, bet: int) -> int:
         rate = self.setting("base_surrender_pct")
@@ -694,8 +758,11 @@ class PokerHeadTable(TableMechanics):
         return self.prepared
 
     def forecast_cards(self) -> tuple[Card, ...]:
-        """The first two cards left after the four-card opening deal."""
-        return self.prepare_deck()[4:6]
+        """Your two opening cards (the deal gives you the first two), as Comeback Ace will leave them."""
+        first, second = self.prepare_deck()[:2]
+        if self.ace_pending:
+            first = Card(Rank("A"), first.suit)
+        return first, second
 
     def before_naturals(self, state):
         self.round.used, self.round.shown = [], []
@@ -723,13 +790,17 @@ class PokerHeadTable(TableMechanics):
         for e in self.effects():
             e.settle(s)
         hand = s.hand()
+        before = self.net_assets()  # the ceiling counts this round's profit from here
         matured = []
         if self.last_settled != self.c.run.round:
             self.last_settled = self.c.run.round
             matured = self._mature(won=outcome in ("player", "blackjack"))
         cap = next((r for r in self.env_rules() if r.profit_cap is not None), None)
         if cap is not None:
-            hand, matured = self._cap_profit(cap, hand, matured)
+            hand, matured = self._cap_profit(cap.profit_cap, cap.title, hand, matured)
+        if self.config.target_multiple:  # the goal is the table's ceiling (CARRIED_CHIPS.zh-CN.md §4)
+            hand, matured = self._cap_profit(max(0, self.c.run.target_money - before), "The table's ceiling",
+                                             hand, matured, net=True)
         self._finance_cash = 0
         for p, back, profit in matured:
             self._finance_cash += back + profit
@@ -759,13 +830,14 @@ class PokerHeadTable(TableMechanics):
             out.append((p, p.principal + min(0, profit), max(0, profit)))
         return out
 
-    def _cap_profit(self, rule: EnvRule, hand: int, matured):
-        """Keep at most the cap of this round's positive profit; cut the hand's profit first."""
-        pool = max(0, hand) + sum(profit for _, _, profit in matured)
-        excess = max(0, pool - rule.profit_cap)
+    def _cap_profit(self, cap: int, title: str, hand: int, matured, net: bool = False):
+        """Keep at most `cap` of this round's positive profit; cut the hand's profit first. With `net`, a
+        hand loss leaves room for investment profit (the ceiling counts the net gain; Withdrawal Limit does not)."""
+        pool = (hand if net else max(0, hand)) + sum(profit for _, _, profit in matured)
+        excess = max(0, pool - cap)
         if not excess:
             return hand, matured
-        self.message(f"{rule.title}: {excess} chips of profit are lost.", NoticeKind.TABLE_EVENT)
+        self.message(f"{title}: {excess} chips of profit are lost.", NoticeKind.TABLE_EVENT)
         cut = min(excess, max(0, hand))
         hand, excess = hand - cut, excess - cut
         capped = []
@@ -778,6 +850,10 @@ class PokerHeadTable(TableMechanics):
     def after_settle(self, state, outcome, modifiers, run):
         run.money += self._finance_cash
         self._finance_cash = 0
+        if run.money < 0:
+            self.ledger.shortfall += -run.money
+            self.message(f"The loss exceeds your cash: {-run.money} chips become debt.", NoticeKind.TABLE_EVENT)
+            run.money = 0
         self.round = RoundState(used=self.round.used)
         self._age_rules()
 
@@ -810,7 +886,7 @@ class PokerHeadTable(TableMechanics):
             raise ValueError("Unsupported Poker Head build save.")
         if data["version"] == 1:
             data = _upgrade_v1(data)
-        self.loadout = Loadout.from_dict(data.get("loadout", {}))
+        self.loadout = _swap_cores(Loadout.from_dict(data.get("loadout", {})))
         self.holdings = Holdings.from_dict(data.get("holdings", {}))
         self.ledger = Ledger.from_dict(data.get("ledger", {}))
         r = data.get("round", {})
@@ -855,6 +931,19 @@ class _RuleView:
     id: str
     label: str
     help: str
+
+
+# 2026-10-14: cores change what you can do; these passive cores became permanents (same style).
+_FORMER_CORES = {"ph_retreat": "ph_late_retreat", "ph_approx": "ph_redeal", "ph_stakes": "ph_late_double"}
+
+
+def _swap_cores(lo: Loadout) -> Loadout:
+    """A save from before the core swap: its core becomes the new core of its style, and a permanent that is
+    now a core leaves the build."""
+    if lo.core in _FORMER_CORES:
+        lo.core = _FORMER_CORES[lo.core]
+    lo.equipped = [x for x in lo.equipped if x in PERMANENTS]
+    return lo
 
 
 def _upgrade_v1(d: dict[str, Any]) -> dict[str, Any]:

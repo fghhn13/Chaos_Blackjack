@@ -38,13 +38,14 @@ def test_shipped_values_are_unchanged() -> None:
     assert (b.start_money, b.target_money, b.objective) == (100, 300, "double_money")
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
-    assert {k: v for k, v in b.shop_prices.items() if not k.startswith("ph_")} == {"peek": 4, "danger_radar": 6, "swap": 2, "hole_card_hacker": 3,
-                             "fate_oracle": 8, "shield": 5, "example_trim": 20,
+    assert {k: v for k, v in b.shop_prices.items() if not k.startswith("ph_")} == {"peek": 2, "danger_radar": 3, "swap": 1, "hole_card_hacker": 2,
+                             "fate_oracle": 4, "shield": 3, "example_trim": 20,
                              # J-54's contracts (its table only)
                              "j54_streamline": 20, "j54_low_purge": 10, "j54_high_injection": 20,
                              "j54_freeze": 15, "j54_start_experiment": 50}
     assert set(b.shop_bankroll_pct) == {"peek", "danger_radar", "swap", "hole_card_hacker", "fate_oracle", "shield"}
-    assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (3, 15, 4, 2)
+    assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (3, 15, 0, 2)
+    assert (b.meta_vault_start, b.meta_relief_base, b.meta_relief_step, b.meta_relief_cap) == (1000, 40, 10, 100)
 
 
 def test_run_config_defaults_come_from_the_seed() -> None:
@@ -57,7 +58,7 @@ def test_run_config_defaults_come_from_the_seed() -> None:
 
 def test_database_is_created_migrated_and_seeded(db, tmp_path) -> None:
     assert (tmp_path / "game.db").is_file()
-    assert schema_version(db) == 7
+    assert schema_version(db) == 9
     row = db.execute("SELECT locked, source_hash FROM balance_profile WHERE name = 'default'").fetchone()
     assert row["locked"] == 1 and row["source_hash"]
     again = connect(tmp_path / "game.db")  # idempotent
@@ -203,7 +204,7 @@ def test_old_databases_are_migrated(tmp_path) -> None:
     raw.commit()
     raw.close()
     conn = connect(path)
-    assert schema_version(conn) == 7
+    assert schema_version(conn) == 9
     assert load_balance("default", conn).chaos_stub == default_balance().chaos_stub
     conn.close()
 
@@ -401,7 +402,7 @@ def test_existing_editable_profiles_receive_new_interaction_settings(db, tmp_pat
                    "('chaos.guidance_probability', 'chaos.memory_enabled', 'chaos.memory_limit')")
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 7
+        assert schema_version(conn) == 9
         b = load_balance("old-profile", conn)
         assert b.start_money == 150
         assert (b.chaos_guidance_probability, b.chaos_memory_enabled, b.chaos_memory_limit) == (.5, False, 32)
@@ -437,7 +438,7 @@ def test_existing_editable_profiles_receive_meta_settings_and_catalog(db, tmp_pa
     _rewind(db, 3)
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 7
+        assert schema_version(conn) == 9
         b = load_balance("old-profile", conn)
         assert b.start_money == 150 and (b.meta_win_tokens, b.meta_loss_cap) == (10, 5)
         # The catalog snapshot of migration 0004; later seed changes do not touch editable profiles.

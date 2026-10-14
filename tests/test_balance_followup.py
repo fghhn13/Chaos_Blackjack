@@ -67,7 +67,7 @@ def test_rule_modified_21_is_an_ordinary_hand():
 def test_low_bankroll_prices_and_purchase_reserve():
     c = GameController(RunConfig(start_money=20, shop_slots=6))
     prices = {o.item: o.price for o in c.view().shop_offers}
-    assert prices == {"peek": 1, "danger_radar": 1, "swap": 1, "hole_card_hacker": 1, "fate_oracle": 2}
+    assert prices == {"peek": 1, "danger_radar": 1, "swap": 1, "hole_card_hacker": 1, "fate_oracle": 1}
     assert GameController(RunConfig(start_money=9)).phase == TablePhase.RUN_OVER
     c = GameController(RunConfig(start_money=10, shop_slots=6))
     assert all(not o.affordable for o in c.view().shop_offers)

@@ -115,7 +115,7 @@ def test_chaos_victory_pays_the_bonus(svc) -> None:
     c.phase = TablePhase.RUN_OVER
     reward = meta.finish_run(run.run_id, c)
     run_lines = {k: v for k, v in reward.breakdown if not k.startswith("Achievement: ")}
-    assert run_lines == {"Victory": 10, "Chaos bonus": 4}
-    assert reward.tokens == 14 + sum(u.tokens for u in reward.unlocked)
+    assert run_lines == {"Brought home": 300}          # the vault pays; no victory bonus on top
+    assert reward.tokens == 300 + sum(u.tokens for u in reward.unlocked)
     house = {"deck_poker_head", "table_poker_head", "deck_poker_head_gold", "chips_poker_head", "avatar_poker_head_j"}
     assert any(set(u.cosmetic_ids) == house for u in reward.unlocked)

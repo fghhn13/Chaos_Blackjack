@@ -12,6 +12,8 @@ os.environ["CHAOS_USE_LLM"] = "0"
 # ...and never read or write the player's data/game.db.
 os.environ["CHAOS_DB"] = ":memory:"
 os.environ.pop("CHAOS_PROFILE", None)
+# Meta upgrades are off in this version; their dormant code keeps its tests (tests of the "off" state unset it).
+os.environ["CHAOS_META_UPGRADES"] = "1"
 
 import pytest
 

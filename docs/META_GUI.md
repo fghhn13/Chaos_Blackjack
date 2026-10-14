@@ -22,7 +22,7 @@ Home ──┬─ Continue run ────────────────�
 - **Home** (`home`, the start scene): title and a vertical menu on the left, the
   dealer, felt, cards and chips on the right. The menu follows the player's state:
   - no player saves: **Start game** (primary) asks for a name, creates the player
-    in the first free slot and opens Run setup. Tokens and upgrades need a player:
+    in the first free slot and opens Run setup. The chip vault needs a player:
     Shop and Run history carry a "Needs a player" tag and the badge reads "No
     player yet". Choosing any of them explains this, highlights Start game with a
     pulsing outline and a "Start here" tag, and gives it keyboard focus. Collection
@@ -33,7 +33,7 @@ Home ──┬─ Continue run ────────────────�
 
   Shop, Collection and Run history follow; Settings and Quit are small text
   actions at the bottom (Esc asks before quitting). The badge at the top right shows
-  the current player's avatar, name and tokens and opens Profile. If a saved run cannot be
+  the current player's avatar, name and vault chips and opens Profile. If a saved run cannot be
   restored, Home says so, hides Continue for that run and promotes New run.
 - **Players** (`player_select`): three compact slot rows. **Play** makes a slot the
   current player and returns home; empty slots offer **Create player**. Rename and
@@ -44,16 +44,22 @@ Home ──┬─ Continue run ────────────────�
   and **Poker Head's Table** (mode id `chaos`), both dealt by Poker Head. A
   showcase with the dealer's portrait, the table's short player-facing
   description and its facts side by side (goal, bets, rules, dealer,
-  blackjack payout) with live numbers (Poker Head's Table in grey violet); a summary of
-  the permanent upgrades in effect with the numbers they change, and a scrolling
-  list of owned consumables with check boxes. Upgrades tied to another mode are
+  blackjack payout) with live numbers (Poker Head's Table in grey violet). On the
+  right, **Your stake**: the vault, a stake slider (drag, press the track, or
+  Left/Right with focus; widgets.Slider) from the table's minimum to the smaller of
+  its maximum and the vault, "Bring N" with the goal it plays for (the showcase's
+  goal follows it), and the early-bust insurance toggle (premium and refund follow
+  the stake). A vault below the table's minimum shows why and disables Start; a
+  free table (J-54's demo) has no slider. Entering the screen claims Poker Head's
+  relief when the vault cannot cover Classic. When meta upgrades are on, a
+  scrolling list of owned consumables with check boxes follows. Upgrades tied to another mode are
   left out; switching modes updates both lists. Each checked kind brings one copy;
   the number of kinds is capped (2 by default, raised by Bag Space) and the list
   says how many are in use.
   Browsing and checking spend nothing; `start_run` performs the consumption. With
   an unfinished run, only the final **Start run** asks before abandoning it. The
   mode and checked items are remembered per player for the session.
-- **Shop** (`meta_shop`, formerly Upgrades), the only place tokens are spent.
+- **Shop** (`meta_shop`): looks for chips. With meta upgrades off only the Cosmetics area shows.
   Three area tabs, each with a count: **Upgrades** (permanent), **Cosmetics**
   and **Starter items** (consumables). Under each, series tabs: the Core
   Classic Table, then a "Dealers" label and one tab per dealer that has
@@ -81,7 +87,8 @@ Home ──┬─ Continue run ────────────────�
 - **Settings** (`meta_settings`): mute, master volume and fullscreen.
 - **Profile** (`profile`): opened from the player badge, which shows the equipped
   avatar. The title is the player's name. Tabs:
-  - **Overview**: avatar, slot, tokens, achievements and looks owned, a record
+  - **Overview**: avatar, slot, vault chips, achievements and looks owned, the membership panel (badge, level,
+    lifetime spend, progress to the next level, perks), a record
     panel (runs, victories, rounds, hands won, blackjacks, best win streak, best
     bankroll), **Rename** and **Change avatar** (opens Wardrobe on Avatars);
   - **Wardrobe**: switching only. One sub-tab per cosmetic slot with how many
@@ -165,7 +172,7 @@ For development without touching player saves on disk:
 python -c "from chaos_blackjack.meta.fake import install_fake; install_fake(); from chaos_blackjack.gui.app import App; from chaos_blackjack.app.config import RunConfig; App(run_config=RunConfig(use_llm=False)).run('home')"
 ```
 
-The fake uses the real service on an in-memory database: Ace in slot 1 has tokens,
+The fake uses the real service on an in-memory database: Ace in slot 1 has a full vault,
 upgrades and history, Rookie occupies slot 2, and slot 3 is empty. Pass
 `install_fake(demo=False)` to see the first-launch Home. Tests always disable
 billed calls and install a throwaway service.

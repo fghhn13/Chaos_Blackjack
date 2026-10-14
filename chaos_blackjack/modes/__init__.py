@@ -69,7 +69,7 @@ class GameMode:
         else:
             claimed = _claimed(self.id, "items")
             values["shop_prices"] = {k: v for k, v in config.shop_prices.items() if k not in claimed}
-        return replace(config, **values)
+        return replace(config, **values).resolved()
 
 
 # Player-facing label of the expansion group in the Collection and the Shop.

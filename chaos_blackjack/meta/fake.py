@@ -13,6 +13,7 @@ import json
 
 from chaos_blackjack import meta
 from chaos_blackjack.data.db import MEMORY, connect
+from chaos_blackjack.meta.models import MetaError
 from chaos_blackjack.meta.service import MetaService
 
 
@@ -30,8 +31,11 @@ def seed_demo(svc: MetaService) -> None:
     ace = svc.create_player(1, "Ace")
     svc.grant_tokens(ace.id, 200)
     for upgrade in ("start_money", "start_money", "bag_space", "start_peek", "start_peek", "start_shield"):
-        svc.buy_upgrade(ace.id, upgrade)
-    svc.grant_tokens(ace.id, 60 - svc.get_player(ace.id).tokens)
+        try:
+            svc.buy_upgrade(ace.id, upgrade)
+        except MetaError:
+            pass  # the profile sells no meta upgrades (meta.upgrades_enabled off)
+    svc.grant_tokens(ace.id, 1000 - svc.get_player(ace.id).tokens)  # a full vault
     svc.create_player(2, "Rookie")
     with svc._db() as db, db:  # noqa: SLF001 - demo history without playing runs
         for mode, result, rounds, final, peak, tokens in (

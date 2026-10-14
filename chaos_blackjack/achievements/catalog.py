@@ -10,12 +10,17 @@ from __future__ import annotations
 from dataclasses import replace
 
 from chaos_blackjack.achievements import Achievement, AchievementContext, register_achievement
+from chaos_blackjack.achievements.stats import CORES
 
 RULE_SCHOLAR_GOAL = 5
 
 
 def _rules_seen(ctx: AchievementContext) -> tuple[int, int]:
     return sum(1 for kind, _ in ctx.seen if kind == "rule"), RULE_SCHOLAR_GOAL
+
+
+def _core_wins(ctx: AchievementContext) -> tuple[int, int]:
+    return sum(1 for core in CORES if ctx.totals.get(f"core_win_{core}", 0) > 0), len(CORES)
 
 
 for _order, _a in enumerate((
@@ -35,5 +40,16 @@ for _order, _a in enumerate((
     Achievement("rule_scholar", "Rule Scholar", f"Meet {RULE_SCHOLAR_GOAL} different Chaos rules.",
                 check=_rules_seen),
     Achievement("white_flag", "White Flag", "Surrender 30 times.", stat="surrenders", goal=30, hidden=True),
+    # The chip economy and the build table: risky play counts as a way to play too.
+    Achievement("to_the_brim", "To the Brim", "Win a run by reaching the table's ceiling.", stat="ceiling_wins"),
+    Achievement("in_and_out", "In and Out", "Win at Poker Head's table within 5 rounds.", stat="quick_hauls"),
+    Achievement("all_in", "All In", "Win a hand with a Fourfold Ticket.", stat="fourfold_wins"),
+    Achievement("saved_by_the_bell", "Saved by the Bell", "Turn a bust into a push with Bust Insurance.",
+                stat="insurance_saves"),
+    Achievement("fresh_start", "Fresh Start", "Swap into 21 with Fresh Hand.", stat="fresh_21"),
+    Achievement("back_from_broke", "Back from Broke", "Win at Poker Head's table after taking his relief.",
+                stat="comebacks"),
+    Achievement("five_ways", "Five Ways to Win", "Win at Poker Head's table with each of the five cores.",
+                check=_core_wins),
 )):
     register_achievement(replace(_a, order=_order))

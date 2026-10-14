@@ -57,6 +57,8 @@ class BuildRules(DefaultBlackjackRules):
         if ctx.actor == "player":
             for e in self.table.effects():
                 high, low = e.card_value(card, high), e.card_value(card, low)
+            for e in self.table.effects():
+                low = e.card_low(card, low)
         return high, low
 
     def card_value(self, card: Card, ctx: RuleContext) -> int:
@@ -88,7 +90,10 @@ class BuildRules(DefaultBlackjackRules):
         rules = self._env()
         flags = ctx.modifiers.chaos_flags()
         if self.is_bust(p, pc):
-            return env.bust_result("player", rules) or ("push" if "reverse_bust" in flags else "dealer")
+            result = env.bust_result("player", rules)
+            if result is None and any(e.insures_bust for e in self.table.effects()):  # Bust Insurance
+                result = "push" if self.is_bust(d, dc) else "dealer"
+            return result or ("push" if "reverse_bust" in flags else "dealer")
         if self.is_bust(d, dc):
             return env.bust_result("dealer", rules) or "player"
         if p != d:

@@ -81,5 +81,20 @@ for _s in (
     Stat("win_streak", "Longest win streak", lambda r: r.count("win_streak")),
     Stat("items_used", "Items used", lambda r: r.count("items_used")),
     Stat("items_bought", "Items bought", lambda r: r.count("items_bought")),
+    # The chip economy and Poker Head's build table (docs/design/CARRIED_CHIPS.zh-CN.md).
+    Stat("ceiling_wins", "Runs won at the table's ceiling", lambda r: int(_won(r) and r.count("ceiling") > 0)),
+    Stat("quick_hauls", "Poker Head runs won within 5 rounds",
+         lambda r: int(_won(r) and r.mode == "chaos" and 0 < r.rounds <= 5)),
+    Stat("fourfold_wins", "Hands won with a Fourfold Ticket", lambda r: r.count("fourfold_wins")),
+    Stat("insurance_saves", "Busts saved by Bust Insurance", lambda r: r.count("insurance_saves")),
+    Stat("fresh_21", "Fresh Hands into 21", lambda r: r.count("fresh_21")),
+    Stat("comebacks", "Poker Head runs won after Poker Head's relief",
+         lambda r: int(_won(r) and r.mode == "chaos" and bool(r.summary.get("after_relief")))),
 ):
     register_stat(_s)
+
+# One stat per Poker Head core: runs won with it (Five Ways to Win).
+CORES = ("ph_margin", "ph_late_retreat", "ph_redeal", "ph_late_double", "ph_account")
+for _core in CORES:
+    register_stat(Stat(f"core_win_{_core}", f"Poker Head runs won with {_core}",
+                       lambda r, core=_core: int(_won(r) and r.mode == "chaos" and r.summary.get("core") == core)))

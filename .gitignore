@@ -59,6 +59,7 @@ chaos_blackjack/saves/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/table_logs/
 
 # Balance simulator (separate git repository)
 black-jack-sim/

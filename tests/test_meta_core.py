@@ -52,7 +52,7 @@ def test_three_slots(svc) -> None:
     assert [s.slot for s in meta.list_slots()] == [1, 2, 3]
     assert all(s.player is None for s in meta.list_slots())
     p = meta.create_player(2, "  Lucky   Lou ")
-    assert p.name == "Lucky Lou" and p.tokens == 0 and p.upgrades == {}
+    assert p.name == "Lucky Lou" and p.tokens == 1000 and p.upgrades == {}   # a new vault
     assert meta.list_slots()[1].player == p
     with pytest.raises(MetaError, match="already used"):
         meta.create_player(2, "Other")
@@ -74,8 +74,9 @@ def test_three_slots(svc) -> None:
 
 def test_buying_permanent_levels_and_consumables(svc) -> None:
     p = meta.create_player(1, "A")
+    svc.grant_tokens(p.id, -1000)
     offer = {o.upgrade_id: o for o in meta.meta_shop(p.id)}["start_money"]
-    assert (offer.next_cost, offer.can_buy, offer.reason) == (20, False, "Needs 20 tokens")
+    assert (offer.next_cost, offer.can_buy, offer.reason) == (20, False, "Needs 20 chips")
     svc.grant_tokens(p.id, 100)
     p = meta.buy_upgrade(p.id, "start_money")
     assert p.tokens == 80 and p.upgrades["start_money"] == 1
@@ -124,16 +125,17 @@ def test_upgrades_shape_the_run(svc) -> None:
     for u in ("start_money", "start_money", "bag_space", "reroll_pass", "start_peek", "start_peek",
               "start_shield"):
         meta.buy_upgrade(p.id, u)
-    run = meta.start_run(p.id, "normal", consumables=["start_peek", "start_shield"], seed=3)
+    run = meta.start_run(p.id, "normal", consumables=["start_peek", "start_shield"], seed=3, stake=100)
     cfg = run.config
     base = RunConfig()
-    assert cfg.start_money == base.start_money + 20 and cfg.bring_kinds == base.bring_kinds + 1
+    # At a staked table the stake is the starting cash, whatever Start Money says.
+    assert cfg.start_money == 100 and cfg.bring_kinds == base.bring_kinds + 1
     # Classic sells every profile item except other tables' own offers (J-54's contracts).
     assert cfg.free_rerolls == 1
     assert cfg.shop_prices == {k: v for k, v in base.shop_prices.items() if not k.startswith(("j54_", "ph_"))}
     assert cfg.starting_items == ("peek", "shield") and not cfg.enable_chaos
     assert sorted(i.id for i in run.controller.view().items) == ["peek", "shield"]
-    assert run.controller.view().money == base.start_money + 20
+    assert run.controller.view().money == 100   # the stake
     assert run.applied == {"bag_space": 1, "reroll_pass": 1, "start_money": 2, "start_peek": 1, "start_shield": 1}
     after = meta.get_player(p.id).upgrades
     assert after["start_peek"] == 1 and "start_shield" not in after  # consumables used up
@@ -172,7 +174,8 @@ def test_victory_pays_and_records(svc) -> None:
     from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
 
     p = meta.create_player(1, "W")
-    run = meta.start_run(p.id, "normal", seed=1)
+    run = meta.start_run(p.id, "normal", seed=1, stake=100)
+    assert meta.get_player(p.id).tokens == 900          # the stake left the vault
     c = run.controller
     c.run.money = 300
     c.place_bet(150)
@@ -182,13 +185,15 @@ def test_victory_pays_and_records(svc) -> None:
     c.finish_dealer()
     assert c.run_end is not None and c.run_end.kind == "victory"
     reward = meta.finish_run(run.run_id, c)
-    # A first victory without items also unlocks First Win and Bare Hands (their tokens follow the run's).
+    # The cash comes home (Classic stops at 4 x 100); first victory without items unlocks two achievements.
     assert reward.result == "victory" and reward.breakdown == (
-        ("Victory", 10), ("Achievement: First Win", 10), ("Achievement: Bare Hands", 12))
-    assert reward.tokens == 32 and {u.achievement_id for u in reward.unlocked} == {"first_win", "bare_hands"}
-    assert reward.player.tokens == 32 and reward.player.stats.victories == 1
+        ("Brought home", 400), ("Achievement: First Win", 100), ("Achievement: Bare Hands", 120),
+        ("Achievement: To the Brim", 300))
+    assert reward.tokens == 920 and {u.achievement_id for u in reward.unlocked} == {"first_win", "bare_hands",
+                                                                                     "to_the_brim"}
+    assert reward.player.tokens == 900 + 920 and reward.player.stats.victories == 1
     rec = meta.history(p.id)[0]
-    assert (rec.result, rec.final_money, rec.peak_money) == ("victory", 450, 450)
+    assert (rec.result, rec.final_money, rec.peak_money) == ("victory", 400, 400)   # Classic stops at 4 x 100
 
 
 def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
@@ -203,7 +208,7 @@ def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
     rec = meta.history(p.id)[0]
     run_tokens = reward.tokens - sum(u.tokens for u in reward.unlocked)  # achievements pay on top
     assert rec.result == "defeat" and rec.mode == "chaos" and rec.tokens_earned == run_tokens
-    assert 0 <= run_tokens <= 5 and reward.player.tokens == reward.tokens
+    assert run_tokens <= 0 and reward.player.tokens == 600 + reward.tokens   # 400 stayed on the table
     assert sum(t for _, t in reward.breakdown) == reward.tokens
     assert rec.summary["rounds"] == rec.rounds and rec.summary["rules_seen"]
     assert rec.summary["items_bought"]
@@ -217,7 +222,9 @@ def test_defeat_pays_consolation_and_fills_history_and_codex(svc) -> None:
 
 
 def test_consolation_formula() -> None:
-    b = default_balance()
+    from dataclasses import replace
+
+    b = replace(default_balance(), meta_loss_cap=5)   # shipped: off (Poker Head's relief instead)
     assert sum(t for _, t in meta.consolation_tokens(b, 10, 100, 100)) == 2      # 10 * 0.2
     assert sum(t for _, t in meta.consolation_tokens(b, 10, 100, 150)) == 4      # + 0.5 * 4
     assert sum(t for _, t in meta.consolation_tokens(b, 60, 100, 300)) == 5      # capped
@@ -259,18 +266,18 @@ def test_data_cli_players(tmp_path, monkeypatch, capsys) -> None:
     assert data_cli(["history", "3"]) == 0
     assert data_cli(["history", "1"]) == 1
     out = capsys.readouterr()
-    assert "Cli: 40 tokens" in out.out and "slot 1: (empty)" in out.out and "Slot 1 is empty" in out.err
+    assert "Cli: 1040 chips" in out.out and "slot 1: (empty)" in out.out and "Slot 1 is empty" in out.err
 
 
 def test_pure_helpers_match_the_service(svc) -> None:
     b = default_balance()
     cfg, applied = meta.build_run_config(b, get_mode("chaos"), {"start_money": 1, "start_peek": 2}, ["start_peek"],
                                          seed=9)
-    assert cfg.enable_chaos and cfg.start_money == RunConfig().start_money + 10 and cfg.starting_items == ("peek",)
+    base = get_mode("chaos").apply(RunConfig.from_balance(b)).start_money
+    assert cfg.enable_chaos and cfg.start_money == base + 10 and cfg.starting_items == ("peek",)
     assert applied == {"start_money": 1, "start_peek": 1}
     with pytest.raises(MetaError):
         meta.build_run_config(b, get_mode("normal"), {}, ["start_peek"])
     assert meta.reward_tokens(b, "victory", 3, 100, 400) == [("Victory", b.meta_win_tokens)]
-    assert meta.reward_tokens(b, "victory", 3, 100, 400, chaos=True) == [
-        ("Victory", b.meta_win_tokens), ("Chaos bonus", b.meta_chaos_win_bonus)]
+    assert meta.reward_tokens(b, "victory", 3, 100, 400, chaos=True) == [("Victory", b.meta_win_tokens)]  # bonus off
     assert meta.reward_tokens(b, "defeat", 10, 100, 100) == meta.consolation_tokens(b, 10, 100, 100)

@@ -115,7 +115,7 @@ class GameController:
         from chaos_blackjack import auto_load_plugins
 
         auto_load_plugins()
-        self.config = config or RunConfig()
+        self.config = (config or RunConfig()).resolved()
         from chaos_blackjack.content.loader import load_content_packs
         from chaos_blackjack.content.ai_profile import build_pipeline
 
@@ -747,7 +747,7 @@ class GameController:
                 actions = actions | {Action.REROLL}
         if self.phase == TablePhase.PLAYER_TURN and len(self._st.player_hand) == 2:
             extra = set()
-            if self.config.allow_double and self.run.money >= self.run.current_bet * self._double_multiplier():
+            if self.config.allow_double and self.run.money >= self.run.current_bet * self._double_cover():
                 extra.add(Action.DOUBLE)
             if self.config.allow_surrender:
                 extra.add(Action.SURRENDER)
@@ -779,6 +779,9 @@ class GameController:
 
     def _double_multiplier(self) -> int:
         return self.table.double_multiplier() if self.table is not None else 2
+
+    def _double_cover(self) -> int:
+        return self.table.double_cover() if self.table is not None else 2
 
     def _offer_price(self, offer: ShopOffer) -> int:
         return self.table.offer_price(offer.item, offer.price) if self.table is not None else offer.price
@@ -884,6 +887,9 @@ class GameController:
         if not self.loop.rules.is_bust(pv, self.loop.context()):
             return False
         self._notify(NoticeKind.PLAYER_BUST, "💀 BUST!", {"total": pv})
+        if self.table is not None and self.table.plays_out_bust():
+            self._to_dealer()  # e.g. Bust Insurance: the outcome waits for the dealer
+            return True
         self.state = self._st.with_phase(GamePhase.RESOLVED)
         self._settle()
         return True
@@ -911,6 +917,7 @@ class GameController:
             won = self.table.victory(self.run)
             self.run_end = RunEndResult(kind="victory", message=won) if won else None
         else:
+            delta -= self._cap_at_target()
             self.run_end = self.run_end_policy.check(self.run)
         self.last_result = RoundResult(
             round=self.run.round,
@@ -997,6 +1004,17 @@ class GameController:
         self.state = self._st.with_phase(GamePhase.RESOLVED)
         self._settle("push")
         return True
+
+    def _cap_at_target(self) -> int:
+        """A goal set as a multiple of the start is also the table's ceiling: chips above it are not
+        paid (docs/design/CARRIED_CHIPS.zh-CN.md §4). Returns the chips cut."""
+        over = self.run.money - self.run.target_money
+        if not self.config.target_multiple or self.run.target_money <= 0 or over <= 0:
+            return 0
+        self.run.money = self.run.target_money
+        self._notify(NoticeKind.TABLE_EVENT, f"The table pays up to {self.run.target_money}: "
+                     f"{over} chips of this win are not paid.")
+        return over
 
     def _check_can_bet(self) -> None:
         if self.phase == TablePhase.BETTING and not self.can_bet(self.run.money):

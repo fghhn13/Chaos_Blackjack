@@ -83,7 +83,7 @@ def _preparations(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
     entries = [Entry(x.name, x.description, icon=x.id, badge="This round", frame="consumable") for x in d.preparations]
     if d.forecast:
         note = " The deck has changed since." if d.forecast_changed else ""
-        entries.append(Entry("Fate Forecast", "After the deal: " + " ".join(d.forecast) + "." + note,
+        entries.append(Entry("Fate Forecast", "Your opening cards: " + " ".join(d.forecast) + "." + note,
                              icon="ph_oracle", tone="warn" if d.forecast_changed else ""))
     if d.next_rank:
         entries.append(Entry("Next rank", d.next_rank, icon="ph_peek"))

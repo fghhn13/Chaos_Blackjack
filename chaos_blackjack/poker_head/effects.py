@@ -53,6 +53,7 @@ class Effect:
 
     unlocks_finance = False    # financial products may be stocked and bought
     suppresses_chaos = False   # this round plays without Chaos rules
+    insures_bust = False       # a player bust lets the dealer play; a dealer bust then makes it a push
 
     def __init__(self, ctx: "BuildContext", product_id: str) -> None:
         self.ctx = ctx
@@ -64,6 +65,10 @@ class Effect:
     # --- hand values (player only) ------------------------------------------
     def bust_limit(self, limit: int) -> int:
         return limit
+
+    def card_low(self, card: Card, low: int) -> int:
+        """A card's lowest value; below its high value it switches like an ace (evaluation.BuildRules.actual)."""
+        return low
 
     def card_value(self, card: Card, value: int) -> int:
         return value
@@ -134,7 +139,7 @@ def build_effect(ctx: "BuildContext", product_id: str) -> Effect:
     return EFFECTS.get(product_id, Effect)(ctx, product_id)
 
 
-# --- cores ----------------------------------------------------------------------
+# --- cores (Room to Breathe, Fresh Hand and Private Account here; Exit Clause and Raise Permission below)
 
 
 @effect("ph_margin")
@@ -163,6 +168,31 @@ class HighStakes(Effect):
             s.bonus_pct += self.ctx.setting("double_bonus_pct")
 
 
+@effect("ph_redeal")
+class FreshHand(Effect):
+    """Core: once per round, before your first action, both opening cards go and the next two come in."""
+
+    ACTION = "ph_redeal"
+
+    def table_moves(self):
+        if self.ctx.phase != TablePhase.PLAYER_TURN:
+            return ()
+        reason = ("Used this round." if self.id in self.ctx.round.used
+                  else "Only before your first action." if len(self.ctx.player_hand) != 2
+                  else "" if len(self.ctx.deck) >= 2 else "The deck is running out.")
+        return (Move(self.ACTION, "", "Use Fresh Hand", not reason, reason),)
+
+    def perform(self, action):
+        if action != self.ACTION:
+            return False
+        state = self.ctx.state
+        self.ctx.set_state(state.with_player_hand(tuple(state.deck[:2])).with_deck(state.deck[2:]))
+        self.ctx.round.used.append(self.id)
+        self.ctx.table.deck_changed()
+        self.ctx.message("Fresh Hand: your opening cards were swapped for the next two.")
+        return True
+
+
 @effect("ph_account")
 class PrivateAccount(Effect):
     unlocks_finance = True
@@ -183,8 +213,9 @@ class CardCountReward(Effect):
 
 @effect("ph_court")
 class CourtDiscount(Effect):
-    def card_value(self, card, value):
-        return self.param("value") if str(card.rank).upper() in ("J", "Q", "K") else value
+    # J, Q and K switch like aces: their value, or `value` when that keeps the hand from busting.
+    def card_low(self, card, low):
+        return min(low, self.param("value")) if str(card.rank).upper() in ("J", "Q", "K") else low
 
 
 @effect("ph_mark")
@@ -299,7 +330,7 @@ class RaisePermission(Effect):
     def actions(self, actions):
         hand = self.ctx.player_hand
         if (self.ctx.table.config.allow_double and len(hand) > 2
-                and self.ctx.cash >= self.ctx.bet * self.ctx.table.double_multiplier()):
+                and self.ctx.cash >= self.ctx.bet * self.ctx.table.double_cover()):
             actions.add(Action.DOUBLE)
 
 
@@ -351,6 +382,11 @@ class PriorityExchange(Effect):
 class TemporaryAllowance(Effect):
     def bust_limit(self, limit):
         return limit + self.param("bonus")
+
+
+@effect("ph_insurance")
+class BustInsurance(Effect):
+    insures_bust = True
 
 
 @effect("ph_silence")

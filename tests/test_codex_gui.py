@@ -245,7 +245,7 @@ def test_build_filters_combine_type_and_style_and_show_empty_result(app):
     assert {e.category for e in scene.filtered_entries} == {"core", "permanent", "item"}
     assert all(e.style == "retreat" for e in scene.filtered_entries)
     click(app, scene.category_buttons["permanent"].rect.center)
-    assert {e.id for e in scene.filtered_entries} == {"ph_late_retreat", "ph_loss_discount", "ph_claim", "ph_ace"}
+    assert {e.id for e in scene.filtered_entries} == {"ph_retreat", "ph_loss_discount", "ph_claim", "ph_ace"}
     click(app, scene.category_buttons["finance"].rect.center)
     assert scene.filtered_entries == () and scene.selected_entry is None
     assert not scene.open_detail.enabled
@@ -287,7 +287,7 @@ def test_inline_reference_and_series_preserve_filter_selection_and_scroll(app, m
 def test_related_link_crosses_filters_and_reveals_target(app):
     scene = open_scene(app, section="poker_head")
     scene._filter(category="core", style="exact")
-    assert scene.selected_entry.id == "ph_approx"
+    assert scene.selected_entry.id == "ph_redeal"
     click(app, scene.related_buttons[0].rect.center)
     assert scene.selected_entry.id == "ph_jackpot"
     assert scene.category == scene.style == "all"

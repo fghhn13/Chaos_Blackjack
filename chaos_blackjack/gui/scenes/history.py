@@ -102,7 +102,7 @@ class HistoryScene(MetaScreen):
             text(surface, a, f"Run #{r.id}  /  {(r.result or 'In progress').title()}", (612, 169), size=28,
                  color=theme.GOLD, width=570)
             text(surface, a, r.started_at, (614, 213), size=16, width=566)
-            text(surface, a, f"{mode_name(r.mode)}  /  {r.rounds or 0} rounds  /  {r.tokens_earned or 0} tokens", (614, 246), width=566)
+            text(surface, a, f"{mode_name(r.mode)}  /  {r.rounds or 0} rounds  /  {r.tokens_earned or 0:+d} chips", (614, 246), width=566)
             text(surface, a, f"Final bankroll: {r.final_money if r.final_money is not None else '-'}  /  Peak: {r.peak_money if r.peak_money is not None else '-'}",
                  (614, 280), width=566)
             lines = self.detail_lines()

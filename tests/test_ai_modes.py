@@ -90,7 +90,7 @@ def test_intro_is_a_random_greeting_then_the_goal_and_rules() -> None:
     classic = get_mode("normal")
     beats = intro_script(classic, classic.apply(base), random.Random(1))
     assert beats[:-1] in host_scripts("poker_head", "intro", mode="normal")  # his Classic-table lines
-    assert "Reach 300 chips from 100" in beats[-1].text and "No rule changes" in beats[-1].text
+    assert "Reach 400 chips from 100" in beats[-1].text and "No rule changes" in beats[-1].text
     poker_head = get_mode("chaos")
     seen = {tuple(intro_lines(poker_head, poker_head.apply(base), random.Random(seed))[:-1]) for seed in range(30)}
     assert len(seen) > 1  # different greetings
@@ -180,7 +180,8 @@ def test_mode_upgrades_apply_only_in_their_mode(tmp_path, monkeypatch) -> None:
         assert "'chaos'" in export_seed(conn, "modes")
         owned = {"start_money": 2, "start_peek": 1}
         chaos, applied = build_run_config(b, get_mode("chaos"), owned, ["start_peek"])
-        assert chaos.start_money == b.start_money + 20 and applied == {"start_money": 2, "start_peek": 1}
+        base_chaos = get_mode("chaos").apply(RunConfig.from_balance(b)).start_money
+        assert chaos.start_money == base_chaos + 20 and applied == {"start_money": 2, "start_peek": 1}
         classic, applied = build_run_config(b, get_mode("normal"), owned)
         assert classic.start_money == b.start_money and applied == {}
         with pytest.raises(MetaError, match="only be brought to Poker Head's Table"):

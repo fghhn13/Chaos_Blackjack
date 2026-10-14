@@ -15,9 +15,9 @@
 - **Three front-ends** on one UI-agnostic `GameController`: a Pygame GUI, the original text CLI, and a JSON command interface for agent players.
 - **Plugins**: chaos rules (`rules/plugins/`) and items (`items/`) self-register; prompts (`ai/prompts/*.txt`) and permission profiles (`ai/permissions/*.json`) are data files.
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
-- **Player progression**: three named slots, the Classic Table and dealers' tables (Poker Head's Table), both dealt by Poker Head, token rewards, permanent and mode-specific upgrades, starting consumables, checkpoints and run history.
+- **Player progression**: three named slots, each with a **chip vault** that carries chips between runs; every run brings a stake to the Classic Table (40-100, win at 4x) or Poker Head's Table (400-1000, Full Haul from 4x, ceiling 6x), Poker Head's relief when you are broke, early-bust insurance, membership levels from lifetime spend, checkpoints and run history. (Meta upgrades are off in this version.)
 - **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
-- **Cosmetics and achievements**: decks, tables, chip sets and avatars, bought with tokens or earned through achievements; a player Profile with a wardrobe and live preview. Looks never change the rules.
+- **Cosmetics and achievements**: decks, tables, chip sets and avatars, bought with chips or earned through achievements; a player Profile with a wardrobe, live preview and membership badge. Looks never change the rules.
 - **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
 - **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
 
@@ -91,7 +91,7 @@ Update after editing `environment.yml`: `conda env update -f environment.yml --p
 - **Double down** and **surrender** (half the bet back, rounded in the house's favour) on the first decision only.
 - Dealer draws to 17 and stands on 17+.
 - **Shop** (between rounds): spend bankroll on items. By default it shows 3 different items, each can be bought once, and it restocks every 2 rounds. Prices are a percentage of your bankroll when the stock rolls (rounded half up, minimum 1 chip), and you may **reroll** the stock once per restock for 3 chips. A purchase must leave enough to make a legal bet. Prices, slots and restocking come from the selected balance profile.
-- **Chaos rules** (Poker Head's Table in the GUI, `--chaos` for agents and the CLI): before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules. Winning with Chaos rules on earns 4 extra tokens.
+- **Chaos rules** (Poker Head's Table in the GUI, `--chaos` for agents and the CLI): before each player turn the Chaos AI may apply one rule or leave the round calm — e.g. card values −1, ties go to the dealer, bust above 19, a bust becomes a push. Totals shown always include active rules.
 
 These are the default profile's values; a balance profile, game mode or player
 upgrade can change them. Natural blackjack, double down, surrender and the shop
@@ -111,7 +111,7 @@ elsewhere).
 | `chaos_rule` | on / off, fixed tuning that wins over the AI's params (`params`, e.g. Great Crash `{"ten_value": 1}`, Fragile Bust `{"bust_limit": 18}`), and how often the offline Chaos AI picks it (`stub_weight`, `stub_params`) |
 | `meta_upgrade` | permanent and consumable upgrade effects, prices, cost increases, level limits and prerequisites |
 | `cosmetic_price` | token price of each cosmetic sold in the wardrobe (no row: not sold) |
-| `achievement_reward` | tokens and an optional cosmetic paid by each achievement |
+| `achievement_reward` | chips (column `tokens`) and an optional cosmetic paid by each achievement |
 
 - The `default` profile is generated from `chaos_blackjack/data/seed/default.sql`,
   the single source of truth for shipped values. It is locked and re-imported
@@ -154,9 +154,9 @@ Player slots, owned upgrades, completed/abandoned runs and encountered codex
 entries live in `player`, `player_upgrade`, `run_history` and `codex_seen`;
 owned and equipped cosmetics, lifetime stats and unlocked achievements in
 `player_cosmetic`, `player_loadout`, `player_stat` and `player_achievement`.
-The profile's `meta.*` settings determine victory and consolation rewards.
+The profile's `meta.*` settings hold the vault (`meta.vault_start`), Poker Head's relief, early-bust insurance and the membership levels.
 
-**Meta progression** (player slots, tokens, upgrades, run history) also lives
+**Meta progression** (player slots, the chip vault, run history) also lives
 there; see [docs/design/META_PROGRESSION.md](docs/design/META_PROGRESSION.md).
 Upgrade costs, rewards and the catalog are part of the balance profile
 (`meta.*` settings, `upgrade.<id>.<field>` keys). `python -m chaos_blackjack.data
@@ -229,39 +229,37 @@ The standalone casino audio library and offline validator remain available: `pyt
 
 #### Player progression and collection
 
-The home screen shows the current player (top right: avatar, name and tokens;
+The home screen shows the current player (top right: avatar, name and vault chips;
 click for the Profile) and the next step: **Continue run** with its mode, round and chips when a run is
 unfinished, otherwise **New run**, plus **Shop**, **Collection** and **Run
 history**. **Players** (Profile, then **Switch player**) holds three named slots
-with play, create, rename and confirmed delete actions. **New run** selects the **Classic Table** or **Poker Head's Table** (each with a short description and its goal, bets, rules and dealer listed side by side), shows the
-permanent upgrades in effect and lets you bring one copy of each checked
-consumable; nothing is spent until the run starts. Each mode is hosted by one
+with play, create, rename and confirmed delete actions. **New run** selects the **Classic Table** or **Poker Head's Table** (each with a short description and its goal, bets, rules and dealer listed side by side), and a
+**stake slider**: how many chips to bring from the vault (the goal shown follows
+it), with an optional early-bust insurance toggle; nothing is spent until the
+run starts. A vault too small for Classic gets Poker Head's relief on entry. Each mode is hosted by one
 Chaos AI with its own rule pool, item pool and goal; the host greets you before
 the first bet and comments when the run ends, with random lines and changing
 expressions from `chaos_blackjack/ai/hosts/<host>.json` (Esc skips). Upgrades are shared, but an upgrade can
-be tied to one mode (`upgrade.<id>.mode`). See [AI modes](docs/design/AI_MODES.md). Tokens persist between runs; bankroll belongs to the current run.
+be tied to one mode (`upgrade.<id>.mode`). See [AI modes](docs/design/AI_MODES.md). Chips persist between runs in the vault: a win brings the table's cash home, a defeat (or abandoning) loses the stake.
 
-The **Shop** (formerly Upgrades) is the only place tokens are spent. It has three
-areas, **Upgrades** (permanent), **Cosmetics** and **Starter items**
-(consumables), each split into the Classic Table and the dealers (currently Poker Head; a
-dealer appears in an area only when it has something there). The table's between-round
-shop uses bankroll. Victory earns the profile's win reward; defeat earns capped
-consolation based on rounds and peak bankroll. Abandoning earns no tokens and
-does not return consumed starting items. The result screen settles each run
-once and shows the token breakdown.
+The **Shop** sells looks for chips (the **Upgrades** and **Starter items** areas
+appear only when meta upgrades are on), split into the Classic Table and the
+dealers. The table's between-round shop uses the run's cash. The result screen
+settles each run once and lists the chips: brought home, debt paid, achievement
+rewards, an insurance payout and Poker Head's relief.
 
 Player runs checkpoint at safe table phases. Closing the window preserves the
 last checkpoint for **Continue run**; confirming a return to the main menu
 abandons the run. Replacing an unfinished run also asks for confirmation.
-History shows outcomes, bankroll, tokens, applied upgrades and encounter counts.
+History shows outcomes, bankroll, the vault's change, applied upgrades and encounter counts.
 
 The **Profile** (scene id `profile`) has three tabs. **Overview** shows the
-avatar, tokens and lifetime record. **Wardrobe** switches between the decks,
+avatar, vault, lifetime record and the membership level (badge, lifetime spend and the way to the next level). **Wardrobe** switches between the decks,
 tables, chip sets and avatars you own (looks are bought in the Shop's
 Cosmetics area, and achievement rewards are shown there locked); a small
 table previews the hovered look with the rest of the loadout, and an equipped
 look is drawn everywhere at once. **Achievements** shows progress and rewards; most pay
-tokens, a few give a cosmetic. Runs are evaluated when they settle, and the
+chips, a few give a cosmetic. Runs are evaluated when they settle, and the
 result screen lists new unlocks with an **Equip** button for rewarded looks.
 Cosmetics only change art, never rules or numbers.
 
@@ -271,11 +269,11 @@ backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
 **Page Up/Page Down** scrolls descriptions. Touchscreens can swipe vertically
 inside lists and description panels; releasing a swipe does not select a row.
 Selected content packs appear in
-the collection. Browsing and demonstrations never spend tokens or call a paid model.
+the collection. Browsing and demonstrations never spend chips or call a paid model.
 
-The agent CLI stays independent of player upgrades. Development
+The agent CLI stays independent of the vault and player upgrades. Development
 tools include `python -m chaos_blackjack.data players`, `history SLOT`,
-`grant SLOT TOKENS`, `achievements SLOT`, `cosmetics SLOT` and
+`grant SLOT CHIPS`, `achievements SLOT`, `cosmetics SLOT` and
 `grant-cosmetic SLOT ID`. See [Player GUI guide](docs/META_GUI.md),
 [Meta API contract](docs/design/META_PROGRESSION.md),
 [Cosmetics and achievements](docs/design/COSMETICS_ACHIEVEMENTS.md) and

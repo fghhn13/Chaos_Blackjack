@@ -190,6 +190,7 @@ a neutral default. The controller never uses `getattr` to discover an
 optional hook. Hooks added for the build table: `entered_betting`,
 `before_bet` (a frozen deal), `before_naturals`, `natural_outcome`,
 `settlement`, `entered_player`, `should_chaos`, `double_multiplier`,
+`double_cover` (how many times the bet the cash must cover to offer a double),
 `surrender_refund`, `persistent_rules`, `product` (the catalog row an id
 stands for here, e.g. a starter alias), `purchase` (returns False for "not
 mine"), `use_item` (returns None for "not mine"), `item_usability`,

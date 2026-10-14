@@ -23,7 +23,7 @@ from chaos_blackjack.meta.models import (
     RunReward, RunStart, Unlock, UpgradeOffer,
 )
 from chaos_blackjack.meta.service import (
-    LoopFactory, MetaService, ModeOption, build_run_config, consolation_tokens, reward_tokens,
+    LoopFactory, MetaService, ModeOption, build_run_config, consolation_tokens, insurance_terms, reward_tokens,
 )
 
 _service: MetaService | None = None
@@ -75,9 +75,25 @@ def modes(player_id: int | None = None) -> list[ModeOption]:
 
 
 def start_run(player_id: int, mode_id: str, *, consumables: Iterable[str] = (), profile: str | None = None,
-              seed: int | None = None, loop_factory: LoopFactory | None = None) -> RunStart:
+              seed: int | None = None, loop_factory: LoopFactory | None = None, stake: int | None = None,
+              insure: bool = False) -> RunStart:
     return service().start_run(player_id, mode_id, consumables=consumables, profile=profile, seed=seed,
-                               loop_factory=loop_factory)
+                               loop_factory=loop_factory, stake=stake, insure=insure)
+
+
+def stake_range(mode_id: str, profile: str | None = None) -> tuple[int, int] | None:
+    """(min, max) chips a run of this mode brings from the vault; None = a free table."""
+    return service().stake_range(mode_id, profile)
+
+
+def membership(player_id: int, profile: str | None = None):
+    """The player's membership level (meta/membership.py) from their lifetime spend."""
+    return service().membership(player_id, profile)
+
+
+def claim_relief(player_id: int, profile: str | None = None) -> int:
+    """Poker Head's relief when the vault cannot cover Classic's minimum stake (0 if not needed)."""
+    return service().claim_relief(player_id, profile)
 
 
 def pending_run(player_id: int) -> PendingRun | None:
@@ -139,5 +155,5 @@ __all__ = [
     "codex_seen", "equip", "loadout", "player_stats", "reward_tokens", "wardrobe",
     "consolation_tokens", "create_player", "delete_player", "effect_ids", "finish_run", "get_effect",
     "get_player", "history", "list_slots", "meta_shop", "modes", "pending_run", "register_effect", "rename_player",
-    "resume_run", "service", "start_run", "use_service",
+    "resume_run", "service", "start_run", "use_service", "stake_range", "claim_relief", "insurance_terms", "membership",
 ]

@@ -1,5 +1,6 @@
-"""Run setup: choose a mode, review the upgrades in effect, pick items to bring,
-then confirm. Nothing is spent until the run actually starts.
+"""Run setup: choose a mode and how many chips to bring from the vault (a slider), review the upgrades in
+effect and pick items to bring when meta upgrades are on, then confirm. Nothing is spent until the run
+actually starts. A vault too small for Classic gets Poker Head's relief on entry.
 
 The mode and item lists scroll, so new modes, challenges and consumables fit
 without a new layout. Choices are remembered per player for this session.
@@ -8,7 +9,7 @@ without a new layout. Choices are remembered per player for this session.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import pygame
 
@@ -23,12 +24,14 @@ from chaos_blackjack.gui.components.lobby import (
 from chaos_blackjack.gui.components.meta_run import run_loop_factory
 from chaos_blackjack.gui.components.meta_screen import MetaScreen
 from chaos_blackjack.gui.scene import register_scene
-from chaos_blackjack.gui.widgets import Button, ScrollColumn, WidgetGroup, fit_text
+from chaos_blackjack.gui.widgets import Button, ScrollColumn, Slider, Toggle, WidgetGroup, fit_text
 
 MODES = pygame.Rect(MARGIN, 162, 300, 420)
 SHOWCASE = pygame.Rect(394, 140, 452, 468)
 RIGHT_X, RIGHT_W = 878, 338
 ITEMS_TOP = 372
+STAKE_SLIDER = pygame.Rect(RIGHT_X, 232, RIGHT_W, 36)
+INSURE = pygame.Rect(RIGHT_X, 440, RIGHT_W, 46)
 
 # Plain-English names for config values an upgrade or mode can change.
 CONFIG_LABELS = {
@@ -78,15 +81,26 @@ def upgrade_effects(base: RunConfig, upgraded: RunConfig) -> list[str]:
 @register_scene("run_setup")
 class RunSetupScene(MetaScreen):
     title = "New run"
-    subtitle = "Choose your table, check your edge, pack your pockets."
+    @property
+    def subtitle(self):
+        if self.app.balance.meta_upgrades_enabled:
+            return "Choose your table, check your edge, pack your pockets."
+        return "Choose your table and take your seat."
+
+    relief_note = ""
+    insure_toggle = None
 
     def on_enter(self, player_id, **params):
         self.setup()
         self.player_id = player_id
         self.starting = False
         memory = self.app.session.setdefault("setup", {}).setdefault(player_id, {"mode": "", "bring": set()})
+        memory.setdefault("stakes", {})
+        memory.setdefault("insure", {})
         self.memory = memory
+        relief = self.action(lambda: meta.claim_relief(player_id, self.profile)) or 0
         self.player = self.action(lambda: meta.get_player(player_id))
+        self.relief_note = f"Poker Head slid {relief} chips across the table." if relief else ""
         if self.player is None:
             self.ui = WidgetGroup(back_button(self.app.assets, self.app.scenes.pop), keyboard=True)
             self.options, self.offers, self.consumables, self.permanents = [], [], [], []
@@ -146,6 +160,21 @@ class RunSetupScene(MetaScreen):
                             check=False, tooltip=offer.description)
             self.item_rows[offer.upgrade_id] = items.add(row)
         self.ui.add(items)
+        self.stake_slider = None
+        bounds = self.stake_bounds
+        if bounds is not None:
+            lo, hi = bounds
+            self.stake_slider = Slider(a, STAKE_SLIDER, lo, max(lo, hi), self.stake, self.set_stake,
+                                       step=5 if hi - lo <= 200 else 10, enabled=hi > lo,
+                                       chaos=self.mode_id == "chaos")
+            self.stake_slider.visible = hi >= lo   # a vault too small for this table shows why instead
+            self.ui.add(self.stake_slider)
+            self.insure_toggle = Toggle(a, INSURE, self.insure_label, self.insured, self.set_insured,
+                                        style="ghost", font_size=theme.FONT_SMALL, key_hint="")
+            self.insure_toggle.visible = hi >= lo
+            self.ui.add(self.insure_toggle)
+        else:
+            self.insure_toggle = None
         self.start_button = Button(a, (946, 640, 270, 54), "Start run", self.start, hotkey=pygame.K_RETURN)
         self.ui.add(self.start_button)
         self.ui.add(back_button(a, self.app.scenes.pop))
@@ -164,7 +193,71 @@ class RunSetupScene(MetaScreen):
             row.enabled = row.check or not full
         chaos = self.mode_id == "chaos"
         self.start_button.style = "chaos" if chaos else "primary"
-        self.start_button.enabled = bool(self.mode_id) and not self.starting
+        bounds = self.stake_bounds
+        affordable = bounds is None or bounds[1] >= bounds[0]
+        self.start_button.enabled = bool(self.mode_id) and not self.starting and affordable
+        if self.insure_toggle is not None:
+            premium = self.insurance()[0]
+            can = affordable and self.player.chips >= self.stake + premium
+            if not can:
+                self.memory["insure"][self.mode_id] = False
+            self.insure_toggle.enabled = can
+            self.insure_toggle.value = self.insured
+            self.insure_toggle.text = self.insure_label(self.insured)
+            self.insure_toggle.selected = self.insured
+
+    # ---------------------------------------------------------------- stake
+
+    @property
+    def table_range(self) -> tuple[int, int] | None:
+        """The table's (min, max) stake; None = a free table."""
+        return meta.stake_range(self.mode_id, self.profile) if self.mode_id else None
+
+    @property
+    def stake_bounds(self) -> tuple[int, int] | None:
+        """(min, the most this vault may bring); max < min when the vault is too small."""
+        table = self.table_range
+        if table is None or self.player is None:
+            return None
+        return table[0], min(table[1], self.player.chips)
+
+    @property
+    def stake(self) -> int:
+        bounds = self.stake_bounds
+        if bounds is None:
+            return 0
+        lo, hi = bounds
+        return max(lo, min(max(lo, hi), self.memory["stakes"].get(self.mode_id, lo)))
+
+    def set_stake(self, value: int) -> None:
+        self.memory["stakes"][self.mode_id] = value
+        self.sync()   # the premium follows the stake
+
+    def insurance(self) -> tuple[int, int]:
+        """(premium, refund) of early-bust insurance for the chosen stake."""
+        return meta.insurance_terms(self.app.balance, self.stake)
+
+    @property
+    def insured(self) -> bool:
+        return bool(self.memory["insure"].get(self.mode_id, False))
+
+    def set_insured(self, value: bool) -> None:
+        self.memory["insure"][self.mode_id] = value
+        self.sync()
+
+    def insure_label(self, value: bool) -> str:
+        premium = self.insurance()[0]
+        return f"Insured  ·  {premium} chips" if value else f"Insure this run  ·  {premium} chips"
+
+    def stake_goal(self, stake: int) -> str:
+        """What this stake plays for at the selected table."""
+        mode = self.mode
+        if mode is None:
+            return ""
+        cfg = replace(mode.apply(RunConfig.from_balance(self.app.balance)), start_money=stake).resolved()
+        if cfg.exit_money:
+            return f"Full Haul from {cfg.exit_money}; Poker Head stops playing at {cfg.target_money}."
+        return f"Turn them into {cfg.target_money} chips to win." if cfg.target_money else ""
 
     def item_icon(self, upgrade_id: str) -> str:
         u = next((u for u in self.app.balance.meta_upgrades if u.upgrade_id == upgrade_id), None)
@@ -176,9 +269,9 @@ class RunSetupScene(MetaScreen):
         if any(o.mode.id == mode_id and o.unlocked for o in self.options):
             changed = mode_id != self.memory["mode"]
             self.memory["mode"] = mode_id
-            if changed and any(o.mode for o in self.offers):
+            if changed:
                 self.filter_offers()  # mode-specific upgrades come and go with the mode
-                self.build()
+                self.build()          # and each table has its own stake slider
             else:
                 self.sync()
 
@@ -230,7 +323,9 @@ class RunSetupScene(MetaScreen):
         self.message = ""
         try:
             started = meta.start_run(self.player_id, self.mode_id, consumables=sorted(self.selected),
-                                     profile=self.profile, loop_factory=run_loop_factory(self.app))
+                                     profile=self.profile, loop_factory=run_loop_factory(self.app),
+                                     stake=self.stake if self.stake_bounds is not None else None,
+                                     insure=self.insured and self.stake_bounds is not None)
         except (ValueError, sqlite3.Error, OSError) as exc:
             started = None
             self.message = str(exc)
@@ -260,13 +355,13 @@ class RunSetupScene(MetaScreen):
             return
         draw_section(surface, a, "Table", (MODES.x, 136), MODES.w)
         self.draw_showcase(surface)
-        y = draw_section(surface, a, "Upgrades in effect", (RIGHT_X, 136), RIGHT_W)
-        self.draw_upgrades(surface, y)
-        y = draw_section(surface, a, f"Bring items  ({len(self.selected)}/{self.bring_limit} kinds)",
-                         (RIGHT_X, ITEMS_TOP - 30), RIGHT_W)
-        if not self.consumables:
-            draw_paragraph(surface, a, "Your bag is empty. Consumables bought in the Shop show up here.",
-                           (RIGHT_X, ITEMS_TOP, RIGHT_W, 80))
+        self.draw_stake(surface)
+        if self.app.balance.meta_upgrades_enabled:
+            y = draw_section(surface, a, f"Bring items  ({len(self.selected)}/{self.bring_limit} kinds)",
+                             (RIGHT_X, ITEMS_TOP - 30), RIGHT_W)
+            if not self.consumables:
+                draw_paragraph(surface, a, "Your bag is empty. Consumables bought in the Shop show up here.",
+                               (RIGHT_X, ITEMS_TOP, RIGHT_W, 80))
         self.ui.draw(surface)
         note = "One copy of each checked item is used when the run starts." if self.consumables else ""
         if self.pending is not None:
@@ -277,6 +372,39 @@ class RunSetupScene(MetaScreen):
         hint = a.font(theme.FONT_TINY).render("Up / Down / Tab to move  ·  Space to choose  ·  Enter to start", True,
                                               theme.TEXT_MUTED)
         surface.blit(hint, hint.get_rect(midleft=(300, 667)))
+
+    def draw_stake(self, surface):
+        """The vault, the stake slider and what the stake plays for."""
+        a = self.app.assets
+        y = draw_section(surface, a, "Your stake", (RIGHT_X, 136), RIGHT_W)
+        small, big = a.font(theme.FONT_SMALL), a.font(theme.FONT_HEADING, role="display")
+        vault = small.render(f"Vault  {self.player.chips} chips", True, theme.TEXT_MUTED)
+        surface.blit(vault, (RIGHT_X, y))
+        if self.relief_note:
+            note = small.render(self.relief_note, True, theme.CHAOS_MAGENTA)
+            surface.blit(note, (RIGHT_X, y + 24))
+        bounds = self.stake_bounds
+        if bounds is None:
+            draw_paragraph(surface, a, "This table is free: nothing leaves your vault.", (RIGHT_X, y + 40, RIGHT_W, 60))
+            return
+        lo, hi = bounds
+        table_lo, table_hi = self.table_range
+        if hi < lo:
+            draw_paragraph(surface, a, f"This table needs at least {lo} chips. Win at the Classic Table to get there.",
+                           (RIGHT_X, y + 56, RIGHT_W, 60), color=theme.CHAOS_MAGENTA)
+            return
+        ends = small.render(f"{lo}", True, theme.TEXT_MUTED)
+        surface.blit(ends, ends.get_rect(topleft=(STAKE_SLIDER.x, STAKE_SLIDER.bottom + 2)))
+        top = small.render(f"{hi}" + ("" if hi == table_hi else "  (your vault)"), True, theme.TEXT_MUTED)
+        surface.blit(top, top.get_rect(topright=(STAKE_SLIDER.right, STAKE_SLIDER.bottom + 2)))
+        chaos = self.mode_id == "chaos"
+        amount = big.render(f"Bring {self.stake}", True, theme.CHAOS_MAGENTA if chaos else theme.GOLD)
+        surface.blit(amount, (RIGHT_X, STAKE_SLIDER.bottom + 30))
+        draw_paragraph(surface, a, self.stake_goal(self.stake) + f" The table takes {table_lo}-{table_hi}.",
+                       (RIGHT_X, STAKE_SLIDER.bottom + 80, RIGHT_W, 70))
+        rounds = self.app.balance.meta_insurance_rounds
+        draw_paragraph(surface, a, f"Lose within {rounds} rounds and {self.insurance()[1]} chips come back.",
+                       (RIGHT_X, INSURE.bottom + 8, RIGHT_W, 44), size=theme.FONT_TINY + 1)
 
     def draw_showcase(self, surface):
         a, r = self.app.assets, SHOWCASE
@@ -318,6 +446,8 @@ class RunSetupScene(MetaScreen):
         if preview is None:
             return []
         cfg = preview[1]
+        if self.stake_bounds is not None and self.stake_bounds[1] >= self.stake_bounds[0]:
+            cfg = replace(cfg, start_money=self.stake).resolved()   # the goal follows the chosen stake
         num, den = cfg.blackjack_pays
         if cfg.enable_chaos:
             pool = [r for r, _, w in cfg.chaos_stub if r and w > 0]
