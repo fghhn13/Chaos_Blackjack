@@ -2,7 +2,7 @@
   "status": "Approved and exported",
   "approval": "User requested the written art specification and adoption of the recommended selections.",
   "date": "2026-10-13",
-  "count": 41,
+  "count": 43,
   "api_count": 36,
   "original_svg_count": 5,
   "size": [
@@ -40,7 +40,7 @@
       "id": "ph_retreat",
       "design_key": "capital_preservation",
       "name": "Graceful Retreat",
-      "category": "core",
+      "category": "permanent",
       "build": "surrender",
       "file": "ph_retreat.png",
       "size": [
@@ -62,7 +62,7 @@
       "id": "ph_approx",
       "design_key": "near_perfect",
       "name": "Almost Perfect",
-      "category": "core",
+      "category": "permanent",
       "build": "precision",
       "file": "ph_approx.png",
       "size": [
@@ -84,7 +84,7 @@
       "id": "ph_stakes",
       "design_key": "high_stakes_privilege",
       "name": "High Stakes",
-      "category": "core",
+      "category": "permanent",
       "build": "double",
       "file": "ph_stakes.png",
       "size": [
@@ -216,7 +216,7 @@
       "id": "ph_late_retreat",
       "design_key": "delayed_exit",
       "name": "Exit Clause",
-      "category": "permanent",
+      "category": "core",
       "build": "surrender",
       "file": "ph_late_retreat.png",
       "size": [
@@ -369,7 +369,7 @@
       "id": "ph_late_double",
       "design_key": "additional_bet_right",
       "name": "Raise Permission",
-      "category": "permanent",
+      "category": "core",
       "build": "double",
       "file": "ph_late_double.png",
       "size": [
@@ -910,6 +910,42 @@
       "export_source": "black-jack-assets/exports/poker-head-approved-sources-v1/ph_loan_512.png",
       "sha256": "36d149659ea4b11424931259bf386238044d320fd807919de742c066cc087d4e",
       "bytes": 25688
+    },
+    {
+      "id": "ph_redeal",
+      "design_key": "fresh_hand",
+      "name": "Fresh Hand",
+      "category": "core",
+      "build": "precision",
+      "file": "ph_redeal.png",
+      "size": [
+        256,
+        256
+      ],
+      "color": "#B7A477",
+      "provider": "code-drawn placeholder",
+      "license": "Original (project)",
+      "status": "Placeholder pending art approval (2026-10-14): two cards and a swap loop, drawn with PIL.",
+      "sha256": "49dd8e1450f59ec0cfa4c8a94e460ed789ce6447ea017458482a62ec0669f160",
+      "bytes": 24449
+    },
+    {
+      "id": "ph_insurance",
+      "design_key": "bust_insurance",
+      "name": "Bust Insurance",
+      "category": "consumable",
+      "build": "common",
+      "file": "ph_insurance.png",
+      "size": [
+        256,
+        256
+      ],
+      "color": "#B7A477",
+      "provider": "code-drawn placeholder",
+      "license": "Original (project)",
+      "status": "Placeholder pending art approval (2026-10-14): a card behind a checked shield, drawn with PIL.",
+      "sha256": "717590a6af39856120d250b15d2341efaacaca18ce4be8f74ad898ede3c84b45",
+      "bytes": 21022
     }
   ]
 }
