@@ -43,6 +43,7 @@ def main() -> None:
     from chaos_blackjack.audio.catalog import validate_assets
     from chaos_blackjack.codex import codex_entries, run_demo
     from chaos_blackjack.data import connect
+    from chaos_blackjack.data.balance import load_balance
 
     if args.installed:
         source = Path(chaos_blackjack.__file__).resolve()
@@ -69,8 +70,17 @@ def main() -> None:
     try:
         player = meta.create_player(1, "CI player")
         service.grant_tokens(player.id, 100)
-        player = meta.buy_upgrade(player.id, "start_money")
-        assert player.upgrades["start_money"] == 1
+        # Builds that ship with meta upgrades off sell none (meta.upgrades_enabled = 0).
+        if getattr(load_balance(conn=db), "meta_upgrades_enabled", True):
+            player = meta.buy_upgrade(player.id, "start_money")
+            assert player.upgrades["start_money"] == 1
+        else:
+            try:
+                meta.buy_upgrade(player.id, "start_money")
+            except meta.MetaError:
+                pass
+            else:
+                raise AssertionError("A meta upgrade was sold while upgrades are off")
         started = meta.start_run(player.id, "normal", seed=7)
         controller = started.controller
         controller.save("ci-checkpoint")
