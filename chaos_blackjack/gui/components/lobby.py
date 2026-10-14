@@ -256,7 +256,7 @@ class PlayerBadge(Button):
     def __init__(self, assets, player: meta.Player, on_click, *, right: int = W - MARGIN, top: int = 30) -> None:
         name_font = assets.font(theme.FONT_BODY, bold=True)
         name = fit_text(name_font, player.name, 230)
-        tokens = f"{player.tokens} tokens"
+        tokens = f"{player.tokens} chips"
         width = name_font.size(name)[0] + assets.font(theme.FONT_SMALL).size(tokens)[0] + 100
         super().__init__(assets, (right - width, top, width, 46), name, on_click, key_hint="")
         self.tokens = tokens

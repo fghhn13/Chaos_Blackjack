@@ -30,10 +30,12 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from fractions import Fraction
 from typing import Any, Iterable
 
 from chaos_blackjack.poker_head import environment as env
+from chaos_blackjack.poker_head.money import chips
 from chaos_blackjack.poker_head.environment import NUMBER_RANKS, RANKS, CardGroup, EnvRule, ranks
 
 COURT = ("J", "Q", "K")
@@ -48,7 +50,8 @@ HIGH_PRESSURE = 3
 
 DEFAULTS: dict[str, Any] = {
     # [first round, action chance, rule slots, pressure budget]
-    "stages": [[1, 0.60, 1, 2], [4, 0.75, 2, 4], [7, 0.85, 3, 7], [10, 0.95, 3, 8]],
+    # Softened 2026-10-14 after playtests: later stages, fewer actions, smaller budgets.
+    "stages": [[1, 0.40, 1, 1], [5, 0.60, 2, 3], [9, 0.75, 2, 5], [13, 0.85, 3, 6]],
     "weights": {"shift": [45, 35, 25, 20], "fixed": [35, 20, 15, 10], "bust": [0, 10, 15, 15],
                 "tie": [0, 10, 10, 10], "bust_outcome": [0, 0, 10, 15], "profit_cap": [0, 0, 10, 15],
                 "item_ban": [0, 5, 5, 5], "markup": [20, 10, 5, 5], "hidden": [0, 10, 5, 5]},
@@ -97,7 +100,8 @@ class Action:
 
 
 class Director:
-    def __init__(self, settings: dict[str, Any], seed: int | str, rule_slots: int = 3) -> None:
+    def __init__(self, settings: dict[str, Any], seed: int | str, rule_slots: int = 3,
+                 money: Fraction = Fraction(1)) -> None:
         def get(key):
             value = settings.get("director." + key, DEFAULTS[key])
             return json.loads(value) if isinstance(value, str) else value
@@ -109,6 +113,7 @@ class Director:
                           "replaced": int(get("cooldown_replaced"))}
         self.seed = seed
         self.rule_slots = rule_slots
+        self.money = money  # Withdrawal Limit caps are chips: they scale with the starting cash (money.py)
 
     # --- stages and pressure ------------------------------------------------------------------
     def stage(self, round_no: int) -> Stage:
@@ -131,7 +136,7 @@ class Director:
         if rule.type == "bust":
             return int(table["bust"][f"{p['actor']}:{p['limit']}"])
         if rule.type == "profit_cap":
-            return int(table["profit_cap"][str(p["cap"])])
+            return int(table["profit_cap"][str(p.get("ref", p["cap"]))])
         if rule.type == "item_ban":
             return int(table["item_ban"][str(rule.duration)])
         if rule.type == "markup":
@@ -146,8 +151,15 @@ class Director:
         for kind, spec in pool.items():
             if not self.weights.get(kind, [0] * 4)[stage.index]:
                 continue
-            out[kind] = list(_make(kind, spec))
+            out[kind] = [self._scaled(r) for r in _make(kind, spec)]
         return {k: v for k, v in out.items() if v}
+
+    def _scaled(self, rule: EnvRule) -> EnvRule:
+        """A Withdrawal Limit's cap in this run's chips; `ref` keeps the profile's amount (pressure key)."""
+        if rule.type != "profit_cap" or self.money == 1:
+            return rule
+        cap = rule.profit_cap
+        return replace(rule, params={"cap": chips(cap, self.money), "ref": cap})
 
     # --- decisions ------------------------------------------------------------------------------
     def decide(self, round_no: int, rules: list[EnvRule], history: list[dict]) -> Action:

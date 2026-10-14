@@ -235,6 +235,14 @@ class TableMechanics:
         """How many times the bet a double stakes."""
         return 2
 
+    def plays_out_bust(self) -> bool:
+        """A player bust waits for the dealer to play (the outcome then decides) instead of settling at once."""
+        return False
+
+    def double_cover(self) -> int:
+        """How many times the bet the bankroll must cover for a double to be offered."""
+        return self.double_multiplier()
+
     def surrender_refund(self, bet: int) -> int:
         """Chips returned on surrender."""
         return bet // 2

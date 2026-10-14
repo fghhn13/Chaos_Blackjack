@@ -82,14 +82,13 @@ class AmendmentLetter(ItemHandler):
 
     def targets(self, holding):
         current = self.ctx.table.loadout.core
-        return tuple(ChoiceOption(c, PRODUCTS[c].name, PRODUCTS[c].description)
-                     for c in holding.choices if c != current)
+        return tuple(self.ctx.table.core_option(c) for c in holding.choices if c != current)
 
     def prompt(self):
         return "Choose your new core. Your permanents, items and contracts stay."
 
     def apply(self, holding, target):
-        self.ctx.table.set_core(target)
+        self.ctx.table.choose_core(target)
         return f"Core changed to {PRODUCTS[target].name}."
 
 
@@ -136,7 +135,7 @@ class FateForecast(ItemHandler):
         cards = self.ctx.table.forecast_cards()
         self.ctx.round.forecast = [f"{c.rank}{c.suit}" for c in cards]
         self.ctx.round.forecast_changed = False
-        return "Fate Forecast: after the deal, the next cards are " + " ".join(self.ctx.round.forecast) + "."
+        return "Fate Forecast: your opening cards will be " + " ".join(self.ctx.round.forecast) + "."
 
 
 # --- changing cards -----------------------------------------------------------------------
@@ -160,16 +159,16 @@ class AcesToTheTop(ItemHandler):
         ranks = [str(c.rank).upper() for c in self.ctx.deck]
         if "A" not in ranks:
             return unusable("No ace is left in the deck.")
-        if ranks == sorted(ranks, key=lambda r: r != "A"):
-            return unusable("Every ace is already on top.")
+        if ranks[0] == "A":
+            return unusable("The next card is already an ace.")
         return USABLE
 
     def apply(self, holding, target):
-        state = self.ctx.state
-        aces = tuple(c for c in state.deck if str(c.rank).upper() == "A")
-        self.ctx.set_state(state.with_deck(aces + tuple(c for c in state.deck if str(c.rank).upper() != "A")))
+        deck = self.ctx.state.deck
+        i = next(i for i, c in enumerate(deck) if str(c.rank).upper() == "A")
+        self.ctx.set_state(self.ctx.state.with_deck((deck[i],) + deck[:i] + deck[i + 1:]))
         self.ctx.table.deck_changed()
-        return f"Aces to the Top: {len(aces)} ace{'s' if len(aces) != 1 else ''} moved to the top."
+        return "Aces to the Top: the next card is an ace."
 
 
 @handler("ph_undo")
@@ -233,11 +232,15 @@ class FourfoldTicket(Preparation):
         prepared = super().usability(holding)
         if not prepared or self.ctx.betting:
             return prepared
-        if not self.ctx.can(Action.DOUBLE):
-            return unusable("You cannot double now.")
-        if self.ctx.cash < self.ctx.bet * self.ctx.param(self.id, "multiplier"):
-            return unusable("Not enough chips to cover a fourfold bet.")
-        return USABLE
+        # Only a plain double must be covered; a fourfold loss beyond the cash becomes debt.
+        return USABLE if self.ctx.can(Action.DOUBLE) else unusable("You cannot double now.")
+
+
+@handler("ph_insurance")
+class BustInsurance(Preparation):
+    def apply(self, holding, target):
+        self.ctx.prepare(self.id)
+        return "Bust Insurance: if you bust this round, the dealer still plays; a dealer bust makes it a push."
 
 
 @handler("ph_waiver")

@@ -36,7 +36,11 @@ def svc(monkeypatch):
     meta.use_service(None)
 
 
-def test_every_look_is_unlocked_by_the_shipped_profile():
+def test_the_unlock_all_switch_lends_every_look_without_storing_it(monkeypatch):
+    from chaos_blackjack.data.balance import default_balance
+
+    assert not default_balance().meta_unlock_all_cosmetics      # shipped: looks are bought or earned
+    monkeypatch.setattr(MetaService, "_all_looks", classmethod(lambda cls, db, profile=None: True))
     s = install_fake(demo=False)
     try:
         p = s.create_player(1, "All")
@@ -56,7 +60,7 @@ def _cards(*ranks: str) -> tuple[Card, ...]:
 
 def _win_run(svc: MetaService, player_id: int):
     """Start a Classic run and win it in one rigged hand."""
-    run = meta.start_run(player_id, "normal", seed=1)
+    run = meta.start_run(player_id, "normal", seed=1, stake=100)
     c = run.controller
     c.run.money = 300
     c.place_bet(150)
@@ -143,8 +147,9 @@ def test_defaults_are_owned_and_equipped(svc) -> None:
 
 def test_buying_and_equipping(svc) -> None:
     p = meta.create_player(1, "A")
+    svc.grant_tokens(p.id, -1000)
     offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "deck")}["card_back_crimson"]
-    assert (offer.price, offer.can_buy, offer.reason, offer.unlock_hint) == (40, False, "Needs 40 tokens", "40 tokens")
+    assert (offer.price, offer.can_buy, offer.reason, offer.unlock_hint) == (40, False, "Needs 40 chips", "40 chips")
     with pytest.raises(MetaError, match="Needs 40"):
         meta.buy_cosmetic(p.id, "card_back_crimson")
     with pytest.raises(MetaError, match="do not own"):
@@ -207,7 +212,7 @@ def test_prices_come_from_the_balance_profile(svc, tmp_path, monkeypatch) -> Non
     s.grant_tokens(p.id, 5)
     offers = {o.cosmetic.id: o for o in s.wardrobe(p.id, profile="cheap")}
     assert offers["table_midnight"].can_buy and offers["chips_neon"].price is None
-    assert s.buy_cosmetic(p.id, "table_midnight", profile="cheap").tokens == 0
+    assert s.buy_cosmetic(p.id, "table_midnight", profile="cheap").tokens == 1000
     conn.close()
 
 
@@ -217,9 +222,9 @@ def test_prices_come_from_the_balance_profile(svc, tmp_path, monkeypatch) -> Non
 def test_victory_unlocks_once_and_pays_rewards(svc) -> None:
     p = meta.create_player(1, "W")
     run, reward = _win_run(svc, p.id)
-    assert {u.achievement_id for u in reward.unlocked} == {"first_win", "bare_hands"}
-    assert ("Achievement: First Win", 10) in reward.breakdown
-    assert reward.tokens == sum(t for _, t in reward.breakdown) == reward.player.tokens
+    assert {u.achievement_id for u in reward.unlocked} == {"first_win", "bare_hands", "to_the_brim"}
+    assert ("Achievement: First Win", 100) in reward.breakdown
+    assert reward.tokens == sum(t for _, t in reward.breakdown) and reward.player.tokens == 900 + reward.tokens
     # run_history keeps the run's own tokens; achievement tokens are paid on top.
     assert meta.history(p.id)[0].tokens_earned == reward.tokens - sum(u.tokens for u in reward.unlocked)
     states = {s.achievement.id: s for s in meta.achievements(p.id)}
@@ -227,7 +232,7 @@ def test_victory_unlocks_once_and_pays_rewards(svc) -> None:
     assert not states["regular"].unlocked and (states["regular"].progress, states["regular"].goal) == (1, 10)
     # A second win does not unlock or pay them again.
     _, again = _win_run(svc, p.id)
-    assert again.unlocked == () and again.tokens == 10
+    assert again.unlocked == () and again.tokens == 400   # only the cash brought home
     assert meta.player_stats(p.id)["victories_normal"] == 2
 
 
@@ -268,7 +273,7 @@ def test_backfill_builds_stats_from_old_history_once(svc) -> None:
     totals = meta.player_stats(p.id)
     assert totals["runs"] == 1 and totals["surrenders"] == 30   # abandoned runs count for nothing
     player = meta.get_player(p.id)
-    assert player.tokens == 10 + 10 + 5
+    assert player.tokens == 1000 + 100 + 300 + 50   # First Win, Poker Face, White Flag
     assert {o.cosmetic.id for o in meta.wardrobe(p.id) if o.owned} >= {"deck_poker_head", "table_poker_head", "avatar_joker"}
     meta.achievements(p.id)
     assert meta.get_player(p.id).tokens == player.tokens   # no second payout

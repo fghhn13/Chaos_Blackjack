@@ -31,8 +31,11 @@ def app(tmp_path):
 
 
 def _controller() -> GameController:
+    # The dialogs at the reference scale: 100 chips, amounts as written for 100, two slots, free cores.
     cfg = get_mode("chaos").apply(RunConfig.from_balance(default_balance(), seed=7, use_llm=False))
-    return GameController(replace(cfg, enable_chaos=False), save_fn=lambda d, n: n)
+    settings = {**cfg.mode_settings, "chaos.money_base": 100, "chaos.build_slots": 2, "chaos.core_cash": "{}"}
+    return GameController(replace(cfg, enable_chaos=False, start_money=100, target_money=500, target_multiple=0.0,
+                                  exit_multiple=0.0, mode_settings=settings), save_fn=lambda d, n: n)
 
 
 def _frame(app) -> None:

@@ -1,4 +1,4 @@
-"""Poker Head's 41 build products, declared once (docs/design/POKER_HEAD_EFFECTS.zh-CN.md).
+"""Poker Head's 43 build products, declared once (docs/design/POKER_HEAD_EFFECTS.zh-CN.md).
 
 Each row is (key, English name, kind, style, effect text[, phases]); phases
 are "B" (before betting) and "P" (on your turn) for consumables. Prices and
@@ -39,23 +39,26 @@ SYSTEM = ("ph_gift", "ph_change")
 _TARGETS = {"ph_gift": "core", "ph_change": "core", "ph_remove": "rule", "ph_buyback": "holding"}
 
 _ROWS = (
-    ("margin", "Room to Breathe", "core", "long", "Raise your bust limit by one."),
-    ("retreat", "Graceful Retreat", "core", "retreat", "Surrender loses only 20% of your bet."),
-    ("approx", "Almost Perfect", "core", "exact", "After natural settlement, your 20 and 22 count as 21."),
-    ("stakes", "High Stakes", "core", "double", "A doubled win earns another 25% of the final bet."),
+    # Cores change what you can do (docs/design/POKER_HEAD_BUILDS.zh-CN.md); permanents amplify results.
+    ("margin", "Room to Breathe", "core", "long", "Raise your bust limit by two."),
+    ("late_retreat", "Exit Clause", "core", "retreat", "You may surrender after hitting, before busting."),
+    ("redeal", "Fresh Hand", "core", "exact",
+     "Once per round, before your first action, swap both opening cards for the next two in the deck."),
+    ("late_double", "Raise Permission", "core", "double", "You may double after hitting."),
     ("account", "Private Account", "core", "finance", "An extra shop slot and access to financial products."),
     ("long_reward", "Long Hand Dividend", "permanent", "long", "Win with four or more cards for another 20% of the bet."),
-    ("court", "Court Discount", "permanent", "long", "Your J, Q and K count as five."),
+    ("court", "Court Discount", "permanent", "long", "Your J, Q and K count as 10 or 5, whichever is better."),
     ("five_reward", "Five Card Feast", "permanent", "long", "Win with five or more cards for another full bet."),
     ("mark", "Sleeve Mark", "permanent", "long", "See the next rank when your turn begins."),
-    ("late_retreat", "Exit Clause", "permanent", "retreat", "You may surrender after hitting, before busting."),
+    ("retreat", "Graceful Retreat", "permanent", "retreat", "Surrender loses only 20% of your bet."),
     ("loss_discount", "Retreat Discount", "permanent", "retreat", "Surrender loses ten percentage points less; minimum 10%."),
     ("claim", "Recovery Receipt", "permanent", "retreat", "Pay a surrender loss; win the next hand to recover the undiscounted fee."),
     ("ace", "Comeback Ace", "permanent", "retreat", "After surrendering, your next hand starts with an ace."),
+    ("approx", "Almost Perfect", "permanent", "exact", "After natural settlement, your 20 and 22 count as 21."),
     ("jackpot", "Perfect Payout", "permanent", "exact", "A winning 21 pays three times your final bet."),
     ("sleeve", "Spare Sleeve", "permanent", "exact", "One free replacement of your first card each round.", "P"),
     ("borrow", "Borrowed Glory", "permanent", "exact", "The dealer's starting blackjack becomes your starting win."),
-    ("late_double", "Raise Permission", "permanent", "double", "You may double after hitting."),
+    ("stakes", "High Stakes", "permanent", "double", "A doubled win earns another 25% of the final bet."),
     ("risk", "Shared Risk", "permanent", "double", "Lose a doubled hand and pay only 75% of the final bet."),
     ("audit", "Open Audit", "permanent", "double", "Automatically reveal a dealer hole card worth at least ten."),
     ("discount", "Purchasing Privilege", "permanent", "finance", "Shop goods cost 10% less; investments and debt are excluded."),
@@ -67,14 +70,16 @@ _ROWS = (
     ("swap", "Sleeve Clip", "item", "long", "Replace your first card with the next deck card.", "P"),
     ("hole", "Hole Probe", "item", "retreat", "Reveal the dealer's hole card.", "P"),
     ("radar", "Risk Pointer", "item", "common", "Check whether your next hit would bust under the current effects.", "P"),
-    ("oracle", "Fate Forecast", "item", "common", "Before betting, see the first two cards left after the initial deal.", "B"),
+    ("oracle", "Fate Forecast", "item", "common", "Before betting, see your two opening cards.", "B"),
     ("remove", "Clause Removal", "item", "common", "Remove one persistent Chaos rule of your choice.", "BP"),
     ("silence", "Silence Seal", "item", "common", "Suppress all Chaos rules for this round, including new ones.", "BP"),
     ("buffer", "Temporary Allowance", "item", "long", "Raise your bust limit by two for this round.", "BP"),
+    ("insurance", "Bust Insurance", "item", "common",
+     "This round, if you bust the dealer still plays; a dealer bust makes it a push.", "BP"),
     ("waiver", "Loss Waiver", "item", "retreat", "Surrender without a loss; no recovery receipt is created.", "P"),
-    ("aces", "Aces to the Top", "item", "exact", "Move all remaining aces to the top, retaining their order.", "P"),
+    ("aces", "Aces to the Top", "item", "exact", "Move the next ace in the deck to the top.", "P"),
     ("undo", "Card Recall", "item", "exact", "Remove your last card; keep at least two.", "P"),
-    ("quad", "Fourfold Ticket", "item", "double", "Your next double this round stakes four times the original bet.", "BP"),
+    ("quad", "Fourfold Ticket", "item", "double", "Your next double this round stakes four times the original bet; a loss beyond your cash becomes debt.", "BP"),
     ("buyback", "Original Price Receipt", "item", "double", "Return another consumable for its actual purchase price; check victory at once.", "B"),
     ("deposit", "Fixed Deposit", "finance", "finance", "Invest 30; receive 40 after two rounds."),
     ("bond", "Performance Bond", "finance", "finance", "Invest 20; win two of three rounds for 45, otherwise receive 10."),
@@ -88,7 +93,7 @@ CORES = tuple(p.id for p in PRODUCTS.values() if p.kind == "core")
 PERMANENTS = tuple(p.id for p in PRODUCTS.values() if p.kind == "permanent")
 SHOP_IDS = tuple(p.id for p in PRODUCTS.values() if p.kind != "core" and p.id != "ph_gift")
 # One slot of every stock prefers one of these general consumables.
-COMMON = ("ph_peek", "ph_swap", "ph_hole", "ph_radar", "ph_oracle", "ph_remove", "ph_silence")
+COMMON = ("ph_peek", "ph_swap", "ph_hole", "ph_radar", "ph_oracle", "ph_remove", "ph_silence", "ph_insurance")
 # Older starter items (meta progression) play as their Poker Head counterparts at this table.
 ALIASES = {"peek": "ph_peek", "swap": "ph_swap", "hole_card_hacker": "ph_hole", "danger_radar": "ph_radar",
            "fate_oracle": "ph_oracle", "shield": "ph_silence"}

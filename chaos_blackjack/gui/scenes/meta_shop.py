@@ -59,7 +59,7 @@ class UpgradeRow(Button):
             icon = a.image_fit(self.icon, (52, 52))
             surface.blit(icon, icon.get_rect(midleft=(x, r.centery)))
             x += 68
-        price = ("Max level" if o.next_cost is None else f"Buy  ·  {o.next_cost} tokens")
+        price = ("Max level" if o.next_cost is None else f"Buy  ·  {o.next_cost} chips")
         pill_font = a.font(theme.FONT_SMALL, bold=True)
         pill = pygame.Rect(0, 0, max(150, pill_font.size(price)[0] + 30), 38)
         pill.midright = (r.right - 18, r.centery - (8 if o.reason and not o.can_buy and o.next_cost is not None else 0))
@@ -120,9 +120,9 @@ class MetaShopScene(MetaScreen):
         self.player_id = player_id
         if area is None and kind is not None:  # earlier callers named the kind
             area = "starter" if kind == "consumable" else "upgrades"
-        self.area = area or self.app.session.get("shop_area", "upgrades")
-        if self.area not in dict(AREAS):
-            self.area = "upgrades"
+        self.area = area or self.app.session.get("shop_area", self.areas[0][0])
+        if self.area not in dict(self.areas):
+            self.area = self.areas[0][0]
         self.series = series or self.app.session.get("shop_series", "core")
         self.scroll = 0
         self.refresh()
@@ -152,6 +152,13 @@ class MetaShopScene(MetaScreen):
         item = self.upgrade_item(offer.upgrade_id) if offer.kind == "consumable" else ""
         return item_series(item, self.app.run_config) if item else "core"
 
+    @property
+    def areas(self):
+        """The shop's areas; only Cosmetics while the profile sells no meta upgrades."""
+        if self.app.balance.meta_upgrades_enabled:
+            return AREAS
+        return tuple(x for x in AREAS if x[0] == "cosmetics")
+
     def area_offers(self, area):
         if area == "cosmetics":
             return self.cosmetic_offers
@@ -180,7 +187,7 @@ class MetaShopScene(MetaScreen):
         self.ui = WidgetGroup(keyboard=True)
         self.area_tabs = {}
         x = MARGIN
-        for key, label in AREAS:
+        for key, label in self.areas:
             count = len(self.area_offers(key))
             text = f"{label}  {count}"
             width = max(150, a.font(theme.FONT_BODY).size(text)[0] + 48)

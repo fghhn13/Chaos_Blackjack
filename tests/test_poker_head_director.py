@@ -55,7 +55,7 @@ def test_the_shipped_profile_holds_the_design_numbers():
 
 
 @pytest.mark.parametrize("round_no, index, act, slots, budget", [
-    (1, 0, 0.6, 1, 2), (3, 0, 0.6, 1, 2), (4, 1, 0.75, 2, 4), (7, 2, 0.85, 3, 7), (10, 3, 0.95, 3, 8), (40, 3, 0.95, 3, 8)])
+    (1, 0, 0.4, 1, 1), (4, 0, 0.4, 1, 1), (5, 1, 0.6, 2, 3), (9, 2, 0.75, 2, 5), (13, 3, 0.85, 3, 6), (40, 3, 0.85, 3, 6)])
 def test_stages_grow_with_the_round(round_no, index, act, slots, budget):
     s = director().stage(round_no)
     assert (s.index, s.act, s.slots, s.budget) == (index, act, slots, budget)
@@ -84,7 +84,7 @@ def test_the_first_stage_pool_is_mild():
             assert rule.params["value"] in (8, 9)
     assert all(abs(d_) == 1 and g.kind == "ranks" and len(g.ranks) == 1 for r in pool["shift"] for g, d_ in r.shifts)
     assert [r.params["pct"] for r in pool["markup"]] == [10]
-    assert {r.params["cap"] for r in d.variants(d.stage(10))["profit_cap"]} == {40, 30}
+    assert {r.params["cap"] for r in d.variants(d.stage(13))["profit_cap"]} == {40, 30}
 
 
 # --- decisions ------------------------------------------------------------------------------------------
@@ -166,7 +166,7 @@ def test_the_director_acts_once_per_round_before_betting_and_announces_it():
     before = list(c.table.environment)
     c.table.director_turn()                                            # a second call this round does nothing
     assert c.table.environment == before and c.table.acted_round == 1
-    c.place_bet(5)
+    c.place_bet(c.bet_limits()[0])
     assert c.phase in (TablePhase.PLAYER_TURN, TablePhase.ROUND_OVER)  # no Chaos phase after the deal
 
 

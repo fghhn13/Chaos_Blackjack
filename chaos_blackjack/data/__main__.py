@@ -17,9 +17,9 @@ Balance profiles
   JSON values: '{"ten_value": 5}'.
 
 Players (meta progression)
-  players                           the 3 player slots: tokens, upgrades, record
+  players                           the 3 player slots: chips, upgrades, record
   history SLOT [-n N]               the player's last runs
-  grant SLOT TOKENS                 add tokens (development and testing)
+  grant SLOT CHIPS                  add chips to the vault (development and testing)
   achievements SLOT                 achievements with progress and rewards
   cosmetics SLOT                    the wardrobe: owned, equipped and how to get the rest
   grant-cosmetic SLOT ID            give a cosmetic (development and testing)
@@ -128,7 +128,7 @@ def _players(conn, a) -> int:
             continue
         st = p.stats
         ups = ", ".join(f"{k} {v}" for k, v in sorted(p.upgrades.items())) or "-"
-        print(f"  slot {s.slot}: {p.name:16s} tokens {p.tokens:<5d} runs {st.runs} "
+        print(f"  slot {s.slot}: {p.name:16s} chips {p.tokens:<6d} runs {st.runs} "
               f"(won {st.victories}, lost {st.defeats}, quit {st.abandoned})  upgrades: {ups}")
     return 0
 
@@ -138,7 +138,7 @@ def _history(conn, a) -> int:
     runs = _meta(conn).history(player.id, a.n)
     for r in runs:
         print(f"  #{r.id:<4d} {r.started_at}  {r.mode:7s} {r.result or 'running':9s} rounds {r.rounds or 0:<4d} "
-              f"money {r.final_money or 0:<5d} peak {r.peak_money or 0:<5d} tokens +{r.tokens_earned or 0}")
+              f"money {r.final_money or 0:<5d} peak {r.peak_money or 0:<5d} chips {r.tokens_earned or 0:+d}")
     if not runs:
         print("  (no runs)")
     return 0
@@ -146,7 +146,7 @@ def _history(conn, a) -> int:
 
 def _grant(conn, a) -> int:
     player = _meta(conn).grant_tokens(_slot_player(conn, a.slot).id, a.tokens)
-    print(f"  {player.name}: {player.tokens} tokens")
+    print(f"  {player.name}: {player.tokens} chips")
     return 0
 
 

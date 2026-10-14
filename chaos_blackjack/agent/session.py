@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import json
 import random
+from dataclasses import replace
 import zlib
 from typing import Any
 
@@ -103,6 +104,10 @@ class AgentSession:
             from chaos_blackjack.modes import get_mode
 
             cfg = get_mode(mode).apply(cfg)
+            if config:  # explicit overrides beat the mode's own "<mode>.config.*" values
+                if "target_money" in config:
+                    config = {"target_multiple": 0.0, **config}
+                cfg = replace(cfg, **config)
         try:
             ctrl = GameController(cfg, save_fn=lambda d, n: n)
         except ValueError as exc:

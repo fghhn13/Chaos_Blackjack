@@ -124,6 +124,12 @@ for _type, _mark, _name in (("fixed", "=#", "Card Rewrite"), ("shift", "+-", "Ca
     register(AssetSpec("ph_env_" + _type, "rule", ICON, ph.icon(_mark, theme.CHAOS_MAGENTA), _name))
 
 
+# Membership badges (meta/membership.py; art: scripts/draw_membership_badges.py).
+for _level, _color in enumerate(((0x8C, 0x64, 0x3C), (0xA8, 0xB0, 0xB6), theme.GOLD, (0x3E, 0x8E, 0x6E),
+                                 theme.CHAOS_MAGENTA), start=1):
+    register(AssetSpec(f"member_{_level}", "icon", ICON, ph.icon(str(_level), _color), f"Membership level {_level}"))
+
+
 # Icons are tinted by product group (theme.GROUP_COLORS); permanents keep the art's gold.
 for _product in POKER_HEAD_PRODUCTS.values():
     _group = _product.to_def().group

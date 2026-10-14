@@ -4,6 +4,53 @@ Status: **agreed plan**, 2026-10-10. Shared contract for the three agents
 working on it. Change this file (in its own commit) before changing a
 contract below.
 
+**2026-10-14: meta upgrades are off in this version.** The balance setting
+`meta.upgrades_enabled` (0 in the shipped profile) empties
+`Balance.meta_upgrades`: nothing is sold, owned upgrades and starter items do
+not apply, and the GUI hides the Shop's Upgrades / Starter items areas and the
+New run sections for them. Tokens, cosmetics, achievements, run history and
+the codex are unchanged. `CHAOS_META_UPGRADES=1` turns the dormant system on
+for development; the test suite sets it (tests/test_meta_upgrades_off.py
+covers the off state). The planned replacement is
+[CARRIED_CHIPS.zh-CN.md](CARRIED_CHIPS.zh-CN.md).
+
+**Chip vault (2026-10-14, docs/design/CARRIED_CHIPS.zh-CN.md).** One currency:
+`player.tokens` is now the player's **chip vault** (the column and API names
+stay `tokens`; every screen says "chips"). Existing players were set to 1000
+chips (migration 0008); a new player starts with `meta.vault_start` (1000).
+
+* **Stakes.** A mode with a `mode.<id>.stake` setting ("min,max": Classic
+  40-100, Poker Head 400-1000) takes its starting cash from the vault:
+  `start_run(..., stake=n)` checks `min <= n <= min(max, vault)`, moves the
+  chips out and starts the run with `start_money = n` (a goal set as a
+  multiple follows it). `stake_range(player_id, mode_id)` gives the bounds.
+  A mode without the setting (J-54's demo) is free, as before.
+* **Settling.** `finish_run`: a win brings the run's final cash home (Full
+  Haul already settled at cost); a defeat brings nothing home, and debt owed
+  at the end (a fourfold loss beyond the cash, open loans) comes out of the
+  vault, never below 0. `abandon_run` loses the stake. Victory and consolation
+  token payouts are off (`meta.win_tokens` 0, `meta.loss_cap` 0); achievements
+  still pay their reward, now in chips.
+* **Relief.** When the vault cannot cover Classic's minimum stake, Poker Head
+  tops it up: `max(min - vault, min(cap, base + step x streak))` with
+  `meta.relief_base` 40, `meta.relief_step` 10, `meta.relief_cap` 100;
+  `player.relief_streak` counts reliefs since the last win and a won run resets
+  it. `claim_relief(player_id)` pays it (0 when not needed); `finish_run` and
+  `abandon_run` claim it after a loss.
+* **Lifetime spend.** `player.lifetime_spend` adds every chip spent on goods:
+  in-run shop purchases (counted by the RunTracker from ITEM_BOUGHT notices)
+  and the meta shop (looks, insurance). Bets and losses do not count. The
+  membership level reads it.
+* **RunReward** for a staked run: `breakdown` lists "Brought home", "Debt
+  paid" (negative), achievements and "Relief from Poker Head"; `tokens` is the
+  vault's change at settling. `run_history.stake` / `chips_back` record it.
+
+**Table logs (2026-10-14).** Every run a player starts or continues writes its
+table notices to `data/table_logs/run-<run id>.jsonl` beside the database (one
+JSON line per notice with round, phase, cash and, at Poker Head, net assets;
+appended on Continue). `meta/table_log.py`, attached and detached with the
+RunTracker; in-memory services (tests) write nothing. The folder is git-ignored.
+
 ## 1. Decisions
 
 | Topic | Decision |

@@ -336,6 +336,7 @@ assets/poker_head/ph_discount.png
 assets/poker_head/ph_five_reward.png
 assets/poker_head/ph_gift.png
 assets/poker_head/ph_hole.png
+assets/poker_head/ph_insurance.png
 assets/poker_head/ph_jackpot.png
 assets/poker_head/ph_late_double.png
 assets/poker_head/ph_late_retreat.png
@@ -348,6 +349,7 @@ assets/poker_head/ph_oracle.png
 assets/poker_head/ph_peek.png
 assets/poker_head/ph_quad.png
 assets/poker_head/ph_radar.png
+assets/poker_head/ph_redeal.png
 assets/poker_head/ph_refresh.png
 assets/poker_head/ph_remove.png
 assets/poker_head/ph_retreat.png
@@ -360,6 +362,11 @@ assets/poker_head/ph_swap.png
 assets/poker_head/ph_undo.png
 assets/poker_head/ph_waiver.png
 assets/poker_head/ph_yield.png
+assets/membership/member_1.png
+assets/membership/member_2.png
+assets/membership/member_3.png
+assets/membership/member_4.png
+assets/membership/member_5.png
 assets/cosmetics/poker_head/avatar_poker_head_j.png
 assets/cosmetics/poker_head/card_back_poker_head_gold.png
 assets/cosmetics/poker_head/chips_poker_head_1.png

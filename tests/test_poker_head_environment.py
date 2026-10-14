@@ -25,8 +25,9 @@ def card(rank, suit="♠"):
 
 def controller(core="ph_margin", rules=(), equipped=()):
     cfg = get_mode("chaos").apply(RunConfig.from_balance(default_balance(), seed=7, use_llm=False))
-    cfg = replace(cfg, enable_chaos=False, mode_settings={**cfg.mode_settings, "chaos.unlock_all": 0,
-                                                          "chaos.director.stages": "[[1, 0, 3, 99]]"})
+    cfg = replace(cfg, enable_chaos=False, start_money=100, target_money=500, target_multiple=0.0, exit_multiple=0.0,
+                  mode_settings={**cfg.mode_settings, "chaos.unlock_all": 0, "chaos.money_base": 100,
+                                 "chaos.director.stages": "[[1, 0, 3, 99]]"})
     c = GameController(cfg, save_fn=lambda d, n: n)
     c.choice = None
     c.table.loadout.core = core
@@ -155,7 +156,11 @@ def test_a_rewrite_changes_both_hands():
 def test_the_player_build_applies_after_the_environment():
     c = controller(rules=[env.fixed(ranks("J", "Q", "K"), 8)], equipped=["ph_court"])
     deal(c, player=("K", "Q"), dealer=("K", "Q"))
-    assert c.hand_value(c.state.player_hand) == 10 and c.hand_value(c.state.dealer_hand, "dealer") == 16
+    # Court Discount switches the rewritten 8s down to 5 only when the hand would bust.
+    assert c.hand_value(c.state.player_hand) == 16 and c.hand_value(c.state.dealer_hand, "dealer") == 16
+    c.table.loadout.core = None                            # bust above 15: one 8 drops to 5
+    c.table.environment = [env.fixed(ranks("J", "Q", "K"), 8), env.bust("player", 15)]
+    assert c.hand_value(c.state.player_hand) == 13
 
 
 def test_ace_switch_with_a_shift():
@@ -267,11 +272,11 @@ def test_profit_above_the_cap_is_lost():
 
 def test_the_cap_counts_hand_and_investment_profit_once_and_cuts_the_hand_first():
     c = controller("ph_account", rules=[env.profit_cap(40)])
-    c.table.ledger.open("ph_deposit", 30, 0, 1)          # pays 40 now: 30 back + 10 profit
+    c.table.ledger.open("ph_deposit", 30, 0, 1)          # pays 50 now: 30 back + 20 profit
     deal(c, player=("10", "9"), dealer=("10", "7"), bet=40)
     finish(c)
-    assert c.last_result.delta == 30                      # 40 + 10 = 50 profit, 10 over the cap
-    assert c.run.money == 100 + 30 + 40                   # the principal comes back in full
+    assert c.last_result.delta == 20                      # 40 + 20 = 60 profit, 20 over the cap
+    assert c.run.money == 100 + 20 + 50                   # the principal comes back in full
 
 
 def test_losses_are_not_capped_and_do_not_raise_the_cap():
@@ -356,7 +361,7 @@ def test_markup_and_discount_round_up_once():
     c = controller(rules=[env.markup(20)], equipped=["ph_discount"])
     offer(c, "ph_swap", "ph_deposit")
     swap, deposit = c.view().shop_offers
-    assert swap.price == 7 and swap.base_price == 6                 # 6 x 1.2 x 0.9 = 6.48 -> 7 (not 8)
+    assert swap.price == 11 and swap.base_price == 10               # 10 x 1.2 x 0.9 = 10.8 -> 11 (not 12)
     assert "+20% Price Hike" in swap.price_note and "−10% Purchasing Privilege" in swap.price_note
     assert deposit.price == 30 and deposit.base_price is None       # money products keep their price
     assert c.reroll_price() == 3
@@ -366,9 +371,9 @@ def test_the_actual_price_paid_is_remembered_and_silence_restores_prices():
     c = controller(rules=[env.markup(40)])
     offer(c, "ph_aces", "ph_swap")
     c.buy("ph_aces")
-    assert c.run.money == 100 - 26 and c.table.holdings.first("ph_aces").paid == 26   # 18 x 1.4 = 25.2 -> 26
+    assert c.run.money == 100 - 35 and c.table.holdings.first("ph_aces").paid == 35   # 25 x 1.4 = 35
     c.table.round.preparations.append("ph_silence")
-    assert c.view().shop_offers[1].price == 6 and c.view().shop_offers[1].base_price is None
+    assert c.view().shop_offers[1].price == 10 and c.view().shop_offers[1].base_price is None
     obs = AgentSession(c, seed=7).observe()
     assert "base_price" not in obs["shop"]["offers"][1]
 

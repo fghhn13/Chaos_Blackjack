@@ -4,6 +4,21 @@ Status: **agreed**, 2026-10-12; D2 (data and service), D3 (art aliases) and D4 (
 `META_PROGRESSION.md`; this file is the contract for the feature. Change it (in its own commit)
 before changing a contract below.
 
+**2026-10-14, the chip economy (META_PROGRESSION.md "Chip vault").** "Tokens"
+below now means **chips**: the same `tokens` column and fields, shown as chips.
+Looks are bought with chips again (`meta.unlock_all_cosmetics` 0; looks a player
+was wearing were kept by migration 0008) and count towards lifetime spend; from
+membership level 4 the Shop takes 5% off (meta/membership.py). Achievement
+rewards are chips, rescaled for the vault (common 50-150, hard 300-500), and
+seven achievements cover the build table and risky play: To the Brim (win at
+the table's ceiling), In and Out (Poker Head within 5 rounds), All In (a hand
+won with a Fourfold Ticket), Saved by the Bell (Bust Insurance turns a bust
+into a push), Fresh Start (Fresh Hand into 21), Back from Broke (Poker Head
+won after his relief) and Five Ways to Win (a Poker Head win with each core).
+Their stats read RunTracker counters (`fourfold_wins`, `insurance_saves`,
+`fresh_21`, `core`, `ceiling`) and `summary.after_relief`, which `finish_run`
+adds.
+
 ## 1. Decisions
 
 | Topic | Decision |

@@ -16,7 +16,7 @@ def test_builtins_and_tab_order():
     assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment"]
     assert [e.id for e in codex_entries("environment")] == [
         "fixed", "shift", "bust", "tie", "bust_outcome", "profit_cap", "item_ban", "markup", "hidden"]
-    assert len(codex_entries("build")) == 41
+    assert len(codex_entries("build")) == 43
     assert len(codex_entries("rule")) == 13  # Poker Head's 7 and J-54's 6
     assert len(codex_entries("item")) == 6
     assert [e.id for e in codex_entries("mode")] == ["normal", "chaos", "j54"]
@@ -65,7 +65,7 @@ def test_modes_describe_the_supplied_config():
     for entry in codex_entries("mode", cfg):
         detail = entry.detail(cfg)
         if entry.id == "chaos":
-            assert "500 net assets" in detail
+            assert "Leave with 1600 to 2400 net assets" in detail   # the table's own stake: 400, x4 to x6
         elif entry.id == "j54":  # J-54's goal is a protocol, not a chip target
             assert "random protocol" in detail
         else:
@@ -158,7 +158,7 @@ def test_build_references_use_live_effects_prices_and_slot_limit():
     assert "15%" in entries["ph_retreat"].summary
     assert "19 and 22" in entries["ph_approx"].summary
     assert "2 shop" in entries["ph_account"].summary
-    assert "as 4 each" in entries["ph_court"].summary
+    assert "10 or 4" in entries["ph_court"].summary
     assert "2 permanent slots" in original["ph_court"].detail(cfg)
     assert entries["ph_court"].price == "77 chips"
     assert entries["ph_stock"].price == "Invest 45 chips"

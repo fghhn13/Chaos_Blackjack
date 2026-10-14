@@ -7,7 +7,8 @@ the player's chosen profile with `RunConfig.from_balance(load_balance())`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+import math
+from dataclasses import dataclass, field, fields, replace
 from typing import Any
 
 from chaos_blackjack.data.balance import Balance, config_fingerprint, default_balance
@@ -27,10 +28,20 @@ DEFAULT_REWARD_STREAK = 2
 DEFAULT_REWARD_POOL: tuple[str, ...] = ("peek", "shield", "swap")
 
 
+def _multiple(start: int, multiple: float) -> int:
+    """start × multiple, rounded half up."""
+    return math.floor(start * multiple + 0.5)
+
+
 @dataclass(frozen=True)
 class RunConfig:
     start_money: int = DEFAULT_START_MONEY
     target_money: int = DEFAULT_TARGET_MONEY
+    # Goal as a multiple of the starting cash (docs/design/CARRIED_CHIPS.zh-CN.md §4); 0 = use target_money.
+    # The target is then also the table's ceiling: winnings above it are not paid.
+    target_multiple: float = 0.0
+    # Full Haul: from start_money × this, the player may leave with a win (a table that offers it); 0 = never.
+    exit_multiple: float = 0.0
     objective: str = _DEFAULTS.objective
     shop_prices: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_SHOP_PRICES))
     shop_slots: int = DEFAULT_SHOP_SLOTS
@@ -113,6 +124,17 @@ class RunConfig:
         }
         values.update(overrides)
         return cls(**values)
+
+    def resolved(self) -> "RunConfig":
+        """target_money from target_multiple, when one is set (call again after changing start_money)."""
+        if not self.target_multiple:
+            return self
+        return replace(self, target_money=_multiple(self.start_money, self.target_multiple))
+
+    @property
+    def exit_money(self) -> int:
+        """Net assets from which Full Haul may be taken (0 = never)."""
+        return _multiple(self.start_money, self.exit_multiple) if self.exit_multiple else 0
 
     @property
     def balance_hash(self) -> str:

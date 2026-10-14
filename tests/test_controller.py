@@ -274,3 +274,27 @@ def test_three_card_21_is_not_a_natural() -> None:
     c.finish_dealer()
     r = c.view().last_result
     assert r.outcome == "player" and r.delta == 10
+
+
+# --- goal as a multiple of the start (docs/design/CARRIED_CHIPS.zh-CN.md §4) -------------------
+
+
+def test_target_multiple_sets_the_goal_and_is_a_ceiling() -> None:
+    c = _ctrl(start_money=100, target_multiple=4)
+    assert c.run.target_money == 400
+    c.run.money = 380
+    _deal(c, [_c("K"), _c("9")], [_c("10"), _c("7")], bet=50)
+    c.stand()
+    c.finish_dealer()
+    assert c.run_end is not None and c.run_end.kind == "victory"
+    assert c.run.money == 400 and c.last_result.delta == 20
+    assert any("not paid" in n.text for n in c.drain_notices())
+
+
+def test_without_a_multiple_wins_are_paid_past_the_target() -> None:
+    c = _ctrl(start_money=100, target_money=300)
+    c.run.money = 290
+    _deal(c, [_c("K"), _c("9")], [_c("10"), _c("7")], bet=50)
+    c.stand()
+    c.finish_dealer()
+    assert c.run.money == 340 and c.run_end.kind == "victory"

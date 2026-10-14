@@ -109,5 +109,5 @@ def test_cli(conn, tmp_path, capsys) -> None:
     assert data_cli(["export", "tune2", "-o", str(out)]) == 0 and "'peek', 1, 'bankroll_pct', 7" in out.read_text("utf-8")
     assert data_cli(["delete", "tune2"]) == 0
     text = capsys.readouterr()
-    assert "item.peek.price 4 -> 7" in text.out and "locked" in text.err
-    assert "item.peek.price  4  ->  7" in text.out and "valid; fingerprint" in text.out
+    assert "item.peek.price 2 -> 7" in text.out and "locked" in text.err
+    assert "item.peek.price  2  ->  7" in text.out and "valid; fingerprint" in text.out

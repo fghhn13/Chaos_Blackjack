@@ -50,7 +50,7 @@ def action_label(offer) -> str:
     if offer.owned:
         return "Equip"
     if offer.price is not None:
-        return f"Buy  ·  {offer.price} tokens"
+        return f"Buy  ·  {offer.price} chips"
     return "Locked"
 
 
@@ -133,7 +133,7 @@ class AchievementRow(Button):
             surface.blit(mark, mark.get_rect(center=medal))
         reward_parts = []
         if s.reward_tokens:
-            reward_parts.append(f"+{s.reward_tokens} tokens")
+            reward_parts.append(f"+{s.reward_tokens} chips")
         reward_parts += list(self.cosmetic_names)
         reward = "  ·  ".join(reward_parts)
         small = a.font(theme.FONT_SMALL)

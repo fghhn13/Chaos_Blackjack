@@ -94,7 +94,7 @@ class RunResultScene(MetaScreen):
             panel(surface, (300, 162, 680, 394))
             left, value_x, width, step, top = 350, 860, 485, 40, 292
         if self.reward:
-            text(surface, a, f"+{self.reward.tokens} tokens", (left, 200), size=48, color=theme.GOLD)
+            text(surface, a, f"{self.reward.tokens:+d} chips", (left, 200), size=48, color=theme.GOLD)
             for i, (label, amount) in enumerate(self.reward.breakdown):
                 text(surface, a, label, (left, top + i * step), width=width, size=18 if unlocked else 20)
                 text(surface, a, f"{amount:+d}", (value_x, top + i * step), color=theme.GOLD)
@@ -120,7 +120,7 @@ class RunResultScene(MetaScreen):
             right = card.right - (124 if look is not None else 16)
             name_font = a.font(theme.FONT_BODY, bold=True)
             surface.blit(name_font.render(fit_text(name_font, u.name, right - x), True, theme.IVORY), (x, card.y + 10))
-            parts = [f"+{u.tokens} tokens"] if u.tokens else []
+            parts = [f"+{u.tokens} chips"] if u.tokens else []
             if looks:
                 parts.append(("New look: " if len(looks) == 1 else "New looks: ") + ", ".join(c.name for c in looks))
             small = a.font(theme.FONT_SMALL)

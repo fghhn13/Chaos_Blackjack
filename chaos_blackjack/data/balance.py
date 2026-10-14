@@ -129,6 +129,21 @@ class Balance:
     meta_chaos_win_bonus: int = 0
     meta_bring_kinds: int = 99
     meta_unlock_all_cosmetics: bool = False  # every look counts as owned (nothing is stored)
+    # Off: the profile sells no meta upgrades and owned ones do nothing (meta_upgrades is empty).
+    meta_upgrades_enabled: bool = False
+    # The chip vault (docs/design/META_PROGRESSION.md): a new player's chips and Poker Head's relief.
+    meta_vault_start: int = 1000
+    meta_relief_base: int = 40
+    meta_relief_step: int = 10
+    meta_relief_cap: int = 100
+    # Early-bust insurance, bought with a staked run: premium and refund as % of the stake.
+    meta_insurance_premium_pct: int = 6
+    meta_insurance_refund_pct: int = 50
+    meta_insurance_rounds: int = 3
+    # Membership (meta/membership.py): lifetime spend per level and the two money perks.
+    meta_membership_spend: str = "0,1000,3000,8000,20000"
+    meta_membership_relief_bonus: int = 20
+    meta_membership_shop_discount_pct: int = 5
     shop_items: tuple[ShopItemBalance, ...] = field(default=())
     item_tuning: tuple[tuple[str, Params], ...] = field(default=())  # every item, sold or not
     chaos_rules: tuple[ChaosRuleBalance, ...] = field(default=())
@@ -210,6 +225,17 @@ _OPTIONAL_SETTINGS: dict[str, str] = {
     "meta.chaos_win_bonus": "meta_chaos_win_bonus",
     "meta.bring_kinds": "meta_bring_kinds",
     "meta.unlock_all_cosmetics": "meta_unlock_all_cosmetics",
+    "meta.upgrades_enabled": "meta_upgrades_enabled",
+    "meta.vault_start": "meta_vault_start",
+    "meta.relief_base": "meta_relief_base",
+    "meta.relief_step": "meta_relief_step",
+    "meta.relief_cap": "meta_relief_cap",
+    "meta.insurance_premium_pct": "meta_insurance_premium_pct",
+    "meta.insurance_refund_pct": "meta_insurance_refund_pct",
+    "meta.insurance_rounds": "meta_insurance_rounds",
+    "meta.membership_spend": "meta_membership_spend",
+    "meta.membership_relief_bonus": "meta_membership_relief_bonus",
+    "meta.membership_shop_discount_pct": "meta_membership_shop_discount_pct",
 }
 
 
@@ -343,6 +369,12 @@ def _load(conn: sqlite3.Connection, name: str) -> Balance:
             "ORDER BY achievement_id", (pid,))
     )
 
+    # This version plays without meta upgrades (docs/design/CARRIED_CHIPS.zh-CN.md); CHAOS_META_UPGRADES=1
+    # turns the dormant system on for development and its tests.
+    values["meta_upgrades_enabled"] = bool(values.get("meta_upgrades_enabled")) or os.environ.get(
+        "CHAOS_META_UPGRADES") == "1"
+    if not values["meta_upgrades_enabled"]:
+        upgrades = ()
     if values["target_money"] <= values["start_money"]:
         raise BalanceError(f"Profile {name!r}: run.target_money must be above run.start_money")
     num, den = values.pop("_bj_num"), values.pop("_bj_den")

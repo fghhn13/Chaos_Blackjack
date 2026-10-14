@@ -40,6 +40,13 @@ class Player:
     created_at: str = ""
     last_played_at: str | None = None
     avatar: str = "avatar"            # asset id of the equipped avatar
+    relief_streak: int = 0            # Poker Head's reliefs since the last won run
+    lifetime_spend: int = 0           # chips spent on goods (the membership level reads it)
+
+    @property
+    def chips(self) -> int:
+        """The chip vault (stored as `tokens`; docs/design/META_PROGRESSION.md "Chip vault")."""
+        return self.tokens
 
 
 @dataclass(frozen=True)
@@ -94,8 +101,8 @@ class Unlock:
 
 @dataclass(frozen=True)
 class RunReward:
-    tokens: int                              # run tokens plus achievement tokens
-    breakdown: tuple[tuple[str, int], ...]   # (label, tokens); achievement lines last
+    tokens: int                              # the vault's change at settling (chips)
+    breakdown: tuple[tuple[str, int], ...]   # (label, chips): brought home, debt, achievements, relief
     result: str                              # victory | defeat
     player: Player
     unlocked: tuple[Unlock, ...] = ()
@@ -109,7 +116,7 @@ class CosmeticOffer:
     price: int | None                 # None: not sold
     can_buy: bool
     reason: str = ""                  # why it cannot be bought (when not owned)
-    unlock_hint: str = ""             # how to get it, e.g. "Achievement: First Win" or "40 tokens"
+    unlock_hint: str = ""             # how to get it, e.g. "Achievement: First Win" or "40 chips"
 
 
 @dataclass(frozen=True)

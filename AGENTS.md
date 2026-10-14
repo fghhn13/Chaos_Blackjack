@@ -106,9 +106,13 @@ drawing, moving to the next round) happens automatically inside your command:
 
 ### Poker Head's build table (`--mode chaos`)
 
-Goal: **net assets 500** (cash + invested principal − every loan repayment
-owed; borrowing never wins). The run opens with `obs.choice`: two cores or
-30 chips without a core. Two build slots (a full build asks what to
+Goal: **Full Haul**. A run starts with 400 chips (`--start-money`); from 4x
+that in net assets (cash + invested principal − every loan repayment owed;
+borrowing never wins) `perform ph_full_haul` leaves with a win, and at 6x
+(`obs.target`) Poker Head stops playing. Every chip amount scales with the
+starting cash. The run opens with `obs.choice`: two cores (each changes what
+you can do; Room to Breathe costs chips, Exit Clause brings some) or chips
+without a core. Three build slots (a full build asks what to
 replace; `perform ph_discard <id>` drops one before betting), consumables with a phase (`obs.items[].when`), financial products
 with the Private Account core, up to three persistent Chaos rules and a
 rising minimum bet. `obs.table.public` is the public build and money
@@ -174,6 +178,6 @@ state = s.to_state()                 # JSON-safe; AgentSession.from_state(state)
 - Credentials live only in the git-ignored `.env` (names in `.env.example`). Never print, commit or copy a real key. `python scripts/debug_llm.py models` checks the relay without billing a completion.
 - Art: raw images live in the git-ignored `black-jack-assets/`; final `<id>.png` files go in `assets/`. Use `scripts/asset_tools.py`, `scripts/validate_assets.py`, `scripts/preview_assets.py` and `scripts/fetch_icons.py`; workflow and rules in `.claude/skills/art-asset-pipeline/SKILL.md`.
 - Game numbers live in SQLite balance profiles (`data/game.db`, git-ignored). Shipped values: `chaos_blackjack/data/seed/default.sql` (the locked `default` profile is re-imported when it changes). Schema changes: new `chaos_blackjack/data/migrations/NNNN_*.sql`. Manage profiles with `python -m chaos_blackjack.data profiles | show | clone | set | diff | export | delete` (never edit the locked `default`; clone it). Saves (`run_save`) and preferences (`preference`) live in the same database; `python -m chaos_blackjack.data saves` lists saves, `import-saves` imports old JSON saves. Tests force `CHAOS_DB=:memory:` (use a tmp file when a test needs data to persist between connections); never commit a `.db` file.
-- Meta progression (players, upgrades, run history, codex) follows `docs/design/META_PROGRESSION.md`; that file is the contract between agents. Cosmetics and achievements follow `docs/design/COSMETICS_ACHIEVEMENTS.md` (adding one is a catalog entry plus seed rows; see its section 2); modes, their hosts and pools follow `docs/design/AI_MODES.md`. The agent CLI does not use meta progression.
+- Meta progression (players, upgrades, run history, codex) follows `docs/design/META_PROGRESSION.md`; meta upgrades are off in this version (`meta.upgrades_enabled` = 0; `CHAOS_META_UPGRADES=1` turns them on for development, and tests set it); that file is the contract between agents. Cosmetics and achievements follow `docs/design/COSMETICS_ACHIEVEMENTS.md` (adding one is a catalog entry plus seed rows; see its section 2); modes, their hosts and pools follow `docs/design/AI_MODES.md`. The agent CLI does not use meta progression.
 - Balance: the simulator is a separate, git-ignored repo in `black-jack-sim/` (see its README). It only imports the game through `bjsim/adapter.py`; after changing rules, prices or the controller API, run `python -m bjsim check` there and update that adapter if needed.
 - Architecture: `core/` state + loop, `rules/` rule engine and chaos plugins, `items/` item plugins, `ai/` chaos pipeline and LLM backends, `app/` UI-agnostic `GameController` (a mode's own mechanics plug in through `app/table_mechanics.py`; J-54's are `j54/`; what the table shows comes from parts and per-mode layouts, see `docs/design/TABLE_UI.md`), `agent/` this agent interface, `gui/` Pygame client, `ui/` + `cli/` text CLI. See README.md.

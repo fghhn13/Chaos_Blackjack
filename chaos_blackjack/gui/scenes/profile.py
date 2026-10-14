@@ -34,6 +34,7 @@ STATS = (
 
 @register_scene("profile")
 class ProfileScene(MetaScreen):
+    member = None
     title = "Profile"
 
     def on_enter(self, player_id, tab=None, slot=None, **params):
@@ -58,6 +59,7 @@ class ProfileScene(MetaScreen):
         self.loadout = self.action(lambda: meta.loadout(self.player_id)) or {}
         self.achievements = self.action(lambda: meta.achievements(self.player_id, profile)) or []
         self.player = self.action(lambda: meta.get_player(self.player_id)) or self.player  # backfill may pay
+        self.member = self.action(lambda: meta.membership(self.player_id, profile))
         self.offers = []
         self.totals = {}
         if self.tab == "wardrobe":
@@ -206,7 +208,7 @@ class ProfileScene(MetaScreen):
         name_font = a.font(theme.FONT_HEADING, bold=True)
         surface.blit(name_font.render(fit_text(name_font, p.name, 320), True, theme.IVORY), (MARGIN + 192, 218))
         text(surface, a, f"Slot {p.slot}", (MARGIN + 194, 268), size=theme.FONT_SMALL, color=theme.GOLD_DIM)
-        text(surface, a, f"{p.tokens} tokens", (MARGIN + 194, 300), size=theme.FONT_BUTTON, color=theme.GOLD)
+        text(surface, a, f"{p.tokens} chips", (MARGIN + 194, 300), size=theme.FONT_BUTTON, color=theme.GOLD)
         done = sum(s.unlocked for s in self.achievements)
         text(surface, a, f"Achievements  {done} / {len(self.achievements)}", (MARGIN + 194, 344),
              size=theme.FONT_SMALL, color=theme.TEXT_MUTED)
@@ -224,6 +226,30 @@ class ProfileScene(MetaScreen):
             text(surface, a, label, (x, yy + 38), size=theme.FONT_SMALL, color=theme.TEXT_MUTED)
         best = a.font(theme.FONT_SMALL).render(f"Best bankroll: {p.stats.best_money}", True, theme.GOLD_DIM)
         surface.blit(best, best.get_rect(bottomright=(box.right - 28, box.bottom - 18)))
+        if self.member is not None:
+            self.draw_membership(surface, pygame.Rect(box.x, box.bottom + 14, box.w, 118))
+
+    def draw_membership(self, surface, box):
+        """Badge, level, lifetime spend and the way to the next level."""
+        a, m = self.app.assets, self.member
+        panel(surface, box)
+        surface.blit(a.image(m.badge, (92, 92)), (box.x + 16, box.y + 13))
+        x = box.x + 126
+        name = a.font(theme.FONT_BUTTON, bold=True).render(m.name, True, theme.IVORY)
+        surface.blit(name, (x, box.y + 14))
+        level = a.font(theme.FONT_SMALL).render(f"Level {m.level}  ·  {m.spend} chips spent", True, theme.GOLD_DIM)
+        surface.blit(level, level.get_rect(midleft=(name.get_rect(topleft=(x, box.y + 14)).right + 14,
+                                                    box.y + 14 + name.get_height() // 2)))
+        bar = pygame.Rect(x, box.y + 54, box.right - 28 - x, 10)
+        pygame.draw.rect(surface, (0x2A, 0x31, 0x2F), bar, border_radius=5)
+        pygame.draw.rect(surface, theme.GOLD, (bar.x, bar.y, round(bar.w * m.progress), bar.h), border_radius=5)
+        goal = "The highest level." if m.next_at is None else f"{m.next_at - m.spend} more chips spent for the next level."
+        perks = "; ".join(m.perks) + "." if m.perks else "Spend chips in any shop to rise."
+        width = box.right - 28 - x
+        small = a.font(theme.FONT_TINY + 1)
+        text(surface, a, fit_text(small, goal, width), (x, box.y + 72), size=theme.FONT_TINY + 1,
+             color=theme.TEXT_MUTED)
+        text(surface, a, fit_text(small, perks, width), (x, box.y + 92), size=theme.FONT_TINY + 1, color=theme.GOLD_DIM)
 
     def preview_looks(self):
         looks = {slot: get_cosmetic(cid) for slot, cid in self.loadout.items()}

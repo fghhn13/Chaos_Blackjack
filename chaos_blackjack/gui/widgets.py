@@ -1,4 +1,4 @@
-"""Minimal widget kit: Label, Button, Toggle, ScrollColumn and a WidgetGroup container.
+"""Minimal widget kit: Label, Button, Toggle, Slider, ScrollColumn and a WidgetGroup container.
 
 Widgets work in logical (canvas) coordinates; App already converts mouse
 positions, so widgets never think about window scaling.
@@ -201,6 +201,116 @@ class Toggle(Button):
         self.text = self.label(self.value)
         if self.on_change is not None:
             self.on_change(self.value)
+
+
+class Slider(Button):
+    """A whole number from `lo` to `hi` in `step`s. Drag the knob or press anywhere on the track (mouse or
+    touch); with keyboard focus, Left/Right move one step, Page Up/Down five and Home/End jump to the ends.
+    A Button so the keyboard focus reaches it; Enter does nothing."""
+
+    KNOB = 13
+    PAD = 16
+
+    def __init__(
+        self,
+        assets: "AssetManager",
+        rect,
+        lo: int,
+        hi: int,
+        value: int,
+        on_change: Callable[[int], None] | None = None,
+        *,
+        step: int = 1,
+        enabled: bool = True,
+        chaos: bool = False,
+    ) -> None:
+        super().__init__(assets, rect, "", None, enabled=enabled, key_hint="", sound=False)
+        self.lo, self.hi, self.step = int(lo), max(int(lo), int(hi)), max(1, int(step))
+        self.on_change = on_change
+        self.chaos = chaos
+        self.dragging = False
+        self.value = self._snap(value)
+
+    def _snap(self, value: float) -> int:
+        """Clamp to [lo, hi] on the step grid from `lo`; `hi` itself is always reachable."""
+        if value >= self.hi:
+            return self.hi
+        steps = round((max(self.lo, value) - self.lo) / self.step)
+        return min(self.hi, self.lo + steps * self.step)
+
+    def _track(self) -> tuple[int, int]:
+        return self.rect.x + self.PAD, self.rect.right - self.PAD
+
+    def _from_x(self, x: int) -> int:
+        left, right = self._track()
+        frac = 0.0 if right <= left else min(1.0, max(0.0, (x - left) / (right - left)))
+        return self._snap(self.lo + frac * (self.hi - self.lo))
+
+    def knob_x(self) -> int:
+        left, right = self._track()
+        frac = 0.0 if self.hi == self.lo else (self.value - self.lo) / (self.hi - self.lo)
+        return round(left + frac * (right - left))
+
+    def set_value(self, value: float) -> None:
+        value = self._snap(value)
+        if value != self.value:
+            self.value = value
+            if self.on_change is not None:
+                self.on_change(value)
+
+    def click(self) -> None:
+        pass
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if not self.visible:
+            return False
+        if event.type == pygame.MOUSEMOTION:
+            self.hovered = self.rect.collidepoint(event.pos)
+            if self.dragging:
+                self.set_value(self._from_x(event.pos[0]))
+                return True
+            return False
+        if not self.enabled:
+            self.dragging = False
+            return False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.inflate(0, 16).collidepoint(event.pos):
+            self.dragging = True
+            self.set_value(self._from_x(event.pos[0]))
+            return True
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging:
+            self.dragging = False
+            return True
+        if event.type == pygame.KEYDOWN and self.focused:
+            moves = {pygame.K_LEFT: -1, pygame.K_RIGHT: 1, pygame.K_PAGEDOWN: -5, pygame.K_PAGEUP: 5}
+            if event.key in moves:
+                delta = moves[event.key]
+                if delta < 0 and self.value == self.hi and (self.hi - self.lo) % self.step:
+                    grid = self.lo + (self.hi - self.lo) // self.step * self.step   # last grid point below hi
+                    self.set_value(grid + (delta + 1) * self.step)
+                else:
+                    self.set_value(self.value + delta * self.step)
+                return True
+            if event.key in (pygame.K_HOME, pygame.K_END):
+                self.set_value(self.lo if event.key == pygame.K_HOME else self.hi)
+                return True
+        return False
+
+    def draw(self, surface: pygame.Surface) -> None:
+        if not self.visible:
+            return
+        accent = theme.CHAOS_MAGENTA if self.chaos else theme.GOLD
+        if not self.enabled:
+            accent = (0x4A, 0x50, 0x4E)
+        left, right = self._track()
+        y = self.rect.centery
+        pygame.draw.rect(surface, (0x2A, 0x31, 0x2F), (left, y - 4, right - left, 8), border_radius=4)
+        x = self.knob_x()
+        pygame.draw.rect(surface, accent, (left, y - 4, max(0, x - left), 8), border_radius=4)
+        r = self.KNOB + (2 if (self.hovered or self.dragging) and self.enabled else 0)
+        pygame.draw.circle(surface, accent, (x, y), r)
+        pygame.draw.circle(surface, (0x17, 0x1C, 0x1B), (x, y), r - 5)
+        if self.focused and self.enabled:
+            draw_focus_ring(surface, self.rect)
 
 
 def draw_focus_ring(surface: pygame.Surface, rect: pygame.Rect, radius: int = 13) -> None:

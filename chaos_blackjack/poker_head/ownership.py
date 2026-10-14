@@ -3,8 +3,9 @@
 * `Holdings`: every consumable as an instance with the price actually paid,
   so Original Price Receipt refunds a specific purchase.
 * `Loadout`: the core (or none) and the permanents in their slots.
-* `Ledger`: open investments and loans. Net assets = cash + open principal −
-  every repayment still owed; unrealised profit never counts.
+* `Ledger`: open investments, loans and a loss larger than the cash. Net
+  assets = cash + open principal − every repayment still owed; unrealised
+  profit never counts.
 
 All three are plain data with `to_dict` / `from_dict`; behaviour lives in the
 table, effects and item handlers (docs/design/ITEM_ARCHITECTURE.md §4).
@@ -99,6 +100,7 @@ class Ledger:
     positions: list[Position] = field(default_factory=list)
     sequence: int = 0
     settled: list[str] = field(default_factory=list)  # uids already paid out (never twice)
+    shortfall: int = 0    # a loss larger than the cash (Fourfold Ticket), owed until the run ends
 
     def open(self, item_id: str, principal: int, debt: int, rounds: int) -> Position:
         self.sequence += 1
@@ -112,7 +114,7 @@ class Ledger:
 
     @property
     def debt(self) -> int:
-        return sum(p.debt for p in self.positions)
+        return sum(p.debt for p in self.positions) + self.shortfall
 
     def net_assets(self, cash: int) -> int:
         return cash + self.invested - self.debt
@@ -137,13 +139,15 @@ class Ledger:
         """Victory: principal returns at cost and debts are paid (cash is set by the caller)."""
         self.settled.extend(p.uid for p in self.positions)
         self.positions = []
+        self.shortfall = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {"sequence": self.sequence, "positions": [asdict(p) for p in self.positions],
-                "settled": list(self.settled)}
+                "settled": list(self.settled), "shortfall": self.shortfall}
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "Ledger":
         positions = [Position(str(p["uid"]), str(p["id"]), int(p["principal"]), int(p.get("debt", 0)),
                               int(p["remaining"]), int(p.get("wins", 0))) for p in d.get("positions", [])]
-        return Ledger(positions, int(d.get("sequence", len(positions))), [str(x) for x in d.get("settled", [])])
+        return Ledger(positions, int(d.get("sequence", len(positions))), [str(x) for x in d.get("settled", [])],
+                      int(d.get("shortfall", 0)))
