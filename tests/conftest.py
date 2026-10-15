@@ -14,6 +14,8 @@ os.environ["CHAOS_DB"] = ":memory:"
 os.environ.pop("CHAOS_PROFILE", None)
 # Meta upgrades are off in this version; their dormant code keeps its tests (tests of the "off" state unset it).
 os.environ["CHAOS_META_UPGRADES"] = "1"
+# New players skip the onboarding (tutorial, table unlocks); its tests turn it back on.
+os.environ["CHAOS_TUTORIAL"] = "0"
 
 import pytest
 

@@ -81,6 +81,10 @@ player (slot 1-3) ── tokens, permanent upgrades (with level), consumables (w
    └─ finish run ──────► tokens (win or consolation), run_history row, codex_seen updates
 ```
 
+Onboarding (migration 0010, docs/design/TUTORIAL.md): a guided player reaches milestones
+(`meta.milestones` / `meta.reach`); `GameMode.requires` / `reveal` open the tables one by one and
+`RunReward.milestones` lists what a run reached. Players from before it are not guided.
+
 ## 3. Data model (migration 0004, owner: agent A)
 
 Implemented in `chaos_blackjack/data/migrations/0004_meta_progression.sql`

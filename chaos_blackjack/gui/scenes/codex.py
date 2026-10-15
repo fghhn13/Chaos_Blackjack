@@ -60,6 +60,9 @@ class CodexScene(Scene):
         self.about = Button(assets, (HOST_PANEL.x + 12, 312, HOST_PANEL.w - 24, 30),
                             "Table rules", self._open_table, style="ghost", font_size=16, key_hint="")
         self.back = back_button(assets, self.app.scenes.pop)
+        # How to play: the basic strategy chart from the tutorial (docs/design/TUTORIAL.md).
+        self.chart = Button(assets, (W - MARGIN - 200, 134, 200, 42), "Strategy chart",
+                            lambda: self.app.scenes.push("strategy_chart"), style="ghost", font_size=18, key_hint="")
         self.open_detail = Button(assets, (PREVIEW_PANEL.x + 18, 590, PREVIEW_PANEL.w - 36, 32),
                                   "Full details", self._open_detail, style="ghost", font_size=16, key_hint="")
         self.category_buttons = {}
@@ -166,7 +169,7 @@ class CodexScene(Scene):
                     (PREVIEW_PANEL.x + 18, 524 + len(self.related_buttons) * 30, PREVIEW_PANEL.w - 36, 26),
                     other.name, lambda e=other: self._follow_related(e),
                     style="ghost", font_size=13, key_hint=""))
-        self.ui = WidgetGroup(*self.tabs.values(), self.about, self.back, self.open_detail,
+        self.ui = WidgetGroup(*self.tabs.values(), self.about, self.back, self.chart, self.open_detail,
                               *self.category_buttons.values(), *self.style_buttons.values(), *self.related_buttons)
 
     def _follow_related(self, entry):

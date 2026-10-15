@@ -19,12 +19,15 @@ from chaos_blackjack.app.table_mechanics import table_goal
 from chaos_blackjack.content.builtin_persona import HOST_NAMES, host_persona
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.lobby import (
-    MARGIN, OptionRow, back_button, draw_glow, draw_paragraph, draw_section,
+    MARGIN, OptionRow, back_button, draw_glow, draw_paragraph, draw_section, silhouette,
 )
 from chaos_blackjack.gui.components.meta_run import run_loop_factory
 from chaos_blackjack.gui.components.meta_screen import MetaScreen
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.widgets import Button, ScrollColumn, Slider, Toggle, WidgetGroup, fit_text
+from chaos_blackjack.gui.components.intro import HostDialog
+from chaos_blackjack.meta.onboarding import FIRST_RELIEF, TUTORIAL
+from chaos_blackjack.tutorial.lessons import FIRST_RELIEF as FIRST_RELIEF_LINES, RELIEF, beats
 
 MODES = pygame.Rect(MARGIN, 162, 300, 420)
 SHOWCASE = pygame.Rect(394, 140, 452, 468)
@@ -89,6 +92,8 @@ class RunSetupScene(MetaScreen):
 
     relief_note = ""
     insure_toggle = None
+    dialog = None
+    offer_tutorial = False
 
     def on_enter(self, player_id, **params):
         self.setup()
@@ -101,11 +106,19 @@ class RunSetupScene(MetaScreen):
         relief = self.action(lambda: meta.claim_relief(player_id, self.profile)) or 0
         self.player = self.action(lambda: meta.get_player(player_id))
         self.relief_note = f"Poker Head slid {relief} chips across the table." if relief else ""
+        self.dialog = None
+        if relief:   # Poker Head explains the first relief; later ones get the same short line
+            first = self.action(lambda: meta.reach(player_id, FIRST_RELIEF))
+            self.dialog = HostDialog(self.app.assets, beats(FIRST_RELIEF_LINES if first else RELIEF),
+                                     host_persona("poker_head"), finish="Enter to continue")
         if self.player is None:
             self.ui = WidgetGroup(back_button(self.app.assets, self.app.scenes.pop), keyboard=True)
             self.options, self.offers, self.consumables, self.permanents = [], [], [], []
             return
         self.options = self.action(lambda: meta.modes(player_id)) or []
+        # A new player is offered the practice table on the first visit (docs/design/TUTORIAL.md).
+        reached = self.action(lambda: meta.milestones(player_id))
+        self.offer_tutorial = reached is not None and TUTORIAL not in reached
         self.offers = [o for o in self.action(lambda: meta.meta_shop(player_id, self.profile)) or [] if o.owned > 0]
         self.pending = self.action(lambda: meta.pending_run(player_id))
         unlocked = [o.mode.id for o in self.options if o.unlocked]
@@ -146,9 +159,11 @@ class RunSetupScene(MetaScreen):
         modes = ScrollColumn(MODES, gap=10)
         for option in self.options:
             m = option.mode
-            row = OptionRow(a, 76, m.name, lambda mid=m.id: self.choose_mode(mid), icon=m.icon,
-                            detail=m.description if option.unlocked else "Locked: unlock it in the Shop",
-                            chaos=m.id == "chaos", enabled=option.unlocked)
+            shadow = self.is_silhouette(option)
+            row = OptionRow(a, 76, "???" if shadow else m.name, lambda mid=m.id: self.choose_mode(mid), icon=m.icon,
+                            detail=m.description if option.unlocked else option.hint or "Locked",
+                            chaos=m.id == "chaos", enabled=option.unlocked or shadow, silhouette=shadow,
+                            tooltip=option.hint if shadow else "")
             self.mode_rows[m.id] = modes.add(row)
         self.ui.add(modes)
         self.item_rows = {}
@@ -195,7 +210,7 @@ class RunSetupScene(MetaScreen):
         self.start_button.style = "chaos" if chaos else "primary"
         bounds = self.stake_bounds
         affordable = bounds is None or bounds[1] >= bounds[0]
-        self.start_button.enabled = bool(self.mode_id) and not self.starting and affordable
+        self.start_button.enabled = bool(self.mode_id) and not self.starting and affordable and self.mode_open
         if self.insure_toggle is not None:
             premium = self.insurance()[0]
             can = affordable and self.player.chips >= self.stake + premium
@@ -210,8 +225,22 @@ class RunSetupScene(MetaScreen):
 
     @property
     def table_range(self) -> tuple[int, int] | None:
-        """The table's (min, max) stake; None = a free table."""
-        return meta.stake_range(self.mode_id, self.profile) if self.mode_id else None
+        """The table's (min, max) stake; None = a free table (or one not open yet)."""
+        return meta.stake_range(self.mode_id, self.profile) if self.mode_id and self.mode_open else None
+
+    @staticmethod
+    def is_silhouette(option) -> bool:
+        """A table the onboarding has not opened yet: shown as a shadow with how to open it."""
+        return not option.unlocked and option.mode.requires is not None and bool(option.hint)
+
+    @property
+    def option(self):
+        return next((o for o in self.options if o.mode.id == self.mode_id), None)
+
+    @property
+    def mode_open(self) -> bool:
+        option = self.option
+        return option is not None and option.unlocked
 
     @property
     def stake_bounds(self) -> tuple[int, int] | None:
@@ -266,7 +295,7 @@ class RunSetupScene(MetaScreen):
     # ---------------------------------------------------------------- choices
 
     def choose_mode(self, mode_id):
-        if any(o.mode.id == mode_id and o.unlocked for o in self.options):
+        if any(o.mode.id == mode_id and (o.unlocked or self.is_silhouette(o)) for o in self.options):
             changed = mode_id != self.memory["mode"]
             self.memory["mode"] = mode_id
             if changed:
@@ -342,9 +371,35 @@ class RunSetupScene(MetaScreen):
         super().on_resume(result)
         self.sync()
 
+    # ---------------------------------------------------------------- tutorial
+
+    def ask_tutorial(self):
+        self.offer_tutorial = False
+        self.navigate("confirm", message="First time at the tables? Poker Head will deal six practice hands "
+                                         "and show you the moves.",
+                      confirm_text="Practice", cancel_text="Skip", on_confirm=self.start_tutorial,
+                      on_cancel=self.finish_tutorial)
+
+    def start_tutorial(self):
+        self.leaving = True
+        self.app.scenes.push("tutorial_table", on_finish=self.finish_tutorial)
+
+    def finish_tutorial(self):
+        self.action(lambda: meta.reach(self.player_id, TUTORIAL))
+
     # ---------------------------------------------------------------- frame
 
+    def handle_event(self, event):
+        if self.dialog is not None and not self.dialog.done:
+            self.dialog.handle_event(event)
+            return
+        super().handle_event(event)
+
     def update(self, dt):
+        if self.dialog is not None and not self.dialog.done:
+            return
+        if self.offer_tutorial and not self.leaving and self.player is not None:
+            self.ask_tutorial()
         self.ui.update(dt)
 
     def draw(self, surface):
@@ -372,6 +427,8 @@ class RunSetupScene(MetaScreen):
         hint = a.font(theme.FONT_TINY).render("Up / Down / Tab to move  ·  Space to choose  ·  Enter to start", True,
                                               theme.TEXT_MUTED)
         surface.blit(hint, hint.get_rect(midleft=(300, 667)))
+        if self.dialog is not None and not self.dialog.done:
+            self.dialog.draw(surface)
 
     def draw_stake(self, surface):
         """The vault, the stake slider and what the stake plays for."""
@@ -384,6 +441,9 @@ class RunSetupScene(MetaScreen):
             note = small.render(self.relief_note, True, theme.CHAOS_MAGENTA)
             surface.blit(note, (RIGHT_X, y + 24))
         bounds = self.stake_bounds
+        if not self.mode_open:
+            draw_paragraph(surface, a, "This table is not open yet.", (RIGHT_X, y + 40, RIGHT_W, 60))
+            return
         if bounds is None:
             draw_paragraph(surface, a, "This table is free: nothing leaves your vault.", (RIGHT_X, y + 40, RIGHT_W, 60))
             return
@@ -419,6 +479,15 @@ class RunSetupScene(MetaScreen):
             draw_paragraph(surface, a, "No mode is available yet.", r.inflate(-48, -48))
             return
         art = pygame.Rect(r.x, r.y + 12, r.w, 200)
+        if not self.mode_open:   # a silhouette: the dealer's shadow and how to open the table
+            face = silhouette(a.image_fit(self.host_portrait(mode), (190, 190)))
+            surface.blit(face, face.get_rect(center=art.center))
+            title = a.font(theme.FONT_HEADING, role="display").render("???", True, theme.TEXT_MUTED)
+            surface.blit(title, title.get_rect(midtop=(r.centerx, art.bottom + 4)))
+            hint = self.option.hint if self.option is not None else ""
+            draw_paragraph(surface, a, hint, pygame.Rect(r.x + 28, art.bottom + 52, r.w - 56, 90), color=theme.TEXT,
+                           size=theme.FONT_SMALL)
+            return
         draw_glow(surface, art.center, 120 if chaos else 110, theme.CHAOS_PURPLE if chaos else theme.FELT_LIGHT, 10)
         face = a.image_fit(self.host_portrait(mode), (190, 190))
         surface.blit(face, face.get_rect(center=art.center))
@@ -443,7 +512,7 @@ class RunSetupScene(MetaScreen):
         """Goal, bets, rules and dealer of the selected table, with upgrades applied (what you
         may bring is listed beside it)."""
         preview = self.preview_config()
-        if preview is None:
+        if preview is None or not self.mode_open:
             return []
         cfg = preview[1]
         if self.stake_bounds is not None and self.stake_bounds[1] >= self.stake_bounds[0]:

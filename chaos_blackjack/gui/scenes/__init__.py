@@ -8,3 +8,4 @@ from chaos_blackjack.gui.scenes import chaos_poke, choice, confirm, ending, run_
 from chaos_blackjack.gui.scenes import history, home, meta_shop, player_select, run_result, run_setup  # noqa: F401
 from chaos_blackjack.gui.scenes import codex  # noqa: F401
 from chaos_blackjack.gui.scenes import profile  # noqa: F401
+from chaos_blackjack.gui.scenes import tutorial  # noqa: F401

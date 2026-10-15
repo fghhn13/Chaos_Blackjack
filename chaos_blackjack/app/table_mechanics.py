@@ -303,3 +303,4 @@ def table_goal(config: "RunConfig") -> str | None:
 def _load_builtin_tables() -> None:
     import chaos_blackjack.j54.table  # noqa: F401  (registers "j54")
     import chaos_blackjack.poker_head.table  # noqa: F401  (registers "chaos")
+    import chaos_blackjack.tutorial.table  # noqa: F401  (registers "tutorial")

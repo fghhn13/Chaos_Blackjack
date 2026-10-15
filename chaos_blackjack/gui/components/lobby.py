@@ -308,7 +308,7 @@ class OptionRow(Button):
 
     def __init__(self, assets, height: int, title: str, on_click=None, *, icon: str = "", detail: str = "",
                  note: str = "", check: bool | None = None, chaos: bool = False, enabled: bool = True,
-                 tooltip: str = "") -> None:
+                 tooltip: str = "", silhouette: bool = False) -> None:
         super().__init__(assets, (0, 0, 10, height), title, on_click, key_hint="", enabled=enabled,
                          tooltip=tooltip)
         self.icon = icon
@@ -316,6 +316,7 @@ class OptionRow(Button):
         self.note = note
         self.check = check
         self.chaos = chaos
+        self.silhouette = silhouette   # a table not open yet: its icon drawn as a shadow
 
     def draw(self, surface: pygame.Surface) -> None:
         if not self.visible:
@@ -336,7 +337,9 @@ class OptionRow(Button):
         if self.icon:
             size = min(48, r.h - 16)
             icon = a.image_fit(self.icon, (size, size))
-            if muted:
+            if self.silhouette:
+                icon = silhouette(icon)
+            elif muted:
                 icon = icon.copy()
                 icon.set_alpha(100)
             surface.blit(icon, icon.get_rect(midleft=(x, r.centery)))
@@ -356,7 +359,7 @@ class OptionRow(Button):
             surface.blit(note, note.get_rect(midright=(right, r.centery)))
             right -= note.get_width() + 14
         title_font = a.font(theme.FONT_BODY, bold=True)
-        title_color = theme.TEXT_MUTED if muted else theme.IVORY
+        title_color = theme.TEXT_MUTED if muted or self.silhouette else theme.IVORY
         title = title_font.render(fit_text(title_font, self.text, right - x), True, title_color)
         if self.detail:
             surface.blit(title, (x, r.centery - title.get_height() + 2))
@@ -367,6 +370,14 @@ class OptionRow(Button):
             surface.blit(title, title.get_rect(midleft=(x, r.centery)))
         if self.focused and self.enabled:
             draw_focus_ring(surface, r)
+
+
+def silhouette(image: pygame.Surface) -> pygame.Surface:
+    """The image's shape in a dark shade (a locked table's portrait or icon)."""
+    shadow = image.copy()
+    shadow.fill((0, 0, 0), special_flags=pygame.BLEND_RGB_MULT)
+    shadow.fill((44, 48, 52), special_flags=pygame.BLEND_RGB_ADD)
+    return shadow
 
 
 class TextButton(Button):
@@ -400,5 +411,5 @@ def back_button(assets, on_click: Callable[[], None], text: str = "Back") -> But
 __all__ = [
     "DealerScene", "EmptyBadge", "MARGIN", "MenuItem", "OptionRow", "PLAYER_PREF", "PlayerBadge", "TextButton", "back_button",
     "apply_loadout", "choose_player", "current_player", "draw_backdrop", "draw_glow", "draw_header", "draw_left_fade",
-    "draw_paragraph", "draw_section", "mode_name", "run_summary",
+    "draw_paragraph", "draw_section", "mode_name", "run_summary", "silhouette",
 ]

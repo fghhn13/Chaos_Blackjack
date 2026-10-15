@@ -42,6 +42,7 @@ class Player:
     avatar: str = "avatar"            # asset id of the equipped avatar
     relief_streak: int = 0            # Poker Head's reliefs since the last won run
     lifetime_spend: int = 0           # chips spent on goods (the membership level reads it)
+    guided: bool = False              # follows the onboarding (meta/onboarding.py; older players do not)
 
     @property
     def chips(self) -> int:
@@ -76,6 +77,7 @@ class RunStart:
     config: "RunConfig"
     applied: dict[str, int]           # upgrade id -> level / copies used
     controller: "GameController"
+    notes: tuple[str, ...] = ()       # what the host adds before the first hand (e.g. a new player's bet cap)
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ class RunReward:
     result: str                              # victory | defeat
     player: Player
     unlocked: tuple[Unlock, ...] = ()
+    milestones: tuple[str, ...] = ()         # onboarding milestones this run reached (meta/onboarding.py)
 
 
 @dataclass(frozen=True)
