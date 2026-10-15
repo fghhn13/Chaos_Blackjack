@@ -21,11 +21,12 @@ from typing import Any
 from chaos_blackjack.achievements import achievements_catalog, get_achievement
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.controller import GameController
+from chaos_blackjack.codex.discovery import Discovery
 from chaos_blackjack.cosmetics import COSMETIC_SLOTS, cosmetics, get_cosmetic
 from chaos_blackjack.data.balance import Balance, BalanceError, MetaUpgradeBalance, default_balance, load_balance
 from chaos_blackjack.data.db import MEMORY, connect, db_path
 from chaos_blackjack.data.saves import SaveNotFound, load_run, save_run
-from chaos_blackjack.meta import membership as tiers, unlocks
+from chaos_blackjack.meta import membership as tiers, onboarding, unlocks
 from chaos_blackjack.meta.effects import get_effect
 from chaos_blackjack.meta.models import (
     MAX_NAME_LENGTH, SLOTS, AchievementState, CosmeticOffer, MetaError, PendingRun, Player, PlayerSlot, PlayerStats,
@@ -42,6 +43,7 @@ LoopFactory = Callable[[Any], Any]
 class ModeOption:
     mode: GameMode
     unlocked: bool
+    hint: str = ""        # how to open a locked table (its silhouette shows this)
 
 
 def consolation_tokens(balance: Balance, rounds: int, start: int, peak: int) -> list[tuple[str, int]]:
@@ -162,8 +164,8 @@ class MetaService:
             try:
                 start = self._balance(db, None, fallback=True).meta_vault_start
                 with db:
-                    pid = db.execute("INSERT INTO player (slot, name, tokens) VALUES (?, ?, ?)",
-                                     (slot, clean, start)).lastrowid
+                    pid = db.execute("INSERT INTO player (slot, name, tokens, guided) VALUES (?, ?, ?, ?)",
+                                     (slot, clean, start, int(onboarding.guided_default()))).lastrowid
             except sqlite3.IntegrityError:
                 raise MetaError(f"Slot {slot} is already used") from None
             return self._player(db, int(pid))
@@ -279,8 +281,38 @@ class MetaService:
             return tiers.membership(self._balance(db, profile, fallback=True), player.lifetime_spend)
 
     def modes(self, player_id: int | None = None) -> list[ModeOption]:
+        """The tables a player sees: open ones, and silhouettes of the next ones with how to open them
+        (onboarding, docs/design/TUTORIAL.md); tables further along are not listed yet."""
         upgrades = self.get_player(player_id).upgrades if player_id is not None else {}
-        return [ModeOption(m, m.unlocked_by is None or upgrades.get(m.unlocked_by, 0) > 0) for m in all_modes()]
+        reached = self.milestones(player_id) if player_id is not None else frozenset(onboarding.ALL)
+        options = []
+        for m in all_modes():
+            if m.reveal is not None and m.reveal not in reached:
+                continue
+            if m.requires is not None and m.requires not in reached:
+                options.append(ModeOption(m, False, m.teaser))
+                continue
+            bought = m.unlocked_by is None or upgrades.get(m.unlocked_by, 0) > 0
+            options.append(ModeOption(m, bought, "" if bought else "Unlock it in the Shop"))
+        return options
+
+    # ---------------------------------------------------------------- onboarding
+
+    def milestones(self, player_id: int) -> frozenset[str]:
+        """Onboarding milestones the player has reached (all of them for a player from before onboarding)."""
+        with self._db() as db:
+            self._player(db, player_id)
+            return onboarding.reached(db, player_id)
+
+    def reach(self, player_id: int, milestone: str) -> bool:
+        """Record an onboarding milestone (e.g. the tutorial finished); True when it is new."""
+        with self._db() as db:
+            self._player(db, player_id)
+            try:
+                with db:
+                    return onboarding.reach(db, player_id, milestone)
+            except ValueError as e:
+                raise MetaError(str(e)) from None
 
     def start_run(
         self,
@@ -306,8 +338,16 @@ class MetaService:
             player = self._player(db, player_id)
             if mode.unlocked_by and player.upgrades.get(mode.unlocked_by, 0) < 1:
                 raise MetaError(f"The {mode.name} mode is locked")
+            reached = onboarding.reached(db, player_id)
+            if mode.hidden or (mode.requires is not None and mode.requires not in reached):
+                raise MetaError(f"{mode.name} is locked" + (f": {mode.teaser}" if mode.teaser else ""))
             balance = self._balance(db, profile)
             config, applied = build_run_config(balance, mode, player.upgrades, bring, seed=seed)
+            notes: tuple[str, ...] = ()
+            if mode.id == "normal" and onboarding.BET_CAP_LIFTED not in reached:
+                config = replace(config, max_bet_fraction=min(config.max_bet_fraction, onboarding.CAP_FRACTION))
+                notes = (f"For your first {onboarding.CAPPED_RUNS} runs here I cap each bet at a quarter of your "
+                         "cash. Chips are not endless: throw them all on one hand and one bad card ends the run.",)
             bounds = _stake_range(balance, mode.id)
             if bounds is not None:
                 lo, hi = bounds
@@ -341,7 +381,7 @@ class MetaService:
                                     save_fn=partial(save_run, conn=self._conn, player_id=player_id, run_id=run_id))
         self._trackers[run_id] = RunTracker(controller)
         self._log(run_id, controller)
-        return RunStart(run_id, mode.id, config, applied, controller)
+        return RunStart(run_id, mode.id, config, applied, controller, notes)
 
     def track(self, run_id: int, controller: GameController) -> None:
         """Follow a run's controller again (e.g. after loading its save)."""
@@ -453,6 +493,9 @@ class MetaService:
                                       summary)
                 unlocks.fold_run(db, player_id, facts)
                 unlocked = backfilled + unlocks.evaluate(db, player_id, balance, facts, run_id)
+                top = _stake_range(balance, run["mode"])
+                reached = onboarding.after_run(db, player_id, run["mode"], result, run["stake"],
+                                               top[1] if top else None)
             breakdown += [(f"Achievement: {u.name}", u.tokens) for u in unlocked if u.tokens]
             tokens += sum(u.tokens for u in unlocked)
             with db:
@@ -460,7 +503,11 @@ class MetaService:
             if relief:
                 breakdown.append(("Relief from Poker Head", relief))
                 tokens += relief
-            return RunReward(tokens, tuple(breakdown), result, self._player(db, player_id), tuple(unlocked))
+                with db:
+                    if onboarding.reach(db, player_id, onboarding.FIRST_RELIEF):
+                        reached.append(onboarding.FIRST_RELIEF)
+            return RunReward(tokens, tuple(breakdown), result, self._player(db, player_id), tuple(unlocked),
+                             tuple(reached))
 
     def abandon_run(self, run_id: int) -> None:
         """Give up a run: recorded as abandoned, no tokens (consumables stay used)."""
@@ -490,6 +537,20 @@ class MetaService:
             json.loads(r["upgrades"] or "{}"), json.loads(r["summary"] or "{}"),
         ) for r in rows]
 
+    def discovery(self, player_id: int | None) -> Discovery:
+        """What the player's Collection shows: discovered entries and which dealers' tabs are open
+        (docs/design/CODEX.md "Discovery"). Everything for no player or a player from before onboarding."""
+        if player_id is None:
+            return Discovery.everything()
+        options = self.modes(player_id)
+        with self._db() as db:
+            self._player(db, player_id)
+            if not onboarding.is_guided(db, player_id):
+                return Discovery.everything()
+            seen = frozenset((r["kind"], r["entry_id"]) for r in db.execute(
+                "SELECT kind, entry_id FROM codex_seen WHERE player_id = ?", (player_id,)))
+        return Discovery.from_seen(seen, options)
+
     def codex_seen(self, player_id: int) -> dict[tuple[str, str], int]:
         """{(kind, entry_id): times} the player has met each codex entry."""
         with self._db() as db:
@@ -503,12 +564,14 @@ class MetaService:
         """Every cosmetic (of one slot) and its state for the player; hidden ones only once owned."""
         if slot is not None and slot not in COSMETIC_SLOTS:
             raise MetaError(f"Unknown cosmetic slot {slot!r}")
+        shown = {o.mode.series for o in self.modes(player_id)}
         with self._db() as db:
             player = self._player(db, player_id)
             balance = self._balance(db, profile)
             owned = unlocks.owned_cosmetics(db, player_id)
             all_owned = self._all_looks(db, profile)
             equipped = {c.id for c in unlocks.loadout(db, player_id, all_owned=all_owned).values()}
+            reached = onboarding.reached(db, player_id)
         prices = {p.cosmetic_id: tiers.shop_price(balance, player.lifetime_spend, p.cost)
                   for p in balance.cosmetic_prices}
         rewarded_by: dict[str, list[str]] = {}
@@ -521,6 +584,8 @@ class MetaService:
             have = c.default or all_owned or c.id in owned
             if c.hidden and not have:
                 continue
+            if c.series not in shown and not have:
+                continue   # a dealer whose table is not even a silhouette yet
             price = None if c.default else prices.get(c.id)
             hints = [f"{price} chips"] if price is not None else []
             hints += [f"Achievement: {name}" for name in rewarded_by.get(c.id, ())]
@@ -528,6 +593,8 @@ class MetaService:
                 reason = "Owned" if c.default or c.id in owned else "Unlocked"
             elif price is None:
                 reason = "Not for sale"
+            elif onboarding.sale_lock(c.series, reached):
+                reason = onboarding.sale_lock(c.series, reached)
             elif player.tokens < price:
                 reason = f"Needs {price} chips"
             else:
@@ -579,6 +646,9 @@ class MetaService:
                 price = tiers.shop_price(balance, player.lifetime_spend, price)
             if price is None:
                 raise MetaError(f"{c.name} is not for sale")
+            locked = onboarding.sale_lock(c.series, onboarding.reached(db, player_id))
+            if locked:
+                raise MetaError(locked)
             if player.tokens < price:
                 raise MetaError(f"Needs {price} chips")
             with db:
@@ -643,7 +713,8 @@ class MetaService:
         stats = PlayerStats(s["runs"] or 0, s["v"] or 0, s["d"] or 0, s["a"] or 0, s["best"] or 0, s["t"] or 0)
         avatar = unlocks.loadout(db, player_id, all_owned=self._all_looks(db))["avatar"].asset_map()["avatar"]
         return Player(row["id"], row["slot"], row["name"], row["tokens"], upgrades, stats,
-                      row["created_at"], row["last_played_at"], avatar, row["relief_streak"], row["lifetime_spend"])
+                      row["created_at"], row["last_played_at"], avatar, row["relief_streak"], row["lifetime_spend"],
+                      bool(row["guided"]))
 
     @classmethod
     def _all_looks(cls, db: sqlite3.Connection, profile: str | None = None) -> bool:
@@ -667,6 +738,8 @@ class MetaService:
         for item, n in summary["items_used"].items():
             items[item] = items.get(item, 0) + n
         seen += [("item", i, n) for i, n in items.items()]
+        seen += [("environment", r, n) for r, n in summary.get("environment_seen", {}).items()]
+        seen += [("offer", i, 1) for i in summary.get("offered", ())]
         if summary.get("chaos_ai"):
             seen.append(("ai", summary["chaos_ai"], 1))
         for kind, entry_id, n in seen:

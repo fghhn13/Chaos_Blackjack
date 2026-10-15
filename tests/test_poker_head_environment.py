@@ -430,3 +430,34 @@ def test_a_swap_keeps_the_second_card_down_and_risk_pointer_still_answers():
     c.use_item("ph_swap")
     assert [x.face_up for x in c.view().player_cards] == [True, False] and c.view().player_total is None
     assert "BUST" in c.use_item("ph_radar").message                     # 5 + 9 + K = 24
+
+
+# --- tiers (rule_tier; measured with the simulator, 2026-10-14) -------------------------------------------
+
+
+@pytest.mark.parametrize("rule, tier", [
+    (env.bust("player", 19), 3), (env.bust("player", 20), 2), (env.bust("dealer", 22), 3), (env.bust("dealer", 23), 3),
+    (env.bust_outcome("dealer", "push"), 3), (env.fixed(ranks("10", "J", "Q", "K"), 7), 3),
+    (env.fixed(ranks("J", "Q", "K"), 8), 2), (env.fixed(ranks("J", "Q", "K"), 9), 1), (env.fixed(ranks("7"), 9), 1),
+    (env.shift((CardGroup("all"), 1)), 2), (env.shift((ranks("10", "J", "Q", "K"), -2)), 2),
+    (env.shift((ranks("7"), 1)), 1), (env.tie("dealer"), 2), (env.item_ban(2), 2), (env.profit_cap(50), 2),
+    (env.hidden(2), 2), (env.markup(20), 1)])
+def test_rules_have_tiers(rule, tier):
+    assert rule.tier == tier and rule.tier_name == ("", "Light", "Medium", "Heavy")[tier]
+
+
+def test_the_director_never_rewrites_high_cards_below_7():
+    from chaos_blackjack.poker_head.director import Director
+
+    d = Director({}, seed=1)
+    for round_no in (1, 5, 9, 13):
+        for rule in d.variants(d.stage(round_no)).get("fixed", []):
+            if len(rule.group.ranks) > 1:
+                assert int(rule.params["value"]) >= 7
+    assert all(d.stage(r).slots <= 2 for r in (1, 5, 9, 13, 40))
+
+
+def test_announcements_and_badges_name_the_tier():
+    c = controller(rules=[env.bust("player", 19)])
+    rule = c.view().active_rules[0]
+    assert rule.tier == "Heavy"

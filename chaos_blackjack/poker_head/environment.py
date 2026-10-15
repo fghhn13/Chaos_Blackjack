@@ -272,6 +272,15 @@ class EnvRule:
             return "It ends on its own; Clause Removal removes it sooner. Silence Seal suppresses it for a round."
         return "Clause Removal removes it, or the dealer may replace it. Silence Seal suppresses it for a round."
 
+    @property
+    def tier(self) -> int:
+        """1 light, 2 medium, 3 heavy (rule_tier)."""
+        return rule_tier(self)
+
+    @property
+    def tier_name(self) -> str:
+        return TIER_NAMES[self.tier]
+
     def text(self) -> str:
         """Everything a player needs: effect, duration and how it goes away."""
         return f"{self.effect_text()} {self.duration_text()} {self.removal_text()}"
@@ -296,6 +305,41 @@ def fixed(group: CardGroup, value: int, actor: str = "both", **kw) -> EnvRule:
 
 def shift(*shifts: tuple[CardGroup, int], actor: str = "both", **kw) -> EnvRule:
     return EnvRule("shift", {"actor": actor, "shifts": [[g.to_dict(), d] for g, d in shifts]}, **kw)
+
+
+# --- tiers -----------------------------------------------------------------------------------------
+# From the simulator (2026-10-14, black-jack-sim): the change in a basic-strategy player's EV per bet with the
+# rule in force. Heavy loses more than 0.12 of the bet (your bust limit 19, the dealer's 22/23, a dealer bust
+# pardoned, high cards rewritten to 7 or less); medium 0.05-0.12 (your limit 20, every card shifted, high cards
+# rewritten to 8 or shifted by 2, ties to the dealer) and the rules that work on money or information (item
+# ban, Withdrawal Limit, a face-down card); everything else is light.
+TIER_NAMES = ("", "Light", "Medium", "Heavy")
+_HIGH = {"10", "J", "Q", "K"}
+
+
+def rule_tier(r: EnvRule) -> int:
+    p = r.params
+    if r.type == "bust_outcome":
+        return 3
+    if r.type == "bust":
+        if r.actor == "player":
+            return 3 if int(p["limit"]) <= 19 else 2
+        return 3 if int(p["limit"]) >= 22 else 1
+    if r.type == "fixed":
+        group = r.group
+        if group.kind == "ranks" and len(group.ranks) > 1 and set(group.ranks) <= _HIGH:
+            value = int(p["value"])
+            return 3 if value <= 7 else 2 if value <= 8 else 1
+        return 1
+    if r.type == "shift":
+        for group, delta in r.shifts:
+            if group.kind == "all" or (group.kind == "ranks" and len(group.ranks) > 1 and set(group.ranks) <= _HIGH
+                                       and abs(delta) >= 2):
+                return 2
+        return 1
+    if r.type in ("tie", "profit_cap", "item_ban", "hidden"):
+        return 2
+    return 1
 
 
 def bust(actor: str, limit: int, rounds: int = 2, **kw) -> EnvRule:

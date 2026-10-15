@@ -132,7 +132,7 @@ Cards are `<rank><suit>`: ranks `A 2 … 10 J Q K`, suits `♠ ♥ ♦ ♣` (♥
 `Chaos AI says: ...`, `You draw: Q`, `Dealer draws: 8`, `Dealer stands at 18.`,
 `Dealer busts.`, `💀 BUST!`, `♠ BLACKJACK!`, `Dealer has blackjack.`,
 `Double down! Bet is now 40.`, `You surrender. 10 returned.`,
-`Next card rank: 7` (item result), `Bought peek for 10.`, `The shop has new stock.`
+`Next card: 7 (Peek)` (item result), `Bought peek for 10.`, `The shop has new stock.`
 Treat them as narration; the authoritative state is `obs`.
 
 ## 5. Errors and recovery
@@ -282,7 +282,7 @@ The GUI's "Poker Head's Table". Design: `docs/design/POKER_HEAD_BUILDS.zh-CN.md`
 - **Fourfold Ticket** (`ph_quad`) is offered whenever a plain double is (your cash covers twice the bet); the stake is four times the bet, win or lose, and a loss beyond your cash becomes debt (`obs.table.public.debt`), which counts against net assets. **Aces to the Top** (`ph_aces`) moves the next ace in the deck to the top.
 - **Cores change what you can do**: Room to Breathe (bust limit +2), Exit Clause (surrender after hitting), Fresh Hand (`perform ph_redeal` once per round before your first action: both opening cards are replaced by the next two), Raise Permission (double after hitting) and Private Account. Graceful Retreat, Almost Perfect and High Stakes are permanents.
 - **Table actions.** Spare Sleeve shows up in `obs.table_actions` on your turn (`perform ph_sleeve`).
-- **Environment rules.** Before shopping each round the dealer may add or replace one rule (at most three in force, fewer early on; a growing offline director, never an LLM). Rules change card values, bust limits, ties, busts, cap a round's profit, ban items (the next consumable you use only lifts the ban), raise shop prices or deal your second card face down. Each is listed in `obs.chaos.active_rules` with `name`, `scope`, `effect`, `remaining` (rounds, or null = until removed), `removal` and `silenced`; changes are announced in `events`. Clause Removal (`ph_remove`) targets one by its `id`.
+- **Environment rules.** Before shopping each round the dealer may add or replace one rule (at most two in force; a growing offline director, never an LLM). Rules are tiered Light / Medium / Heavy by measured strength: heavy ones (your bust limit 19, the dealer's 22/23, dealer busts pardoned, high cards rewritten to 7) appear only from round 9 and one at a time. Rules change card values, bust limits, ties, busts, cap a round's profit, ban items (the next consumable you use only lifts the ban), raise shop prices or deal your second card face down. Each is listed in `obs.chaos.active_rules` with `name`, `scope`, `effect`, `remaining` (rounds, or null = until removed), `removal`, `silenced` and `tier`; changes are announced in `events`. Clause Removal (`ph_remove`) targets one by its `id`.
 - **Fate Forecast** shows your own two opening cards before you bet (a pending Comeback Ace shows the first as an ace); shopping, rerolling or resuming never changes them, and card effects during your turn (Fresh Hand, Aces to the Top, Sleeve Clip, Spare Sleeve) mark them out of date.
 - **Bust Insurance** (`ph_insurance`, before betting or on your turn): if you bust this round, the dealer still plays (the reply shows the dealer drawing); a dealer bust makes it a push, otherwise you lose. **Court Discount**: your J/Q/K count as 10 or 5, whichever keeps you from busting.
 

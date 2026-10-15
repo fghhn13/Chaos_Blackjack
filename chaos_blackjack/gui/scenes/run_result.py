@@ -8,7 +8,11 @@ from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.lobby import apply_loadout, draw_section
 from chaos_blackjack.gui.components.meta_screen import MetaScreen, panel, text
 from chaos_blackjack.gui.components.wardrobe import draw_look
+from chaos_blackjack.content.builtin_persona import host_persona
+from chaos_blackjack.gui.components.intro import HostDialog
 from chaos_blackjack.gui.scene import register_scene
+from chaos_blackjack.meta.onboarding import CLASSIC_MAX_WIN, FIRST_RELIEF, POKER_HEAD_WIN
+from chaos_blackjack.tutorial.lessons import FIRST_RELIEF as FIRST_RELIEF_LINES, RELIEF, UNLOCK_J54, UNLOCK_POKER_HEAD, beats
 from chaos_blackjack.gui.widgets import Button, WidgetGroup, fit_text
 
 UNLOCK_X, UNLOCK_W = 650, 470
@@ -23,6 +27,7 @@ class RunResultScene(MetaScreen):
         self.run_id, self.player_id, self.controller = run_id, player_id, controller
         self.reward = None
         self.equip_buttons = {}
+        self.dialog = None
         self.settle()
 
     def settle(self):
@@ -41,6 +46,14 @@ class RunResultScene(MetaScreen):
         else:
             self.title = "Victory" if victory else "Defeat"
             self.app.audio.play("ending_victory" if victory else "ending_bankrupt")
+            # A table this run opened (onboarding, docs/design/TUTORIAL.md): Poker Head announces it.
+            lines = (UNLOCK_POKER_HEAD if CLASSIC_MAX_WIN in self.reward.milestones else ()) + (
+                UNLOCK_J54 if POKER_HEAD_WIN in self.reward.milestones else ())
+            if any(label == "Relief from Poker Head" for label, _ in self.reward.breakdown):
+                lines += FIRST_RELIEF_LINES if FIRST_RELIEF in self.reward.milestones else RELIEF
+            if lines:
+                self.dialog = HostDialog(self.app.assets, beats(lines), host_persona("poker_head"),
+                                         finish="Enter to continue")
             for i, u in enumerate(self.cards()):
                 if self.looks(u):
                     y = 214 + i * (CARD_H + CARD_GAP)
@@ -78,6 +91,9 @@ class RunResultScene(MetaScreen):
             self.app.scenes.reset("home")
 
     def handle_event(self, event):
+        if self.dialog is not None and not self.dialog.done:
+            self.dialog.handle_event(event)
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.reward:
             self.back_to_hub()
         else:
@@ -103,6 +119,8 @@ class RunResultScene(MetaScreen):
         if unlocked:
             self.draw_unlocks(surface)
         self.ui.draw(surface)
+        if self.dialog is not None and not self.dialog.done:
+            self.dialog.draw(surface)
 
     def draw_unlocks(self, surface):
         a = self.app.assets

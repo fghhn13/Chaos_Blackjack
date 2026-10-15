@@ -103,7 +103,7 @@ class CardLens(ItemHandler):
     def apply(self, holding, target):
         rank = str(self.ctx.deck[0].rank)
         self.ctx.round.shown = [rank]
-        return f"Card Lens: the next rank is {rank}."
+        return f"Next card: {rank} (Card Lens)."
 
 
 @handler("ph_hole")
@@ -113,7 +113,8 @@ class HoleProbe(ItemHandler):
 
     def apply(self, holding, target):
         self.ctx.reveal_hole()
-        return "Hole Probe: the dealer's hole card is revealed."
+        hole = self.ctx.state.dealer_hand[1]
+        return f"Dealer's hole card: {hole.rank}{hole.suit} (Hole Probe)."
 
 
 @handler("ph_radar")
@@ -123,7 +124,7 @@ class RiskPointer(ItemHandler):
 
     def apply(self, holding, target):
         total = self.ctx.value(self.ctx.player_hand + self.ctx.deck[:1])
-        return "Risk Pointer: your next hit would " + ("BUST." if self.ctx.is_bust(total) else "be safe.")
+        return ("BUST if you hit" if self.ctx.is_bust(total) else "Safe to hit") + " (Risk Pointer)."
 
 
 @handler("ph_oracle")
@@ -135,7 +136,7 @@ class FateForecast(ItemHandler):
         cards = self.ctx.table.forecast_cards()
         self.ctx.round.forecast = [f"{c.rank}{c.suit}" for c in cards]
         self.ctx.round.forecast_changed = False
-        return "Fate Forecast: your opening cards will be " + " ".join(self.ctx.round.forecast) + "."
+        return "Your opening cards: " + " ".join(self.ctx.round.forecast) + " (Fate Forecast)."
 
 
 # --- changing cards -----------------------------------------------------------------------
@@ -168,7 +169,7 @@ class AcesToTheTop(ItemHandler):
         i = next(i for i, c in enumerate(deck) if str(c.rank).upper() == "A")
         self.ctx.set_state(self.ctx.state.with_deck((deck[i],) + deck[:i] + deck[i + 1:]))
         self.ctx.table.deck_changed()
-        return "Aces to the Top: the next card is an ace."
+        return "Next card: an ace (Aces to the Top)."
 
 
 @handler("ph_undo")

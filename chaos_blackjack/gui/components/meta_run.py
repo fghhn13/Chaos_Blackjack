@@ -6,13 +6,17 @@ import pygame
 
 from chaos_blackjack import meta
 from chaos_blackjack.app.controller import ActionError
+from chaos_blackjack.app.notices import NoticeKind
 from chaos_blackjack.app.view import Action, TablePhase
 from chaos_blackjack.content.ai_profile import build_pipeline
 from chaos_blackjack.core.game_loop import GameLoop
+from chaos_blackjack.gui.components.intro import HostDialog
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.scenes.table import TableScene, RUN_END_DELAY
 from chaos_blackjack.gui.texts import BAD
+from chaos_blackjack.meta.onboarding import PH_INTRO_BUILD, PH_INTRO_RULES
 from chaos_blackjack.registry import get_registry
+from chaos_blackjack.tutorial.lessons import PH_INTRO_BUILD as BUILD_LINES, PH_INTRO_RULES as RULES_LINES, beats
 
 
 def run_loop_factory(app):
@@ -31,7 +35,43 @@ class MetaTableScene(TableScene):
         self.exit_pending = False
         self.save_name = f"player-{player_id}-run-{self.run_id}"
         super().on_enter(controller=started.controller, intro=intro)
+        self.onboard(started, intro)
         self.checkpoint()
+
+    def onboard(self, started, intro):
+        """A guided player's first visit: the host adds a new player's notes (e.g. the bet cap) to the
+        greeting, explains builds at Poker Head's Table and its rules when the first one arrives
+        (docs/design/TUTORIAL.md)."""
+        try:
+            reached = meta.milestones(self.player_id)
+        except (meta.MetaError, sqlite3.Error, OSError):
+            reached = frozenset({PH_INTRO_BUILD, PH_INTRO_RULES})
+        extra = [*beats(tuple(("neutral", note) for note in getattr(started, "notes", ()) if intro))]
+        if started.mode == "chaos" and PH_INTRO_BUILD not in reached:
+            extra += beats(BUILD_LINES)
+            self.reach(PH_INTRO_BUILD)
+        if extra:
+            before = self.intro.beats if self.intro is not None else []
+            self.intro = HostDialog(self.app.assets, before + extra, self.persona)
+        self.explain_rules = started.mode == "chaos" and PH_INTRO_RULES not in reached
+        if self.explain_rules:
+            self.subscribe(NoticeKind.RULE_MODIFIER_APPLIED, self.first_rule)
+
+    def first_rule(self, notice):
+        """Poker Head's first rule of a guided player's first visit: say how rules work, once."""
+        if not self.explain_rules:
+            return
+        self.explain_rules = False
+        self.reach(PH_INTRO_RULES)
+        self.pending_lines = beats(RULES_LINES)
+
+    pending_lines = ()
+
+    def reach(self, milestone):
+        try:
+            meta.reach(self.player_id, milestone)
+        except (meta.MetaError, sqlite3.Error, OSError):
+            pass
 
     def checkpoint(self):
         if (self._closed or self._poke_pending or self._chaos_future is not None
@@ -73,6 +113,9 @@ class MetaTableScene(TableScene):
         super().on_resume(result)
 
     def update(self, dt):
+        if self.pending_lines and self.dialog() is None and not self.fx.busy:
+            self.intro = HostDialog(self.app.assets, list(self.pending_lines), self.persona, finish="Enter to continue")
+            self.pending_lines = ()
         if self.view.phase != TablePhase.RUN_OVER:
             super().update(dt)
             return

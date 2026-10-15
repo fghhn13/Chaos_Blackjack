@@ -138,10 +138,10 @@ def test_looks_are_bought_in_the_shop_and_switched_in_the_wardrobe(app) -> None:
     choose_player(app, rookie.id)
     shop = _screen(app, "meta_shop", player_id=rookie.id, area="cosmetics", series="core")
     row = shop.rows["card_back_crimson"]
-    assert not row.enabled and row.offer.reason == "Needs 40 chips"
+    assert not row.enabled and row.offer.reason == "Needs 400 chips"
     assert not shop.rows["card_back_royal"].enabled                     # an achievement reward: locked
     assert not shop.rows["card_back_standard"].enabled                  # owned and equipped
-    meta.service().grant_tokens(rookie.id, 45)
+    meta.service().grant_tokens(rookie.id, 405)
     shop.refresh()
     _click(app, shop.rows["card_back_crimson"])
     assert meta.get_player(rookie.id).tokens == 5 and "purchased" in shop.message

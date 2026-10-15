@@ -8,7 +8,11 @@ goal (docs/design/AI_MODES.md):
                            items=("peek", "shield"), intro=("Quick hands tonight.",)))
 
 `overrides` are RunConfig fields. A mode with `unlocked_by` needs that meta
-upgrade (effect `unlock_mode`); `None` means always available.
+upgrade (effect `unlock_mode`); `None` means always available. For a guided
+player (docs/design/TUTORIAL.md) a mode with `requires` opens at that onboarding
+milestone and shows as a silhouette with its `teaser` from `reveal` (None: at
+once) until then. A `hidden` mode (the tutorial's practice table) is never
+listed.
 """
 
 from __future__ import annotations
@@ -46,6 +50,12 @@ class GameMode:
     shared_items: tuple[str, ...] = ()  # usable starter aliases, not claimed from other modes
     # Which parts the table shows and where (app/layout.py); None = the default layout.
     layout: "Layout | None" = None
+    # Onboarding (meta/onboarding.py): the milestone that opens the table, the one from which its
+    # silhouette shows (None = always) and how to open it, in a few words.
+    requires: str | None = None
+    reveal: str | None = None
+    teaser: str = ""
+    hidden: bool = False                # never listed (e.g. the tutorial's practice table)
 
     def apply(self, config: "RunConfig") -> "RunConfig":
         """The run's config in this mode: goal overrides, host, AI and pools."""
@@ -127,7 +137,8 @@ def get_mode(mode_id: str) -> GameMode:
 
 
 def modes() -> list[GameMode]:
-    return sorted(_MODES.values(), key=lambda m: (m.order, m.id))
+    """The listed modes (not hidden ones), in order."""
+    return sorted((m for m in _MODES.values() if not m.hidden), key=lambda m: (m.order, m.id))
 
 
 def sold_items(config: "RunConfig") -> set[str]:
@@ -214,6 +225,7 @@ register_mode(GameMode(
     icon="mode_poker_head", overrides={"enable_chaos": True}, order=1, host="poker_head", series="poker_head",
     items=POKER_HEAD_ITEMS + tuple(POKER_HEAD_ALIASES), exclusive=True,
     shared_items=tuple(POKER_HEAD_ALIASES), layout=_poker_head_layout(),
+    requires="classic_max_win", teaser="Win the Classic Table once with the top stake to open this table.",
 ))
 # Demo of the deck-rebuilding table (docs/design/J54_TABLE.md); its mechanics are chaos_blackjack/j54.
 J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection",
@@ -237,6 +249,14 @@ register_mode(GameMode(
     "reshape it, pay the compute fee each round and complete the protocol before the deck turns against you.",
     icon="mode_j54", overrides={"enable_chaos": True}, order=2, host="j54", series="j54",
     rules=J54_RULES, items=J54_CONTRACTS, exclusive=True, layout=_j54_layout(),
+    requires="poker_head_win", reveal="classic_max_win", teaser="Beat Poker Head's Table once to open this table.",
+))
+# The tutorial's practice table (chaos_blackjack/tutorial): never listed, started by the onboarding.
+register_mode(GameMode(
+    "tutorial", "Practice Table",
+    "Poker Head deals a few practice hands and explains each decision.",
+    icon="mode_normal", overrides={"enable_chaos": False, "shop_slots": 0, "max_bet_fraction": 0.25},
+    order=99, host="poker_head", rules=(), items=(), series="core", hidden=True,
 ))
 
 __all__ = [

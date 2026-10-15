@@ -21,8 +21,8 @@ class DangerRadar:
         if busts is None:
             return ItemResult(ok=False, message="The radar has nothing to read")
         ctx.emit_event(Event(EventType.ITEM_USED, {"item": self.name, "next_hit_busts": busts}))
-        return ItemResult(ok=True, message="Radar: the next hit would BUST you." if busts
-                          else "Radar: the next hit is safe.")
+        return ItemResult(ok=True, message="BUST if you hit (Danger Radar)." if busts
+                          else "Safe to hit (Danger Radar).")
 
 
 register_item(DangerRadar.name, DangerRadar)

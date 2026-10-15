@@ -38,6 +38,10 @@ class GameMode:
     rules: tuple[str, ...] | None = None     # Chaos rule pool; None = every rule the profile enables
     items: tuple[str, ...] | None = None     # shop item pool; None = every item the profile sells
     intro: tuple[str, ...] = ()              # fallback greeting when the host has no line library
+    requires: str | None = None              # onboarding milestone that opens the table (TUTORIAL.md)
+    reveal: str | None = None                # milestone from which its silhouette shows (None = always)
+    teaser: str = ""                         # how to open it, shown on the silhouette
+    hidden: bool = False                     # never listed (the tutorial's practice table)
 ```
 
 `mode.apply(config)` applies `overrides`, then sets `config.mode`,

@@ -392,5 +392,10 @@ Run result ── unlock cards (achievement, tokens, cosmetic with "Equip" butto
 
 ## 10. Open points
 
-- Exact prices and token rewards (placeholders until the economy is looked at again).
+- Prices (2026-10-15) are set by wins: a top-stake Classic win nets about 300 chips and a Poker Head win
+  1200 or more. Classic looks cost 300-600, Chaos Velvet 1200, and J-54's looks 1500-3000; buying every look
+  that is sold costs about 15,500.
+- A dealer's looks go on sale once the dealer is beaten (`meta/onboarding.py` `SALE_LOCKS`). Poker Head's are
+  the Poker Face reward anyway. J-54's are not sold to players created since onboarding while its table is a
+  demo. A dealer whose table is not listed yet has no looks in the Shop.
 - Mid-run achievement toasts (data model already allows it).

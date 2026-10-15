@@ -31,8 +31,10 @@ PORTRAIT = 170
 
 class HostDialog(Widget):
     def __init__(self, assets: "AssetManager", beats: list[HostLine], persona: "Persona | None", *,
-                 finish: str = "Enter to start") -> None:
+                 finish: str = "Enter to start", box: pygame.Rect | None = None, shade: bool = True) -> None:
         self.assets = assets
+        self.box = box or BOX       # where the box sits (e.g. below a chart it talks about)
+        self.shade = shade          # dim the screen behind it
         self.beats = [b for b in beats if b.text]
         self.index = 0
         self.persona = persona
@@ -72,30 +74,52 @@ class HostDialog(Widget):
             self.advance()
         return True  # nothing else reacts while the host is talking
 
+    def fit(self, text: str, width: int, height: int) -> tuple[pygame.font.Font, list[str]]:
+        """The largest body font whose wrapped lines of `text` fit `width` x `height` (the smallest otherwise)."""
+        for size in (theme.FONT_BUTTON, theme.FONT_BODY, theme.FONT_SMALL + 2):
+            font = self.assets.font(size)
+            lines = wrap_text(font, text, width)
+            if len(lines) * font.get_linesize() <= height:
+                return font, lines
+        rows = max(1, height // font.get_linesize())
+        return font, wrap_text(font, text, width, max_lines=rows)
+
+    @property
+    def compact(self) -> bool:
+        """A narrow box (e.g. beside the cards): a small portrait above the text."""
+        return self.box.w < 600
+
     def draw(self, surface: pygame.Surface) -> None:
         if self.done:
             return
         a = self.assets
-        shade = pygame.Surface(LOGICAL_SIZE, pygame.SRCALPHA)
-        shade.fill((0x0E, 0x11, 0x10, 170))
-        surface.blit(shade, (0, 0))
-        pygame.draw.rect(surface, theme.PANEL, BOX, border_radius=16)
-        pygame.draw.rect(surface, theme.CHAOS_MAGENTA, BOX, 2, border_radius=16)
-        portrait = a.image_fit(self.portrait, (PORTRAIT, PORTRAIT))
-        surface.blit(portrait, portrait.get_rect(center=(BOX.x + 24 + PORTRAIT // 2, BOX.centery)))
-        x = BOX.x + PORTRAIT + 48
+        if self.shade:
+            shade = pygame.Surface(LOGICAL_SIZE, pygame.SRCALPHA)
+            shade.fill((0x0E, 0x11, 0x10, 170))
+            surface.blit(shade, (0, 0))
+        box = self.box
+        pygame.draw.rect(surface, theme.PANEL, box, border_radius=16)
+        pygame.draw.rect(surface, theme.CHAOS_MAGENTA, box, 2, border_radius=16)
         name = a.font(theme.FONT_BUTTON, bold=True).render(self.name, True, theme.GOLD)
-        surface.blit(name, (x, BOX.y + 24))
-        body = a.font(theme.FONT_BUTTON)
-        y = BOX.y + 66
-        for line in wrap_text(body, self.beats[self.index].text, BOX.right - 32 - x, max_lines=3):
+        if self.compact:
+            size = 96
+            portrait = a.image_fit(self.portrait, (size, size))
+            surface.blit(portrait, (box.x + 18, box.y + 16))
+            surface.blit(name, name.get_rect(midleft=(box.x + size + 34, box.y + 16 + size // 2)))
+            x, y = box.x + 24, box.y + size + 28
+        else:
+            portrait = a.image_fit(self.portrait, (PORTRAIT, PORTRAIT))
+            surface.blit(portrait, portrait.get_rect(center=(box.x + 24 + PORTRAIT // 2, box.centery)))
+            x, y = box.x + PORTRAIT + 48, box.y + 66
+            surface.blit(name, (x, box.y + 24))
+        body, lines = self.fit(self.beats[self.index].text, box.right - 28 - x, box.bottom - 40 - y)
+        for line in lines:
             surface.blit(body.render(line, True, theme.IVORY), (x, y))
             y += body.get_linesize()
         for i in range(len(self.beats)):
             pygame.draw.circle(surface, theme.GOLD if i <= self.index else theme.FELT_LIGHT,
-                               (x + 6 + i * 18, BOX.bottom - 24), 5)
+                               (x + 6 + i * 18, box.bottom - 24), 5)
         last = self.index == len(self.beats) - 1
         hint = a.font(theme.FONT_SMALL).render(
             (self.finish if last else "Enter to continue") + "  ·  Esc to skip", True, theme.TEXT_MUTED)
-        surface.blit(hint, hint.get_rect(bottomright=(BOX.right - 28, BOX.bottom - 14)))
-
+        surface.blit(hint, hint.get_rect(bottomright=(box.right - 28, box.bottom - 14)))

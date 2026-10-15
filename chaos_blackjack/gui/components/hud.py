@@ -10,7 +10,7 @@ import pygame
 from chaos_blackjack.app.view import GameView
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
-from chaos_blackjack.gui.widgets import Widget, fit_text
+from chaos_blackjack.gui.widgets import Widget, wrap_text
 
 if TYPE_CHECKING:
     from chaos_blackjack.gui.assets import AssetManager
@@ -107,7 +107,9 @@ class _FeedLine:
 
 
 class EventFeed(Widget):
-    """Bottom-left log of recent events; lines fade out after `ttl` seconds."""
+    """Bottom-left log of recent events; lines fade out after `ttl` seconds. With `max_width`, a long message
+    wraps onto more rows instead of being cut; `max_lines` counts rows, filled from the newest message back,
+    so the newest message always shows in full."""
 
     def __init__(
         self,
@@ -129,7 +131,7 @@ class EventFeed(Widget):
 
     def push(self, text: str, color: theme.Color = theme.TEXT) -> None:
         self.lines.append(_FeedLine(text, color))
-        del self.lines[:-self.max_lines]
+        del self.lines[:-max(self.max_lines, 1)]
 
     def clear(self) -> None:
         self.lines.clear()
@@ -139,22 +141,37 @@ class EventFeed(Widget):
             line.age += dt
         self.lines = [l for l in self.lines if l.age < self.ttl]
 
+    def rows(self, font: pygame.font.Font) -> list[tuple[str, _FeedLine]]:
+        """The rows on screen, oldest first: each message wrapped to `max_width`, newest messages kept."""
+        out: list[tuple[str, _FeedLine]] = []
+        for line in reversed(self.lines):
+            room = self.max_lines - len(out)
+            if room <= 0:
+                break
+            wrapped = wrap_text(font, line.text, self.max_width) if self.max_width else [line.text]
+            if len(wrapped) > room:
+                if out:
+                    break                      # an older message that no longer fits leaves whole
+                wrapped = wrap_text(font, line.text, self.max_width, max_lines=room)
+            out[:0] = [(text, line) for text in wrapped]
+        return out
+
     def draw(self, surface: pygame.Surface) -> None:
         font = self.assets.font(theme.FONT_SMALL)
         x, y = self.anchor
+        rows = self.rows(font)
         if self.align_top:
-            for line in self.lines[-self.max_lines:]:
-                img = self._render(font, line)
+            for text, line in rows:
+                img = self._render(font, text, line)
                 surface.blit(img, (x, y))
                 y += img.get_height() + 4
             return
-        for line in reversed(self.lines[-self.max_lines:]):
-            img = self._render(font, line)
+        for text, line in reversed(rows):
+            img = self._render(font, text, line)
             y -= img.get_height() + 4
             surface.blit(img, (x, y))
 
-    def _render(self, font: pygame.font.Font, line: _FeedLine) -> pygame.Surface:
-        text = fit_text(font, line.text, self.max_width) if self.max_width else line.text
+    def _render(self, font: pygame.font.Font, text: str, line: _FeedLine) -> pygame.Surface:
         img = font.render(text, True, line.color)
         fade = min(1.0, (self.ttl - line.age) / 1.5)
         img.set_alpha(int(255 * fade))

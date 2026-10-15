@@ -142,11 +142,12 @@ def _rule_entry(ctx: PartContext, r, full: bool) -> Entry:
     if not r.effect:  # a Chaos AI modifier: its description is the whole story
         return Entry(name, _detail(name, r.description), icon=r.icon or r.id, tone="chaos", tooltip=r.description)
     left = "Until removed" if r.remaining is None else f"{r.remaining} round{'s' if r.remaining != 1 else ''}"
-    badge = "Silenced" if r.silenced else left
+    badge = "Silenced" if r.silenced else f"{r.tier} · {left}" if r.tier else left
     text = f"{r.effect}  {r.removal}" if full else r.effect
     return Entry(f"{name} · {r.scope}" if full else name, text, icon=r.icon or r.id,
-                 tone="muted" if r.silenced else "chaos", badge=badge,
-                 tooltip=f"{r.scope}: {r.description}" + (" Silenced this round." if r.silenced else ""))
+                 tone="muted" if r.silenced else "warn" if r.tier == "Heavy" else "chaos", badge=badge,
+                 tooltip=(f"{r.tier} rule. " if r.tier else "") + f"{r.scope}: {r.description}"
+                 + (" Silenced this round." if r.silenced else ""))
 
 
 def _rules(ctx: PartContext, variant: str) -> tuple[Widget, ...]:

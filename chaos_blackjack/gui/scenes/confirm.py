@@ -27,17 +27,19 @@ class ConfirmScene(Scene):
         on_confirm: Callable[[], None] | None = None,
         confirm_text: str = "Confirm",
         cancel_text: str = "Cancel",
+        on_cancel: Callable[[], None] | None = None,
         **params,
     ) -> None:
         self.message = message
         self.on_confirm = on_confirm
+        self.on_cancel = on_cancel
         a = self.app.assets
         self.box = pygame.Rect(0, 0, 520, 220)
         self.box.center = (W // 2, H // 2)
         bx, by = self.box.centerx, self.box.bottom - 80
         self.ui = WidgetGroup(
             Button(a, (bx - 190, by, 170, 52), confirm_text, self._confirm, hotkey=pygame.K_RETURN),
-            Button(a, (bx + 20, by, 170, 52), cancel_text, self.app.scenes.pop, style="ghost",
+            Button(a, (bx + 20, by, 170, 52), cancel_text, self._cancel, style="ghost",
                    hotkey=pygame.K_ESCAPE),
             keyboard=True,
         )
@@ -46,6 +48,11 @@ class ConfirmScene(Scene):
         self.app.scenes.pop()
         if self.on_confirm is not None:
             self.on_confirm()
+
+    def _cancel(self) -> None:
+        self.app.scenes.pop()
+        if self.on_cancel is not None:
+            self.on_cancel()
 
     def handle_event(self, event: pygame.event.Event) -> None:
         self.ui.handle_event(event)

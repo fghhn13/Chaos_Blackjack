@@ -58,7 +58,7 @@ def test_run_config_defaults_come_from_the_seed() -> None:
 
 def test_database_is_created_migrated_and_seeded(db, tmp_path) -> None:
     assert (tmp_path / "game.db").is_file()
-    assert schema_version(db) == 9
+    assert schema_version(db) == 10
     row = db.execute("SELECT locked, source_hash FROM balance_profile WHERE name = 'default'").fetchone()
     assert row["locked"] == 1 and row["source_hash"]
     again = connect(tmp_path / "game.db")  # idempotent
@@ -204,7 +204,7 @@ def test_old_databases_are_migrated(tmp_path) -> None:
     raw.commit()
     raw.close()
     conn = connect(path)
-    assert schema_version(conn) == 9
+    assert schema_version(conn) == 10
     assert load_balance("default", conn).chaos_stub == default_balance().chaos_stub
     conn.close()
 
@@ -321,7 +321,7 @@ def test_item_params_reach_the_item(db) -> None:
     c.place_bet(5)
     if c.phase.value != "player_turn":
         pytest.skip("seed dealt a natural")
-    assert c.use_item("fate_oracle").message.startswith("Top 2 cards")
+    assert c.use_item("fate_oracle").message.startswith("Next 2 cards")
 
 
 def test_bad_params_are_rejected(db) -> None:
@@ -402,7 +402,7 @@ def test_existing_editable_profiles_receive_new_interaction_settings(db, tmp_pat
                    "('chaos.guidance_probability', 'chaos.memory_enabled', 'chaos.memory_limit')")
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 9
+        assert schema_version(conn) == 10
         b = load_balance("old-profile", conn)
         assert b.start_money == 150
         assert (b.chaos_guidance_probability, b.chaos_memory_enabled, b.chaos_memory_limit) == (.5, False, 32)
@@ -413,6 +413,9 @@ def test_existing_editable_profiles_receive_new_interaction_settings(db, tmp_pat
 def _rewind(conn, version: int) -> None:
     """Undo migrations newer than `version` (to test upgrades of old databases)."""
     with conn:
+        if version < 10:
+            conn.execute("DROP TABLE player_milestone")
+            conn.execute("ALTER TABLE player DROP COLUMN guided")
         if version < 7:
             conn.execute("ALTER TABLE meta_upgrade DROP COLUMN mode")
             conn.execute("ALTER TABLE achievement_reward RENAME COLUMN cosmetic_ids TO cosmetic_id")
@@ -438,7 +441,7 @@ def test_existing_editable_profiles_receive_meta_settings_and_catalog(db, tmp_pa
     _rewind(db, 3)
     conn = connect(tmp_path / "game.db")
     try:
-        assert schema_version(conn) == 9
+        assert schema_version(conn) == 10
         b = load_balance("old-profile", conn)
         assert b.start_money == 150 and (b.meta_win_tokens, b.meta_loss_cap) == (10, 5)
         # The catalog snapshot of migration 0004; later seed changes do not touch editable profiles.

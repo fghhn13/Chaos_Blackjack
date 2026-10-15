@@ -128,14 +128,14 @@ a filtered card grid, and the selected entry's scrollable reference. Series tabs
 remain at the top. Poker Head additionally offers multi-card, surrender,
 precision, double, finance and general build filters, combined with item type.
 Selection, filters and scroll positions survive opening a full detail/demo and
-returning, and switching series. Every entry remains visible without unlocks.
+returning, and switching series. A guided player discovers entries as they play (see "Discovery" below).
 
 Poker Head's build table changes the rules through its offline director, so its
 page lists the `environment` kind (one entry per environment rule type, with
 an example, how it goes away and the director's stages from the balance
-profile) instead of registry Chaos rules. The registry rules no dealer's table
-uses any more (they still play in the mode-less `--chaos` run) appear on the
-Classic Table page.
+profile) instead of registry Chaos rules. The registry rules no listed table
+uses any more (they still play in the mode-less `--chaos` run) are left out of
+the Collection.
 
 `CodexEntry` has optional `category`, `style`, `timing`, `price` strings and a
 `related` tuple of entry IDs within the same kind. Existing providers may omit
@@ -191,7 +191,7 @@ series** (labelled "Classic Table"), then a **Dealers** group with one tab per e
 Poker Head). `codex_sections(config) -> list[CodexSection]` returns:
 
 - **Classic Table**: its tables, the items sold at every table (or at
-  none), Chaos rules no expansion uses, and guest Chaos AIs from content packs;
+  none), Chaos rules its own tables apply (none today), and guest Chaos AIs from content packs;
 - one section per dealer: the character's portrait, name, profile and
   signature line (`profile` and `signature` in the host's line library;
   system details stay on detail pages), its table (the mode entry, behind
@@ -201,12 +201,31 @@ Poker Head). `codex_sections(config) -> list[CodexSection]` returns:
 
 `CodexSection(id, label, groups, expansion, host, mode, portrait, summary, quote,
 entries)` and `CodexGroup(id, label, entries, empty)` are headless. Every
-rule, item and mode appears in some section, so nothing is hidden; a new
-expansion gets its own tab automatically. The GUI displays a compact identity
+item and listed mode appears in some section, and a Chaos rule wherever a listed
+table can apply it; a new expansion gets its own tab automatically. The GUI displays a compact identity
 panel (with "Table rules"), category navigation, cards and an inline reference.
 Long grids scroll with the wheel or Page Up/Page Down, and Tab cycles sections.
 `codex_kinds` and `codex_entries` remain available for tools
 and tests.
+
+## Discovery
+
+`meta.discovery(player_id) -> Discovery` (`codex/discovery.py`) decides what a
+player's Collection shows; no player, and players from before onboarding
+(docs/design/TUTORIAL.md), see everything.
+
+- An entry is discovered once met. Each run records it in `codex_seen`:
+  - `item`: an item or build bought or used;
+  - `offer`: seen on a shop shelf, or offered in a choice such as the opening cores;
+  - `rule`: a Chaos rule that came up;
+  - `environment`: one of Poker Head's rule types that came up.
+- An undiscovered entry is a shadowed icon named "???" with a hint where to look.
+  It has no details, demo or related links.
+- The header counts "Discovered n / total".
+- A dealer's tab follows New run:
+  - its table not open yet: a "???" tab with a silhouetted portrait and the unlock condition;
+  - not listed at all yet: no tab.
+- Tables, the strategy chart and table rules of open tables are always shown.
 
 `tests/test_codex_gui.py` verifies gallery/detail navigation, sections, scrolling, pause,
 single stepping, replay, the final-frame stop, live numbers in text and

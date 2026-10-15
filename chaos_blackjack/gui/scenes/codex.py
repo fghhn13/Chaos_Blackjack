@@ -7,10 +7,11 @@ import pygame
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.codex import CodexEntry, CodexSection, codex_sections, run_demo
 from chaos_blackjack.codex.build_reference import CATEGORY_LABELS, STYLE_LABELS
+from chaos_blackjack.codex.discovery import Discovery
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.components.codex_demo import CodexDemo
 from chaos_blackjack.gui.components.codex_text import draw_text, wrap_text
-from chaos_blackjack.gui.components.lobby import MARGIN, back_button, draw_backdrop, draw_header
+from chaos_blackjack.gui.components.lobby import MARGIN, back_button, draw_backdrop, draw_header, silhouette
 from chaos_blackjack.gui.scene import Scene, register_scene
 from chaos_blackjack.gui.settings import LOGICAL_SIZE
 from chaos_blackjack.gui.widgets import Button, WidgetGroup
@@ -33,9 +34,11 @@ TEXT_RECT = TEXT_PANEL.inflate(-40, -40)
 class CodexScene(Scene):
     """Series tabs, category/style filters, cards and an independent reference pane."""
 
-    def on_enter(self, config: RunConfig | None = None, section: str | None = None, **params):
+    def on_enter(self, config: RunConfig | None = None, section: str | None = None, player_id: int | None = None,
+                 **params):
         self.config = config if config is not None else self.app.run_config
-        self.sections = codex_sections(self.config)
+        self.discovery = self._discovery(player_id)
+        self.sections = [s for s in codex_sections(self.config) if self.discovery.series_state(s.id) != "hidden"]
         ids = [s.id for s in self.sections]
         self.current = section if section in ids else ids[0]
         self.scroll = 0
@@ -53,13 +56,17 @@ class CodexScene(Scene):
                 x += 14
                 self.expansions_label_x = x
                 x += assets.font(theme.FONT_TINY, bold=True).size(EXPANSIONS_LABEL.upper())[0] + 14
-            width = max(140, assets.font(theme.FONT_BODY).size(s.label)[0] + 40)
-            self.tabs[s.id] = Button(assets, (x, 134, width, 42), s.label, lambda sid=s.id: self._select(sid),
+            label = s.label if self.discovery.series_state(s.id) == "open" else "???"
+            width = max(140, assets.font(theme.FONT_BODY).size(label)[0] + 40)
+            self.tabs[s.id] = Button(assets, (x, 134, width, 42), label, lambda sid=s.id: self._select(sid),
                                      style="ghost", font_size=20, key_hint="")
             x += width + 10
         self.about = Button(assets, (HOST_PANEL.x + 12, 312, HOST_PANEL.w - 24, 30),
                             "Table rules", self._open_table, style="ghost", font_size=16, key_hint="")
         self.back = back_button(assets, self.app.scenes.pop)
+        # How to play: the basic strategy chart from the tutorial (docs/design/TUTORIAL.md).
+        self.chart = Button(assets, (W - MARGIN - 200, 134, 200, 42), "Strategy chart",
+                            lambda: self.app.scenes.push("strategy_chart"), style="ghost", font_size=18, key_hint="")
         self.open_detail = Button(assets, (PREVIEW_PANEL.x + 18, 590, PREVIEW_PANEL.w - 36, 32),
                                   "Full details", self._open_detail, style="ghost", font_size=16, key_hint="")
         self.category_buttons = {}
@@ -68,6 +75,28 @@ class CodexScene(Scene):
         self._select(self.current)
 
     # ------------------------------------------------------------------ data
+
+    @staticmethod
+    def _discovery(player_id: int | None) -> Discovery:
+        """The player's discoveries (everything without a player, or when the store cannot be read)."""
+        if player_id is None:
+            return Discovery.everything()
+        import sqlite3
+
+        from chaos_blackjack import meta
+
+        try:
+            return meta.discovery(player_id)
+        except (ValueError, sqlite3.Error, OSError):   # the Collection still opens without a readable store
+            return Discovery.everything()
+
+    @property
+    def section_open(self) -> bool:
+        return self.discovery.series_state(self.current) == "open"
+
+    def known(self, entry: CodexEntry) -> bool:
+        """Discovered, in a dealer's tab that is open (otherwise drawn as "???")."""
+        return self.section_open and self.discovery.known(entry)
 
     @property
     def section(self) -> CodexSection:
@@ -101,7 +130,7 @@ class CodexScene(Scene):
         for sid, tab in self.tabs.items():
             expansion = next(s.expansion for s in self.sections if s.id == sid)
             tab.style = "ghost" if sid != section_id else ("chaos" if expansion else "primary")
-        self.about.visible = self.about.enabled = self.section.mode is not None
+        self.about.visible = self.about.enabled = self.section.mode is not None and self.section_open
         self._make_filters()
         self._layout()
         entry = next((e for e in self.filtered_entries if (e.kind, e.id) == selected), None)
@@ -113,7 +142,7 @@ class CodexScene(Scene):
             self.app.scenes.push("codex_detail", entry=self.section.mode, config=self.config)
 
     def _open_detail(self):
-        if self.selected_entry:
+        if self.selected_entry and self.known(self.selected_entry):
             self.app.scenes.push("codex_detail", entry=self.selected_entry, config=self.config)
 
     def _make_filters(self):
@@ -153,20 +182,25 @@ class CodexScene(Scene):
     def _select_entry(self, entry):
         self.selected_entry = entry
         self.detail_offset = 0
-        self.reference = entry.detail(self.config) if entry else "No entries match these filters."
-        self.open_detail.enabled = entry is not None
+        if entry is not None and not self.known(entry):
+            self.reference = (self.discovery.teasers.get(self.current, "") if not self.section_open
+                              else self.discovery.hint(entry))
+            self.open_detail.enabled = False
+        else:
+            self.reference = entry.detail(self.config) if entry else "No entries match these filters."
+            self.open_detail.enabled = entry is not None
         self.open_detail.text = "Watch demo" if entry and entry.demo else "Full details"
         self.related_buttons = []
         if entry:
             by_id = {e.id: e for e in self.entries if e.kind == entry.kind}
-            for entry_id in entry.related[:2]:
-                if entry_id not in by_id: continue
+            for entry_id in entry.related[:2] if self.known(entry) else ():
+                if entry_id not in by_id or not self.known(by_id[entry_id]): continue
                 other = by_id[entry_id]
                 self.related_buttons.append(Button(self.app.assets,
                     (PREVIEW_PANEL.x + 18, 524 + len(self.related_buttons) * 30, PREVIEW_PANEL.w - 36, 26),
                     other.name, lambda e=other: self._follow_related(e),
                     style="ghost", font_size=13, key_hint=""))
-        self.ui = WidgetGroup(*self.tabs.values(), self.about, self.back, self.open_detail,
+        self.ui = WidgetGroup(*self.tabs.values(), self.about, self.back, self.chart, self.open_detail,
                               *self.category_buttons.values(), *self.style_buttons.values(), *self.related_buttons)
 
     def _follow_related(self, entry):
@@ -268,6 +302,9 @@ class CodexScene(Scene):
         self._draw_host(surface)
         self._draw_preview(surface)
         count = f"{len(self.filtered_entries)} / {len(self.entries)} entries"
+        if not self.discovery.all_known:
+            found, total = self.discovery.count(self.entries) if self.section_open else (0, len(self.entries))
+            count += f"   ·   Discovered {found} / {total}"
         draw_text(surface, count, assets.font(16), (268, 192, 620, 28), theme.GOLD_DIM)
         area = self._area()
         clip = surface.get_clip()
@@ -282,6 +319,16 @@ class CodexScene(Scene):
             pygame.draw.rect(surface, theme.GOLD if selected else theme.GOLD_DIM if hover else theme.FELT_LIGHT,
                              rect, 2, border_radius=10)
             icon = assets.image_fit(entry.icon, (54, 54))
+            if not self.known(entry):   # undiscovered: a shadow, "???" and where to look
+                surface.blit(silhouette(icon), icon.get_rect(center=(rect.x + 40, rect.y + 40)))
+                draw_text(surface, "???", assets.font(17, bold=True), (rect.x + 78, rect.y + 12, rect.w - 90, 50),
+                          theme.TEXT_MUTED)
+                category = CATEGORY_LABELS.get(self._category(entry), self._category(entry).title())
+                draw_text(surface, category, assets.font(13), (rect.x + 14, rect.y + 66, rect.w - 28, 22),
+                          theme.GOLD_DIM)
+                hint = self.discovery.hint(entry) if self.section_open else self.discovery.teasers.get(self.current, "")
+                draw_text(surface, hint, assets.font(15), (rect.x + 14, rect.y + 91, rect.w - 28, 55), theme.TEXT_MUTED)
+                continue
             surface.blit(icon, icon.get_rect(center=(rect.x + 40, rect.y + 40)))
             draw_text(surface, entry.name, assets.font(17, bold=True), (rect.x + 78, rect.y + 12, rect.w - 90, 50))
             category = CATEGORY_LABELS.get(self._category(entry), self._category(entry).title())
@@ -311,13 +358,15 @@ class CodexScene(Scene):
         accent = theme.CHAOS_MAGENTA
         pygame.draw.rect(surface, (0x26, 0x1E, 0x2B), r, border_radius=14)
         pygame.draw.rect(surface, accent, r, 2, border_radius=14)
+        shut = not self.section_open
         if s.portrait:
             portrait = a.image_fit(s.portrait, (54, 54))
-            surface.blit(portrait, portrait.get_rect(topleft=(r.x + 12, r.y + 12)))
-        draw_text(surface, s.label, a.font(19, bold=True), (r.x + (76 if s.portrait else 12), r.y + 14,
-                  r.w - (88 if s.portrait else 24), 50), accent)
+            surface.blit(silhouette(portrait) if shut else portrait, portrait.get_rect(topleft=(r.x + 12, r.y + 12)))
+        draw_text(surface, "???" if shut else s.label, a.font(19, bold=True), (r.x + (76 if s.portrait else 12),
+                  r.y + 14, r.w - (88 if s.portrait else 24), 50), accent)
         font = a.font(13)
-        lines = wrap_text(s.profile[0] if s.profile else s.summary, font, r.w - 24)
+        about = self.discovery.teasers.get(s.id, "") if shut else (s.profile[0] if s.profile else s.summary)
+        lines = wrap_text(about, font, r.w - 24)
         brief = lines[:2]
         if len(lines) > 2:
             last = brief[-1].rstrip()
@@ -333,8 +382,13 @@ class CodexScene(Scene):
             draw_text(surface, self.reference, a.font(18), r.inflate(-36, -36), theme.TEXT_MUTED)
             return
         icon = a.image_fit(entry.icon, (64, 64))
-        surface.blit(icon, icon.get_rect(topleft=(r.x + 18, r.y + 14)))
-        draw_text(surface, entry.name, a.font(20, bold=True), (r.x + 98, r.y + 14, r.w - 116, 72), theme.GOLD)
+        known = self.known(entry)
+        surface.blit(icon if known else silhouette(icon), icon.get_rect(topleft=(r.x + 18, r.y + 14)))
+        draw_text(surface, entry.name if known else "???", a.font(20, bold=True), (r.x + 98, r.y + 14, r.w - 116, 72),
+                  theme.GOLD if known else theme.TEXT_MUTED)
+        if not known:
+            draw_text(surface, self.reference, a.font(16), PREVIEW_TEXT, theme.TEXT_MUTED)
+            return
         label = CATEGORY_LABELS.get(self._category(entry), self._category(entry).title())
         style = STYLE_LABELS.get(entry.style, entry.style)
         if style and style != label: label += " / " + style

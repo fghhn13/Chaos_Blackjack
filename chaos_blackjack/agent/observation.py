@@ -167,7 +167,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             "budget": v.chaos_budget if v.chaos_budget_shown else None,
             "active_rules": [{"id": r.id, "help": r.description,
                               **({"name": r.name, "scope": r.scope, "effect": r.effect, "remaining": r.remaining,
-                                  "removal": r.removal, "silenced": r.silenced} if r.effect else {})}
+                                  "removal": r.removal, "silenced": r.silenced, "tier": r.tier} if r.effect else {})}
                              for r in v.active_rules],
         },
         # A mode's own mechanics (J-54: protocol, Joker, deck, fee; Poker Head: build and money); None elsewhere.

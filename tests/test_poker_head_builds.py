@@ -104,7 +104,7 @@ def test_declining_the_core_pays_its_chips_and_blocks_amendments_for_the_run():
     s = AgentSession.new(mode="chaos", seed=7)
     assert s.execute({"cmd": "choose", "option": "cash"})["ok"]
     c = s.controller
-    assert c.run.money == 480 and c.table.loadout.no_core and c.table.loadout.core is None   # 30 written for 150
+    assert c.run.money == 560 and c.table.loadout.no_core and c.table.loadout.core is None   # 60 written for 150
     assert not c.table.stockable("ph_change")
     offer(c, "ph_change")
     assert c.view().shop_offers[0].reason.startswith("You took the opening chips")
@@ -204,7 +204,7 @@ def test_risk_pointer_uses_the_same_player_values():
     c = controller()
     item(c, "ph_radar")
     deal(c, player=("10", "6"), deck=("6",))
-    assert "safe" in c.use_item("ph_radar").message   # 22 is not a bust with Room to Breathe
+    assert c.use_item("ph_radar").message.startswith("Safe")  # 22 is not a bust with Room to Breathe
 
 
 def test_multi_card_rewards_combine_once():
@@ -537,7 +537,7 @@ def test_chip_amounts_are_a_share_of_the_starting_cash():
     assert [t.min_bet(r) for r in (1, 4, 16, 19)] == [20, 40, 160, 200]
     assert t.config.item_params["ph_loan"] == {**c.config.item_params["ph_loan"], "advance": 400, "repay": 480}
     assert t.config.item_params["ph_stock"]["probability"] == 0.5  # not a chip amount
-    assert t.setting("decline_cash") == 120 and t.reroll_price(0) == 12
+    assert t.setting("decline_cash") == 240 and t.reroll_price(0) == 12
     assert c.bet_limits() == (20, 200)
 
 

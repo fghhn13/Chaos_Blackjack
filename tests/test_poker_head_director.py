@@ -55,7 +55,7 @@ def test_the_shipped_profile_holds_the_design_numbers():
 
 
 @pytest.mark.parametrize("round_no, index, act, slots, budget", [
-    (1, 0, 0.4, 1, 1), (4, 0, 0.4, 1, 1), (5, 1, 0.6, 2, 3), (9, 2, 0.75, 2, 5), (13, 3, 0.85, 3, 6), (40, 3, 0.85, 3, 6)])
+    (1, 0, 0.4, 1, 1), (4, 0, 0.4, 1, 1), (5, 1, 0.6, 2, 3), (9, 2, 0.75, 2, 5), (13, 3, 0.85, 2, 6), (40, 3, 0.85, 2, 6)])
 def test_stages_grow_with_the_round(round_no, index, act, slots, budget):
     s = director().stage(round_no)
     assert (s.index, s.act, s.slots, s.budget) == (index, act, slots, budget)
@@ -64,7 +64,7 @@ def test_stages_grow_with_the_round(round_no, index, act, slots, budget):
 @pytest.mark.parametrize("rule, pressure", [
     (env.fixed(ranks("7"), 9), 1), (env.shift((ranks("7"), 1)), 1), (env.shift((CardGroup("red"), 2)), 2),
     (env.shift((CardGroup("even"), 1), (CardGroup("odd"), -1)), 2), (env.shift((CardGroup("all"), 1)), 2),
-    (env.bust("player", 20), 2), (env.bust("player", 19), 3), (env.bust("dealer", 22), 2), (env.bust("dealer", 23), 3),
+    (env.bust("player", 20), 2), (env.bust("player", 19), 3), (env.bust("dealer", 22), 3), (env.bust("dealer", 23), 3),
     (env.tie("dealer"), 2), (env.bust_outcome("dealer", "push"), 3), (env.profit_cap(50), 2), (env.profit_cap(30), 4),
     (env.item_ban(2), 2), (env.item_ban(3), 3), (env.markup(10), 1), (env.markup(30), 2), (env.hidden(2), 2)])
 def test_pressure_follows_the_design_table(rule, pressure):
@@ -128,7 +128,7 @@ def test_budget_high_pressure_and_hidden_with_ban_limits():
         if action.kind == "added":
             new = action.rule
             assert new.type not in ("hidden", "bust", "item_ban")
-            assert d.pressure(new) < HIGH_PRESSURE                       # one high-pressure rule at most
+            assert new.tier < 3                                          # one heavy rule at most
             assert 5 + d.pressure(new) <= 8
 
 
@@ -218,7 +218,8 @@ def test_a_long_run_keeps_every_limit(seed):
         stage = d.stage(c.run.round)
         assert len(rules) <= stage.slots and len({r.type for r in rules}) == len(rules)
         assert sum(d.pressure(r) for r in rules) <= stage.budget or c.run.round == 1
-        assert sum(1 for r in rules if d.pressure(r) >= HIGH_PRESSURE) <= 1
+        assert sum(1 for r in rules if r.tier == 3) <= 1               # one heavy rule at most ...
+        assert c.run.round >= 9 or all(r.tier < 3 for r in rules)        # ... and none before round 9
         assert not {"hidden", "item_ban"} <= {r.type for r in rules}
         play_round(c)
     assert c.run.round == 31
@@ -249,11 +250,12 @@ def test_rules_show_as_cards_with_scope_time_and_removal():
     assert all(r.effect in r.description and r.removal for r in rules)
     full = build_part("core.rules", PartContext(c, c.view()), "full")
     cards = full[0].entries
-    assert [e.badge for e in cards] == ["Until removed", "3 rounds"] and "Clause Removal" in cards[0].text
+    assert [e.badge for e in cards] == ["Light · Until removed", "Light · 3 rounds"] and "Clause Removal" in cards[0].text
     assert len(full) == 1                                              # no Chaos AI rule pool at this table
     obs = AgentSession(c, seed=7).observe()["chaos"]["active_rules"]
     assert obs[1] == {"id": "markup", "help": rules[1].description, "name": "Price Hike", "scope": "The shop",
-                      "effect": rules[1].effect, "remaining": 3, "removal": rules[1].removal, "silenced": False}
+                      "effect": rules[1].effect, "remaining": 3, "removal": rules[1].removal, "silenced": False,
+                      "tier": "Light"}
 
 
 def test_silenced_rules_stay_listed_and_marked():

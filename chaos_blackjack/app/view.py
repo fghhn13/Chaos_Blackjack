@@ -93,6 +93,7 @@ class RuleView:
     removal: str = ""         # how it goes away
     silenced: bool = False    # suppressed this round (e.g. Silence Seal)
     icon: str = ""            # asset id ("" = the id)
+    tier: str = ""            # Light | Medium | Heavy (Poker Head's environment rules); "" elsewhere
 
 
 @dataclass(frozen=True)

@@ -151,7 +151,7 @@ def test_lifetime_spend_counts_the_run_shop_and_looks(svc):
     paid = before - c.run.money
     _lose(run)
     meta.buy_cosmetic(p.id, "card_back_crimson")
-    assert meta.get_player(p.id).lifetime_spend == paid + 40
+    assert meta.get_player(p.id).lifetime_spend == paid + 400
 
 
 def test_a_free_table_takes_no_stake(svc):
@@ -245,10 +245,10 @@ def test_level_3_raises_the_relief_cap_and_level_4_discounts_the_shop(svc):
         paid.append(meta.claim_relief(p.id))
     assert max(paid) == 120
     offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "deck")}["card_back_crimson"]
-    assert offer.price == 40
+    assert offer.price == 400
     _spend(svc, p.id, 8000)
     _set_vault(svc, p.id, 1000)
     offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "deck")}["card_back_crimson"]
-    assert offer.price == 38 and offer.unlock_hint.startswith("38 chips")
+    assert offer.price == 380 and offer.unlock_hint.startswith("380 chips")
     meta.buy_cosmetic(p.id, "card_back_crimson")
-    assert meta.get_player(p.id).tokens == 962 and meta.get_player(p.id).lifetime_spend == 8038
+    assert meta.get_player(p.id).tokens == 620 and meta.get_player(p.id).lifetime_spend == 8380
