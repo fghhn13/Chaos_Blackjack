@@ -687,7 +687,7 @@ class PokerHeadTable(TableMechanics):
     def active_rules(self):
         silenced = self._suppressed()
         return tuple(RuleView(r.type, r.text(), r.title, r.effect_text(), r.scope, r.remaining, r.removal_text(),
-                              silenced, r.icon) for r in self.environment)
+                              silenced, r.icon, r.tier_name) for r in self.environment)
 
     def remove_rule(self, rule_type: str) -> str:
         """Clause Removal: take a rule off for good (its type then cools down)."""
@@ -713,9 +713,9 @@ class PokerHeadTable(TableMechanics):
         rule = action.rule
         if action.kind == "replaced":
             self.lift_rule(action.replaced, "replaced")
-            text = f"Poker Head replaces {action.replaced.title} with {rule.title}."
+            text = f"Poker Head replaces {action.replaced.title} with {rule.title} ({rule.tier_name.lower()})."
         else:
-            text = f"Poker Head changes the table: {rule.title}."
+            text = f"Poker Head changes the table: {rule.title} ({rule.tier_name.lower()})."
         self.environment.append(rule)
         self._announce(f"{text} {rule.effect_text()} {rule.duration_text()}", action.kind, rule)
 

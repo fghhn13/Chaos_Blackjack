@@ -59,13 +59,13 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
     (:profile, 'mode.chaos.config.exit_multiple', '4', 'float', 0, NULL, 'Full Haul: net assets, as a multiple of the starting cash, from which the player may leave with a win (0 = never)'),
     (:profile, 'mode.chaos.config.objective', 'net_assets', 'str', NULL, NULL, 'Poker Head victory objective'),
     (:profile, 'mode.chaos.build_slots', '3', 'int', 1, NULL, 'Permanent build slots'),
-    (:profile, 'mode.chaos.rule_slots', '3', 'int', 1, NULL, 'Persistent Chaos rule slots'),
+    (:profile, 'mode.chaos.rule_slots', '2', 'int', 1, NULL, 'Persistent Chaos rule slots'),
     (:profile, 'mode.chaos.margin_bonus', '2', 'int', 0, NULL, 'Room to Breathe bust limit bonus'),
     (:profile, 'mode.chaos.approx_values', '20,22', 'str', NULL, NULL, 'Totals recognized as 21 after natural settlement'),
     (:profile, 'mode.chaos.surrender_pct', '20', 'int', 0, 100, 'Graceful Retreat loss percentage'),
     (:profile, 'mode.chaos.base_surrender_pct', '50', 'int', 0, 100, 'Undiscounted surrender fee percentage'),
     (:profile, 'mode.chaos.double_bonus_pct', '25', 'int', 0, NULL, 'High Stakes extra win percentage'),
-    (:profile, 'mode.chaos.decline_cash', '30', 'int', 0, NULL, 'Extra starting chips for declining a core'),
+    (:profile, 'mode.chaos.decline_cash', '60', 'int', 0, NULL, 'Extra starting chips for declining a core (written for money_base)'),
     (:profile, 'mode.chaos.core_cash', '{"ph_margin":-60,"ph_late_retreat":60}', 'str', NULL, NULL, 'Chips a core costs (negative) or brings (positive) when chosen, JSON by core id'),
     (:profile, 'mode.chaos.extra_shop_slots', '1', 'int', 0, NULL, 'Private Account extra shop slots'),
     (:profile, 'mode.chaos.min_bets', '5,10,15,20,30,40', 'str', NULL, NULL, 'Minimum bet steps'),
@@ -80,10 +80,11 @@ INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
 
 -- Poker Head's offline director (poker_head/director.py; design: POKER_HEAD_CHAOS_RULES_AND_AGENT.zh-CN.md §6).
 INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
-    (:profile, 'mode.chaos.director.stages', '[[1,0.4,1,1],[5,0.6,2,3],[9,0.75,2,5],[13,0.85,3,6]]', 'str', NULL, NULL, 'Director stages: [first round, action chance, rule slots, pressure budget]'),
+    (:profile, 'mode.chaos.director.stages', '[[1,0.4,1,1],[5,0.6,2,3],[9,0.75,2,5],[13,0.85,2,6]]', 'str', NULL, NULL, 'Director stages: [first round, action chance, rule slots, pressure budget]'),
     (:profile, 'mode.chaos.director.weights', '{"shift":[45,35,25,20],"fixed":[35,20,15,10],"bust":[0,10,15,15],"tie":[0,10,10,10],"bust_outcome":[0,0,10,15],"profit_cap":[0,0,10,15],"item_ban":[0,5,5,5],"markup":[20,10,5,5],"hidden":[0,10,5,5]}', 'str', NULL, NULL, 'Director type weights per stage'),
-    (:profile, 'mode.chaos.director.pools', '[{"fixed":{"single":2,"group":[8,9]},"shift":{"rank":[1,-1]},"markup":[[10,3]]},{"fixed":{"single":3,"group":[7,8]},"shift":{"rank":[1,-1],"group":[1,-1],"compound":[1]},"bust":[["player",20,2],["dealer",22,2]],"tie":["dealer"],"item_ban":[2],"markup":[[20,3]],"hidden":[2]},{"fixed":{"single":4,"group":[6,7,8]},"shift":{"rank":[1,-1,2,-2],"group":[1,-1,2,-2],"all":[1,-1]},"bust":[["player",19,2],["player",20,2],["dealer",22,2],["dealer",23,2]],"tie":["dealer"],"bust_outcome":[["dealer","push",2]],"profit_cap":[[50,3]],"item_ban":[2],"markup":[[30,3]],"hidden":[2]},{"fixed":{"single":4,"group":[5,6,7]},"shift":{"rank":[1,-1,2,-2],"group":[1,-1,2,-2],"all":[1,2,-1]},"bust":[["player",19,2],["player",20,2],["dealer",22,2],["dealer",23,2]],"tie":["dealer"],"bust_outcome":[["dealer","push",2]],"profit_cap":[[40,3],[30,3]],"item_ban":[3],"markup":[[40,3]],"hidden":[3]}]', 'str', NULL, NULL, 'Director variant pools per stage'),
+    (:profile, 'mode.chaos.director.pools', '[{"fixed":{"single":2,"group":[8,9]},"shift":{"rank":[1,-1]},"markup":[[10,3]]},{"fixed":{"single":3,"group":[7,8]},"shift":{"rank":[1,-1],"group":[1,-1],"compound":[1]},"bust":[["player",20,2],["dealer",22,2]],"tie":["dealer"],"item_ban":[2],"markup":[[20,3]],"hidden":[2]},{"fixed":{"single":4,"group":[7,8]},"shift":{"rank":[1,-1,2,-2],"group":[1,-1,2,-2],"all":[1,-1]},"bust":[["player",19,2],["player",20,2],["dealer",22,2],["dealer",23,2]],"tie":["dealer"],"bust_outcome":[["dealer","push",2]],"profit_cap":[[50,3]],"item_ban":[2],"markup":[[30,3]],"hidden":[2]},{"fixed":{"single":4,"group":[7,8]},"shift":{"rank":[1,-1,2,-2],"group":[1,-1,2,-2],"all":[1,2,-1]},"bust":[["player",19,2],["player",20,2],["dealer",22,2],["dealer",23,2]],"tie":["dealer"],"bust_outcome":[["dealer","push",2]],"profit_cap":[[40,3],[30,3]],"item_ban":[3],"markup":[[40,3]],"hidden":[3]}]', 'str', NULL, NULL, 'Director variant pools per stage'),
     (:profile, 'mode.chaos.director.pressure', '{"fixed":1,"shift_local_1":1,"shift_local_2":2,"shift_compound":2,"shift_all":2,"bust":{"player:20":2,"player:19":3,"dealer:22":2,"dealer:23":3},"tie":2,"bust_outcome":3,"profit_cap":{"50":2,"40":3,"30":4},"item_ban":{"2":2,"3":3},"markup":{"10":1,"20":1,"30":2,"40":2},"hidden":2}', 'str', NULL, NULL, 'Director pressure per rule variant'),
+    (:profile, 'mode.chaos.director.heavy_from', '9', 'int', 1, NULL, 'Heavy environment rules wait until this round; one at a time'),
     (:profile, 'mode.chaos.director.cooldown_cleared', '2', 'int', 0, NULL, 'Director actions a type waits after the player clears it'),
     (:profile, 'mode.chaos.director.cooldown_expired', '1', 'int', 0, NULL, 'Director actions a type waits after it ends'),
     (:profile, 'mode.chaos.director.cooldown_replaced', '2', 'int', 0, NULL, 'Director actions a replaced effect waits');

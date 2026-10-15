@@ -114,7 +114,7 @@ starting cash. The run opens with `obs.choice`: two cores (each changes what
 you can do; Room to Breathe costs chips, Exit Clause brings some) or chips
 without a core. Three build slots (a full build asks what to
 replace; `perform ph_discard <id>` drops one before betting), consumables with a phase (`obs.items[].when`), financial products
-with the Private Account core, up to three persistent Chaos rules and a
+with the Private Account core, up to two persistent Chaos rules (tiered; one heavy at most, from round 9) and a
 rising minimum bet. `obs.table.public` is the public build and money
 snapshot. Guide: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md) §8b; architecture:
 [docs/design/ITEM_ARCHITECTURE.md](docs/design/ITEM_ARCHITECTURE.md).

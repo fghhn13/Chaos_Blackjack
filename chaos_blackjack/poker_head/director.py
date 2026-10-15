@@ -50,8 +50,10 @@ HIGH_PRESSURE = 3
 
 DEFAULTS: dict[str, Any] = {
     # [first round, action chance, rule slots, pressure budget]
-    # Softened 2026-10-14 after playtests: later stages, fewer actions, smaller budgets.
-    "stages": [[1, 0.40, 1, 1], [5, 0.60, 2, 3], [9, 0.75, 2, 5], [13, 0.85, 3, 6]],
+    # Softened 2026-10-14 after playtests: later stages, fewer actions, smaller budgets, two rules at most.
+    "stages": [[1, 0.40, 1, 1], [5, 0.60, 2, 3], [9, 0.75, 2, 5], [13, 0.85, 2, 6]],
+    # Heavy rules (environment.rule_tier) wait until this round; one is in force at a time.
+    "heavy_from": 9,
     "weights": {"shift": [45, 35, 25, 20], "fixed": [35, 20, 15, 10], "bust": [0, 10, 15, 15],
                 "tie": [0, 10, 10, 10], "bust_outcome": [0, 0, 10, 15], "profit_cap": [0, 0, 10, 15],
                 "item_ban": [0, 5, 5, 5], "markup": [20, 10, 5, 5], "hidden": [0, 10, 5, 5]},
@@ -64,12 +66,12 @@ DEFAULTS: dict[str, Any] = {
          "shift": {"rank": [1, -1], "group": [1, -1], "compound": [1]},
          "bust": [["player", 20, 2], ["dealer", 22, 2]], "tie": ["dealer"], "item_ban": [2],
          "markup": [[20, 3]], "hidden": [2]},
-        {"fixed": {"single": 4, "group": [6, 7, 8]},
+        {"fixed": {"single": 4, "group": [7, 8]},
          "shift": {"rank": [1, -1, 2, -2], "group": [1, -1, 2, -2], "all": [1, -1]},
          "bust": [["player", 19, 2], ["player", 20, 2], ["dealer", 22, 2], ["dealer", 23, 2]],
          "tie": ["dealer"], "bust_outcome": [["dealer", "push", 2]], "profit_cap": [[50, 3]],
          "item_ban": [2], "markup": [[30, 3]], "hidden": [2]},
-        {"fixed": {"single": 4, "group": [5, 6, 7]},
+        {"fixed": {"single": 4, "group": [7, 8]},
          "shift": {"rank": [1, -1, 2, -2], "group": [1, -1, 2, -2], "all": [1, 2, -1]},
          "bust": [["player", 19, 2], ["player", 20, 2], ["dealer", 22, 2], ["dealer", 23, 2]],
          "tie": ["dealer"], "bust_outcome": [["dealer", "push", 2]], "profit_cap": [[40, 3], [30, 3]],
@@ -111,6 +113,7 @@ class Director:
         self.pressures = get("pressure")
         self.cooldowns = {"cleared": int(get("cooldown_cleared")), "expired": int(get("cooldown_expired")),
                           "replaced": int(get("cooldown_replaced"))}
+        self.heavy_from = int(get("heavy_from"))
         self.seed = seed
         self.rule_slots = rule_slots
         self.money = money  # Withdrawal Limit caps are chips: they scale with the starting cash (money.py)
@@ -122,6 +125,10 @@ class Director:
         return Stage(index, float(act), min(int(slots), self.rule_slots), int(budget))
 
     def pressure(self, rule: EnvRule) -> int:
+        """The rule's weight against a stage's budget: its table value, at least its tier's floor."""
+        return max(self._table_pressure(rule), {1: 1, 2: 2, 3: HIGH_PRESSURE}[rule.tier])
+
+    def _table_pressure(self, rule: EnvRule) -> int:
         p, table = rule.params, self.pressures
         if rule.type == "fixed":
             return int(table["fixed"])
@@ -191,7 +198,7 @@ class Director:
         if replacing is not None:
             blocked_signatures = blocked_signatures | {replacing.signature}
         base = sum(self.pressure(r) for r in rules)
-        high = sum(1 for r in rules if self.pressure(r) >= HIGH_PRESSURE)
+        heavy = sum(1 for r in rules if r.tier == 3)
         kinds = {r.type for r in rules}
         out: dict[str, list[EnvRule]] = {}
         for kind, rows in variants.items():
@@ -204,8 +211,8 @@ class Director:
                 pressure = self.pressure(rule)
                 if rule.signature in blocked_signatures or base + pressure > stage.budget:
                     continue
-                if pressure >= HIGH_PRESSURE and high:
-                    continue
+                if rule.tier == 3 and (heavy or round_no < self.heavy_from):
+                    continue   # one heavy rule at a time, and none early
                 # Within a type, a replacement only strengthens or changes tack (never weakens).
                 if replacing is not None and replacing.type == kind and pressure < self.pressure(replacing):
                     continue

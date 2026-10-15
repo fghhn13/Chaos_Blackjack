@@ -228,6 +228,8 @@ def _list(r: _Render, w: Any, x: int, y: int, width: int) -> int:
                     cx, y = x, y + size + 6
                     rect.topleft = (cx, y)
                 r.rect(theme.FELT if r.hovered(rect) else theme.DARK, rect, 0, 8)
+                if e.tone in ("warn", "bad"):  # e.g. a heavy rule: the strip says so before any hover
+                    r.rect(tone(e.tone), rect, 2, 8)
                 r.icon(e.icon, rect.inflate(-6, -6))
             else:
                 text = r.font(theme.FONT_SMALL, bold=True).render(f"{e.title} {e.badge}".strip(), True, tone(e.tone))
