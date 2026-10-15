@@ -16,7 +16,7 @@
 - **Plugins**: chaos rules (`rules/plugins/`) and items (`items/`) self-register; prompts (`ai/prompts/*.txt`) and permission profiles (`ai/permissions/*.json`) are data files.
 - **Optional real LLM**: an offline stub drives the Chaos AI by default; the [GPTsAPI](https://api2.gptsapi.net/tutorial) relay (OpenAI-compatible) can be switched on.
 - **Player progression**: three named slots, each with a **chip vault** that carries chips between runs; every run brings a stake to the Classic Table (40-100, win at 4x) or Poker Head's Table (400-1000, Full Haul from 4x, ceiling 6x), Poker Head's relief when you are broke, early-bust insurance, membership levels from lifetime spend, checkpoints and run history. New players get a practice table with a basic strategy chart, and the tables open one by one ([onboarding](docs/design/TUTORIAL.md)). (Meta upgrades are off in this version.)
-- **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations.
+- **Collection**: browse rules, items, modes and Chaos AIs with live balance values and deterministic animated demonstrations; new players discover entries as they meet them, and the basic strategy chart is always there.
 - **Cosmetics and achievements**: decks, tables, chip sets and avatars, bought with chips or earned through achievements; a player Profile with a wardrobe, live preview and membership badge. Looks never change the rules.
 - **Responsive table**: background LLM calls, portrait advice, card/chip animations and synchronized casino sound cues.
 - **SQLite balance profiles and content packs**: tune game and progression values, and add scoped items and Chaos AIs.
@@ -263,7 +263,7 @@ chips, a few give a cosmetic. Runs are evaluated when they settle, and the
 result screen lists new unlocks with an **Equip** button for rewarded looks.
 Cosmetics only change art, never rules or numbers.
 
-The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. A **Classic Table** tab holds the classic table and the items every table sells; under **Dealers**, each dealer (Poker Head) has a tab introducing the character (portrait, profile and signature line) beside the Chaos rules and the items only their table sells. Every entry appears somewhere. Detail pages use the selected profile's numbers;
+The **Collection** (scene id `codex`) is available from the home screen or `--scene codex`. A **Classic Table** tab holds the classic table and the items every table sells; under **Dealers**, each dealer (Poker Head) has a tab introducing the character (portrait, profile and signature line) beside the Chaos rules and the items only their table sells. A new player's entries light up as they are met at the table or on a shop shelf ("???" until then, with a hint), and a dealer whose table is still locked shows as a silhouette tab ([Discovery](docs/design/CODEX.md)); players from before onboarding see everything. A **Strategy chart** button opens the basic strategy chart. Detail pages use the selected profile's numbers;
 card demonstrations run on a real controller with fixed deals and an offline
 backend. **Space** pauses, **R** replays, **Left/Right** steps, and the wheel or
 **Page Up/Page Down** scrolls descriptions. Touchscreens can swipe vertically

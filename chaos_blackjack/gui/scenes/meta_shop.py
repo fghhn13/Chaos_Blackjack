@@ -177,7 +177,7 @@ class MetaShopScene(MetaScreen):
         if self.series not in {s.id for s in self.series_options}:
             self.series = "core"
         self.visible_offers = [o for o in offers if self.series_of(o) == self.series]
-        self.subtitle = "Spend tokens between runs. Your bankroll stays at the table."
+        self.subtitle = "Spend vault chips between runs. A dealer's looks go on sale once you beat the dealer."
         self.build()
 
     # ---------------------------------------------------------------- widgets

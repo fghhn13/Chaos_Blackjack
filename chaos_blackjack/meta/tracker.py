@@ -22,6 +22,8 @@ class RunTracker:
         self.rules_seen: Counter[str] = Counter()
         self.items_used: Counter[str] = Counter()
         self.items_bought: Counter[str] = Counter()
+        self.environment_seen: Counter[str] = Counter()   # Poker Head's rule types (Collection discovery)
+        self.offered: set[str] = set()     # items and builds seen on a shelf or offered as a core
         self.blackjacks = self.doubles = self.surrenders = 0
         self.hands_won = self.five_card_hands = self.win_streak = 0
         self.peak_money = controller.run.money
@@ -29,10 +31,21 @@ class RunTracker:
         # Poker Head's build table: Fourfold Ticket wins, Bust Insurance saves, Fresh Hand into 21.
         self.fourfold_wins = self.insurance_saves = self.fresh_21 = 0
         self._prepared: dict[str, int] = {}  # consumable -> the round it was used in
+        self._glimpse()
         controller.add_listener(self.on_notice)
+
+    def _glimpse(self) -> None:
+        """What the player can see on offer right now: the shop's shelf and a choice's options (e.g. cores)."""
+        c = self.controller
+        self.offered.update(o.item for o in getattr(c.shop, "offers", ()))
+        if c.choice is not None:
+            self.offered.update(o.id for o in c.choice.options)
 
     def on_notice(self, n: Notice) -> None:
         kind, data = n.kind, n.data
+        self._glimpse()
+        if kind == NoticeKind.RULE_MODIFIER_APPLIED and data.get("environment") and data.get("rule"):
+            self.environment_seen[str(data["rule"])] += 1   # besides rules_seen (Rule Scholar counts both)
         if kind == NoticeKind.RULE_MODIFIER_APPLIED and data.get("rule_id"):
             self.rules_seen[str(data["rule_id"])] += 1
         elif kind == NoticeKind.ITEM_RESULT and data.get("ok") and data.get("item"):
@@ -76,8 +89,11 @@ class RunTracker:
     def summary(self) -> dict[str, Any]:
         c = self.controller
         rounds = c.last_result.round if c.last_result else max(0, c.run.round - 1)
+        self._glimpse()
         return {
             "rules_seen": dict(self.rules_seen),
+            "environment_seen": dict(self.environment_seen),
+            "offered": sorted(self.offered),
             "items_used": dict(self.items_used),
             "items_bought": dict(self.items_bought),
             "rounds": rounds,

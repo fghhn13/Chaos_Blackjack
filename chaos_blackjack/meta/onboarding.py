@@ -17,9 +17,16 @@ PH_INTRO_BUILD = "ph_intro_build"    # heard how builds work at Poker Head's Tab
 PH_INTRO_RULES = "ph_intro_rules"    # heard how Poker Head's rules work
 BET_CAP_LIFTED = "bet_cap_lifted"    # played enough Classic runs to bet freely
 FIRST_RELIEF = "first_relief"        # heard Poker Head's first relief speech (later reliefs get a short one)
+J54_SALE = "j54_sale"                # J-54's looks are sold (nothing reaches it while J-54's table is a demo)
 
 ALL: tuple[str, ...] = (TUTORIAL, CLASSIC_MAX_WIN, POKER_HEAD_WIN, PH_INTRO_BUILD, PH_INTRO_RULES, BET_CAP_LIFTED,
-                        FIRST_RELIEF)
+                        FIRST_RELIEF, J54_SALE)
+
+# A dealer's looks are sold once the player has reached this (series -> milestone, why not yet).
+SALE_LOCKS: dict[str, tuple[str, str]] = {
+    "poker_head": (POKER_HEAD_WIN, "Beat Poker Head's Table to buy this"),
+    "j54": (J54_SALE, "Not sold yet"),
+}
 
 # A guided player's first Classic runs cap each bet at this share of the cash, so a new player cannot throw
 # the whole stake on the first hands while learning (lifted after CAPPED_RUNS settled Classic runs).
@@ -55,6 +62,12 @@ def reach(db: sqlite3.Connection, player_id: int, milestone: str) -> bool:
                       (player_id, milestone)).rowcount > 0
 
 
+def sale_lock(series: str, reached: frozenset[str]) -> str:
+    """Why a look of this series cannot be bought yet ("" = it can)."""
+    milestone, reason = SALE_LOCKS.get(series, (None, ""))
+    return "" if milestone is None or milestone in reached else reason
+
+
 def after_run(db: sqlite3.Connection, player_id: int, mode: str, result: str, stake: int | None,
               top_stake: int | None) -> list[str]:
     """Milestones a settled run reaches, newly recorded, in order."""
@@ -72,5 +85,5 @@ def after_run(db: sqlite3.Connection, player_id: int, mode: str, result: str, st
 
 
 __all__ = ["ALL", "BET_CAP_LIFTED", "CAPPED_RUNS", "CAP_FRACTION", "CLASSIC_MAX_WIN", "FIRST_RELIEF", "PH_INTRO_BUILD",
-           "PH_INTRO_RULES", "POKER_HEAD_WIN", "TUTORIAL", "after_run", "guided_default", "is_guided", "reach",
+           "J54_SALE", "PH_INTRO_RULES", "POKER_HEAD_WIN", "SALE_LOCKS", "TUTORIAL", "after_run", "sale_lock", "guided_default", "is_guided", "reach",
            "reached"]

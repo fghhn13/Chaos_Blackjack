@@ -74,6 +74,10 @@ def modes(player_id: int | None = None) -> list[ModeOption]:
     return service().modes(player_id)
 
 
+def discovery(player_id: int | None):
+    return service().discovery(player_id)
+
+
 def milestones(player_id: int) -> frozenset[str]:
     return service().milestones(player_id)
 
@@ -164,5 +168,5 @@ __all__ = [
     "consolation_tokens", "create_player", "delete_player", "effect_ids", "finish_run", "get_effect",
     "get_player", "history", "list_slots", "meta_shop", "modes", "pending_run", "register_effect", "rename_player",
     "resume_run", "service", "start_run", "use_service", "stake_range", "claim_relief", "insurance_terms", "membership",
-    "milestones", "reach",
+    "discovery", "milestones", "reach",
 ]

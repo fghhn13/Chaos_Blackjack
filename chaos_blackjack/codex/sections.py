@@ -5,14 +5,14 @@ first, then one section per dealer (an expansion, see
 `chaos_blackjack.modes.register_series`):
 
 * Classic Table: its tables, the items sold at every table (or at none), Chaos
-  rules no dealer uses, and guest Chaos AIs from content packs.
+  rules its own tables may apply, and guest Chaos AIs from content packs.
 * A dealer (e.g. Poker Head): the character's portrait, name, profile and
   signature line, then the Chaos rules its tables may apply and the items
   only its tables sell. How the AI works is not shown here; the table's
   numbers are on the mode's detail page.
 
-Nothing is left out: every rule, item, mode and pack AI appears in some
-section. Headless; the GUI only lays the sections out.
+Every item, listed mode and pack AI appears in some section; a Chaos rule only
+when a listed table can apply it. Headless; the GUI only lays the sections out.
 """
 
 from __future__ import annotations
@@ -147,7 +147,8 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
                                            if e.id in everywhere or e.id in core_items or e.id not in anywhere),
                    empty="No items are sold at every table."),
     ]
-    spare = tuple(e for e in rules if e.id in core_rules or e.id not in claimed_rules)
+    # Only rules a listed table can apply: the old Classic Chaos rules no table uses are left out.
+    spare = tuple(e for e in rules if e.id in core_rules and e.id not in claimed_rules)
     if spare:
         groups.append(CodexGroup("rules", "Chaos rules", spare))
     if ais:

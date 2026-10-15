@@ -48,8 +48,8 @@ def test_gallery_core_series_then_expansions_and_detail_back_preserve_section(ap
     gallery = open_scene(app)
     assert [s.label for s in gallery.sections] == ["Classic Table", "Poker Head", "J-54"]
     assert gallery.current == "core" and gallery.expansions_label_x is not None
-    # The Classic Table also lists the registry Chaos rules: no dealer's table uses them now.
-    assert {e.kind for _, e in gallery.tiles} == {"mode", "item", "rule"} and not gallery.about.visible
+    # The old Classic Chaos rules no table applies are left out.
+    assert {e.kind for _, e in gallery.tiles} == {"mode", "item"} and not gallery.about.visible
     key(app, pygame.K_TAB)
     assert gallery.current == "poker_head" and gallery.about.visible
     assert gallery.section.profile and gallery.section.quote.startswith("Old friends")
@@ -144,9 +144,9 @@ def test_long_sections_scroll_without_hiding_entries(app, monkeypatch):
                           lambda cfg: "Details", None) for i in range(15)]
     register_codex_provider("item", lambda cfg: entries)
     scene = open_scene(app, section="core")
-    # Classic + 5 shared items + 15 never sold + 7 registry Chaos rules no dealer uses
-    assert len(scene.entries) == 28 and len(scene.tiles) == 28
-    assert scene.max_scroll > 0 and len(scene.visible_tiles()) < 28
+    # Classic + 5 shared items + 15 never sold
+    assert len(scene.entries) == 21 and len(scene.tiles) == 21
+    assert scene.max_scroll > 0 and len(scene.visible_tiles()) < 21
     first = scene.tiles[0][0].y
     key(app, pygame.K_PAGEDOWN)
     assert scene.scroll > 0 and scene.tiles[0][0].y < first
@@ -212,13 +212,13 @@ def test_sections_place_every_entry_by_series():
     assert [e.id for e in groups["items"].entries] == ["shield"]  # Classic never sells Shield
     core_groups = {g.id: g for g in core.groups}
     assert "shield" not in {e.id for e in core.entries}
-    assert {e.id for e in core_groups["rules"].entries} == {e.id for e in codex_entries("rule")
-                                                           if not e.id.startswith("j54_")}
-    # Nothing is left out: every rule, item and mode appears somewhere.
+    assert "rules" not in core_groups   # no table applies the old Classic Chaos rules
+    # Every item, mode and environment rule appears somewhere; a Chaos rule only where a table applies it.
     placed = {(e.kind, e.id) for s in sections.values() for e in s.entries}
     placed |= {("mode", s.mode.id) for s in sections.values() if s.mode is not None}
-    for kind in ("rule", "item", "mode", "environment"):
+    for kind in ("item", "mode", "environment"):
         assert {(kind, e.id) for e in codex_entries(kind)} <= placed, kind
+    assert {("rule", e.id) for e in codex_entries("rule") if e.id.startswith("j54_")} <= placed
 
 
 def test_sections_follow_mode_pools(monkeypatch):

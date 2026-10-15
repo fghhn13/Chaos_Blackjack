@@ -149,12 +149,12 @@ def test_buying_and_equipping(svc) -> None:
     p = meta.create_player(1, "A")
     svc.grant_tokens(p.id, -1000)
     offer = {o.cosmetic.id: o for o in meta.wardrobe(p.id, "deck")}["card_back_crimson"]
-    assert (offer.price, offer.can_buy, offer.reason, offer.unlock_hint) == (40, False, "Needs 40 chips", "40 chips")
-    with pytest.raises(MetaError, match="Needs 40"):
+    assert (offer.price, offer.can_buy, offer.reason, offer.unlock_hint) == (400, False, "Needs 400 chips", "400 chips")
+    with pytest.raises(MetaError, match="Needs 400"):
         meta.buy_cosmetic(p.id, "card_back_crimson")
     with pytest.raises(MetaError, match="do not own"):
         meta.equip(p.id, "card_back_crimson")
-    svc.grant_tokens(p.id, 50)
+    svc.grant_tokens(p.id, 410)
     assert meta.buy_cosmetic(p.id, "card_back_crimson").tokens == 10
     with pytest.raises(MetaError, match="already own"):
         meta.buy_cosmetic(p.id, "card_back_crimson")
@@ -251,7 +251,7 @@ def test_cosmetic_rewards_are_owned_and_equippable(svc) -> None:
                                         "card_front_blank": "card_front_poker_head"}
     assert meta.equip(p.id, "table_poker_head")["table"] == "table_poker_head"
     # Chaos Velvet, the old reward, is sold now.
-    assert {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_chaos"].price == 80
+    assert {o.cosmetic.id: o for o in meta.wardrobe(p.id, "table")}["table_chaos"].price == 1200
 
 
 def test_run_scope_uses_the_best_run_and_total_scope_the_sum(svc) -> None:

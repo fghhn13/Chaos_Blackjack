@@ -21,6 +21,7 @@ from typing import Any
 from chaos_blackjack.achievements import achievements_catalog, get_achievement
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.app.controller import GameController
+from chaos_blackjack.codex.discovery import Discovery
 from chaos_blackjack.cosmetics import COSMETIC_SLOTS, cosmetics, get_cosmetic
 from chaos_blackjack.data.balance import Balance, BalanceError, MetaUpgradeBalance, default_balance, load_balance
 from chaos_blackjack.data.db import MEMORY, connect, db_path
@@ -536,6 +537,20 @@ class MetaService:
             json.loads(r["upgrades"] or "{}"), json.loads(r["summary"] or "{}"),
         ) for r in rows]
 
+    def discovery(self, player_id: int | None) -> Discovery:
+        """What the player's Collection shows: discovered entries and which dealers' tabs are open
+        (docs/design/CODEX.md "Discovery"). Everything for no player or a player from before onboarding."""
+        if player_id is None:
+            return Discovery.everything()
+        options = self.modes(player_id)
+        with self._db() as db:
+            self._player(db, player_id)
+            if not onboarding.is_guided(db, player_id):
+                return Discovery.everything()
+            seen = frozenset((r["kind"], r["entry_id"]) for r in db.execute(
+                "SELECT kind, entry_id FROM codex_seen WHERE player_id = ?", (player_id,)))
+        return Discovery.from_seen(seen, options)
+
     def codex_seen(self, player_id: int) -> dict[tuple[str, str], int]:
         """{(kind, entry_id): times} the player has met each codex entry."""
         with self._db() as db:
@@ -549,12 +564,14 @@ class MetaService:
         """Every cosmetic (of one slot) and its state for the player; hidden ones only once owned."""
         if slot is not None and slot not in COSMETIC_SLOTS:
             raise MetaError(f"Unknown cosmetic slot {slot!r}")
+        shown = {o.mode.series for o in self.modes(player_id)}
         with self._db() as db:
             player = self._player(db, player_id)
             balance = self._balance(db, profile)
             owned = unlocks.owned_cosmetics(db, player_id)
             all_owned = self._all_looks(db, profile)
             equipped = {c.id for c in unlocks.loadout(db, player_id, all_owned=all_owned).values()}
+            reached = onboarding.reached(db, player_id)
         prices = {p.cosmetic_id: tiers.shop_price(balance, player.lifetime_spend, p.cost)
                   for p in balance.cosmetic_prices}
         rewarded_by: dict[str, list[str]] = {}
@@ -567,6 +584,8 @@ class MetaService:
             have = c.default or all_owned or c.id in owned
             if c.hidden and not have:
                 continue
+            if c.series not in shown and not have:
+                continue   # a dealer whose table is not even a silhouette yet
             price = None if c.default else prices.get(c.id)
             hints = [f"{price} chips"] if price is not None else []
             hints += [f"Achievement: {name}" for name in rewarded_by.get(c.id, ())]
@@ -574,6 +593,8 @@ class MetaService:
                 reason = "Owned" if c.default or c.id in owned else "Unlocked"
             elif price is None:
                 reason = "Not for sale"
+            elif onboarding.sale_lock(c.series, reached):
+                reason = onboarding.sale_lock(c.series, reached)
             elif player.tokens < price:
                 reason = f"Needs {price} chips"
             else:
@@ -625,6 +646,9 @@ class MetaService:
                 price = tiers.shop_price(balance, player.lifetime_spend, price)
             if price is None:
                 raise MetaError(f"{c.name} is not for sale")
+            locked = onboarding.sale_lock(c.series, onboarding.reached(db, player_id))
+            if locked:
+                raise MetaError(locked)
             if player.tokens < price:
                 raise MetaError(f"Needs {price} chips")
             with db:
@@ -714,6 +738,8 @@ class MetaService:
         for item, n in summary["items_used"].items():
             items[item] = items.get(item, 0) + n
         seen += [("item", i, n) for i, n in items.items()]
+        seen += [("environment", r, n) for r, n in summary.get("environment_seen", {}).items()]
+        seen += [("offer", i, 1) for i in summary.get("offered", ())]
         if summary.get("chaos_ai"):
             seen.append(("ai", summary["chaos_ai"], 1))
         for kind, entry_id, n in seen:

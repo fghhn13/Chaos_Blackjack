@@ -161,3 +161,20 @@ def test_poker_head_speaks_when_he_tops_up_a_broke_vault(app):
         seen.append(app.scenes.top.dialog.lines)
     assert seen[0] == [text for _, text in FIRST_RELIEF]
     assert seen[1] == [text for _, text in RELIEF]
+
+
+def test_a_new_players_collection_shows_undiscovered_entries_and_a_silhouette_tab(app):
+    player = meta.create_player(1, "New")
+    app.scenes.reset("codex", player_id=player.id)
+    settle(app)
+    codex = app.scenes.top
+    assert [s.id for s in codex.sections] == ["core", "poker_head"]       # J-54 is not shown yet
+    assert codex.tabs["poker_head"].text == "???"
+    items = [e for e in codex.entries if e.kind == "item"]
+    assert items and not any(codex.known(e) for e in items)
+    codex._select_entry(items[0])
+    assert not codex.open_detail.enabled and "shop shelf" in codex.reference
+    assert codex.known(next(e for e in codex.entries if e.kind == "mode"))
+    codex._select("poker_head")
+    settle(app)
+    assert not codex.about.visible and "top stake" in codex.reference

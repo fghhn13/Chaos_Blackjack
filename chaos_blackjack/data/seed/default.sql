@@ -209,20 +209,21 @@ INSERT INTO meta_upgrade (profile_id, upgrade_id, kind, effect, params, cost, co
     (:profile, 'start_shield',           'consumable', 'run.starting_item',   '{"item": "shield"}',            8,  0, 3);
 
 -- Cosmetics sold for tokens in the wardrobe (catalog: chaos_blackjack/cosmetics/catalog.py).
--- A cosmetic without a row is not sold. Placeholder prices.
+-- A cosmetic without a row is not sold; a dealer's looks only once the dealer is beaten (meta/onboarding.py).
 INSERT INTO cosmetic_price (profile_id, cosmetic_id, cost) VALUES
-    (:profile, 'card_back_crimson', 40),
-    (:profile, 'table_midnight',    60),
-    (:profile, 'chips_neon',        50),
-    (:profile, 'avatar_spade',      30),
-    (:profile, 'table_chaos',       80),
-    -- J-54's look (assets/cosmetics/j54)
-    (:profile, 'deck_j54',            60),
-    (:profile, 'deck_j54_calculator', 60),
-    (:profile, 'table_j54',           80),
-    (:profile, 'chips_j54',           50),
-    (:profile, 'avatar_j54',          30),
-    (:profile, 'avatar_j54_computer', 30);
+    -- Priced by wins (2026-10-15): a top-stake Classic win nets about 300, a Poker Head win 1200+.
+    (:profile, 'avatar_spade',      300),
+    (:profile, 'card_back_crimson', 400),
+    (:profile, 'chips_neon',        500),
+    (:profile, 'table_midnight',    600),
+    (:profile, 'table_chaos',      1200),
+    -- J-54's look (assets/cosmetics/j54); not sold to new players while J-54's table is a demo
+    (:profile, 'avatar_j54',          1500),
+    (:profile, 'avatar_j54_computer', 1500),
+    (:profile, 'deck_j54',            2000),
+    (:profile, 'deck_j54_calculator', 2000),
+    (:profile, 'chips_j54',           2500),
+    (:profile, 'table_j54',           3000);
 
 -- Achievement rewards (catalog: chaos_blackjack/achievements/catalog.py): tokens
 -- and optional cosmetics (comma-separated ids). An achievement without a row
