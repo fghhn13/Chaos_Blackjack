@@ -30,7 +30,7 @@ class FateOracle:
             ),
         )
         shown = ", ".join(str(r) for r in ranks)
-        return ItemResult(ok=True, message=f"Top {len(ranks)} cards: {shown}")
+        return ItemResult(ok=True, message=f"Next {len(ranks)} cards: {shown} (Fate Oracle)")
 
 
 register_item(FateOracle.name, FateOracle)

@@ -31,7 +31,7 @@ class HoleCardHacker:
         )
         return ItemResult(
             ok=True,
-            message=f"Dealer hole card: {hole_rank}",
+            message=f"Dealer's hole card: {hole_rank} (Hole Card Hacker)",
             extra={"reveal_hole_card": True},
         )
 

@@ -204,7 +204,7 @@ def test_risk_pointer_uses_the_same_player_values():
     c = controller()
     item(c, "ph_radar")
     deal(c, player=("10", "6"), deck=("6",))
-    assert "safe" in c.use_item("ph_radar").message   # 22 is not a bust with Room to Breathe
+    assert c.use_item("ph_radar").message.startswith("Safe")  # 22 is not a bust with Room to Breathe
 
 
 def test_multi_card_rewards_combine_once():

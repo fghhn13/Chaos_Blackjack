@@ -40,7 +40,7 @@ def _status(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
         widgets.append(Rows((Row("Core", core), Row("Minimum bet", str(d.min_bet))), title="Table"))
     else:
         widgets.append(Rows((Row("Minimum bet", str(d.min_bet)),)))
-    widgets.append(Rows((Row("Dealer", f"{d.dealer_stage} ({d.dealer_slots} rule{'s' if d.dealer_slots != 1 else ''})"),)))
+    widgets.append(Rows((Row("Dealer", d.dealer_stage), Row("Rule slots", str(d.dealer_slots)))))
     return tuple(widgets)
 
 

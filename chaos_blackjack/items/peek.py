@@ -21,7 +21,7 @@ class Peek:
         )
         if rank is None:
             return ItemResult(ok=False, message="Deck empty")
-        return ItemResult(ok=True, message=f"Next card rank: {rank}")
+        return ItemResult(ok=True, message=f"Next card: {rank} (Peek)")
 
 
 register_item("peek", Peek)

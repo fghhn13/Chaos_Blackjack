@@ -107,7 +107,7 @@ def test_danger_radar_reports_whether_the_next_hit_busts() -> None:
     emitted = ctx._emitted_for_test  # type: ignore[attr-defined]
     assert [e.payload.get("next_hit_busts") for e in emitted if e.type == EventType.ITEM_USED] == [True]
     ctx.next_hit_busts = lambda: False
-    assert "safe" in item.use(ctx).message
+    assert item.use(ctx).message.startswith("Safe to hit")
 
 
 def test_danger_radar_through_the_controller_uses_the_rules_in_force() -> None:
@@ -119,9 +119,9 @@ def test_danger_radar_through_the_controller_uses_the_rules_in_force() -> None:
     c.place_bet(5)
     hand = (Card(Rank("10"), "♠"), Card(Rank("8"), "♥"))
     c.state = c.state.with_player_hand(hand).with_deck((Card(Rank("2"), "♣"),) + c.state.deck)
-    assert "safe" in c.use_item("danger_radar").message          # 20 is fine at 21
+    assert c.use_item("danger_radar").message.startswith("Safe")         # 20 is fine at 21
     c.loop.modifiers = c.loop.modifiers.with_added(FragileBustPlugin.from_params({"bust_limit": 19}))
-    assert "BUST" in c.use_item("danger_radar").message          # 20 busts at 19
+    assert c.use_item("danger_radar").message.startswith("BUST")         # 20 busts at 19
 
 
 def test_shield_item_registered_and_usable() -> None:

@@ -321,7 +321,7 @@ def test_item_params_reach_the_item(db) -> None:
     c.place_bet(5)
     if c.phase.value != "player_turn":
         pytest.skip("seed dealt a natural")
-    assert c.use_item("fate_oracle").message.startswith("Top 2 cards")
+    assert c.use_item("fate_oracle").message.startswith("Next 2 cards")
 
 
 def test_bad_params_are_rejected(db) -> None:
