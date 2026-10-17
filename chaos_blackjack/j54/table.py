@@ -397,7 +397,7 @@ class J54Table(TableMechanics):
         rows.append(("Meter", f"{snap.bar:.1%} win, EV {snap.ev:+.2f} bets, suggested stake {snap.band['suggested']}"
                      + (f", capture {snap.capture:.1%}" if self.joker == IN_DECK else "")))
         if self.announcement:
-            rows.append(("Next", self.announcement))
+            rows.append(("Next condition", self.announcement.removeprefix("Next condition: ").rstrip(".")))
         fw = self.firmware
         rows.append(("Firmware", fw.name if fw else "None"))
         rows.append(("Joker", self.joker))
