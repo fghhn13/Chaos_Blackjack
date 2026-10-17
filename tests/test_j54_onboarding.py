@@ -135,7 +135,8 @@ def test_a_restored_run_does_not_cue_the_start_again() -> None:
 
 
 def _hint_widgets(c: GameController) -> list:
-    widgets = build_part("j54.meter", PartContext(c, c.view()), "compact")
+    """The hint as the run panel shows it (an entry); the side column puts it in the gauge's label."""
+    widgets = build_part("j54.meter", PartContext(c, c.view()), "full")
     return [w for w in widgets if isinstance(w, ListWidget)]
 
 
@@ -148,6 +149,8 @@ def test_the_meter_hint_shows_once_per_run_for_a_guided_player() -> None:
     assert snap.hint == f"The meter says 20% of the bankroll: {snap.band['suggested']} chips."
     hint = _hint_widgets(c)
     assert hint and hint[0].entries[0].title == "Band two reached"
+    gauge = build_part("j54.meter", PartContext(c, c.view()), "compact")[0]
+    assert gauge.label == f"Band two: {snap.band['suggested']} chips" and snap.hint in gauge.tooltip
     c.place_bet(5)
     c.table.onboarding(True)
     assert c.view().table_public.hint is None  # betting only
@@ -361,3 +364,22 @@ def test_a_table_that_sells_nothing_has_no_shop_button_and_no_buying(app) -> Non
     assert obs["hint"].endswith("(see obs.table_actions).")
     classic = GameController(RunConfig.from_balance(default_balance(), seed=1)).view()
     assert classic.has_shop and classic.can(Action.BUY)
+
+
+def test_the_meter_hint_never_pushes_the_operations_out_of_the_column(app) -> None:
+    """The side column drops blocks that do not fit: the hint takes the gauge's label instead of a row, so
+    Release stays on screen (and lit) when its explanation and the hint show in the same betting phase."""
+    scene = _open(app, _player(True))
+    scene.intro.skip()
+    scene.controller.choose("none")
+    table = scene.controller.table
+    for _ in range(2):
+        _play_round(scene.controller)
+    table.guide.hint_round = table.entered_round  # the hint shows this betting phase
+    scene._after_command()
+    _settle(app)
+    assert scene.view.table_public.hint and scene.dialog() is not None
+    meter = build_part("j54.meter", PartContext(scene.controller, scene.view), "compact")
+    assert len(meter) == 1 and meter[0].label.startswith("Band two") and meter[0].label_tone == "gold"
+    assert scene.right.hidden == 0
+    assert scene.focus_rects(onboarding.FOCUS[J54_INTRO_RELEASE])

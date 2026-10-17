@@ -133,14 +133,19 @@ def _meter(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
            f"Bands: " + ", ".join(f"from {b['low']}% stake {b['stake_pct']}%" for b in d.bands)
            + f"; below, the minimum. Suggested stake now: {stake}. Advice only; the bet range is unchanged.")
     tone = "good" if band["stake_pct"] else "muted"
-    gauge = Progress("Win chance", round(d.bar * 1000), 1000, tone=tone, text=f"{d.bar:.1%}", marks=marks,
-                     tooltip=tip, title="" if variant == "compact" else "Meter")
+    compact = variant == "compact"
     # A guided player's one-time line, the first time the meter reaches its second band (j54/onboarding.py).
+    # In the side column it takes the gauge's label, so it adds no height: a taller meter would push the
+    # Operations below it out of the column.
+    label = f"Band two: {band['suggested']} chips" if d.hint and compact else "Win chance"
+    gauge = Progress(label, round(d.bar * 1000), 1000, tone=tone, text=f"{d.bar:.1%}", marks=marks,
+                     tooltip=f"J-54: {d.hint} {tip}" if d.hint else tip, title="" if compact else "Meter",
+                     label_tone="gold" if d.hint and compact else "")
     hint = ((ListWidget((Entry("Band two reached", d.hint, tone="gold",
                                tooltip=f"J-54: {d.hint} Advice only; the bet range is unchanged."),)),)
-            if d.hint else ())
-    if variant == "compact":
-        return (gauge, *hint)
+            if d.hint and not compact else ())
+    if compact:
+        return (gauge,)
     rows = [Row("Expected result", f"{d.ev:+.2f} bets per hand", "good" if d.ev > 0 else "bad" if d.ev < 0 else ""),
             Row("Suggested stake", stake, "gold" if band["stake_pct"] else "")]
     if d.joker == IN_DECK:

@@ -224,8 +224,9 @@ def _progress(r: _Render, w: Any, x: int, y: int, width: int) -> int:
     top = y
     y = r.heading(w.title, x, y, width)
     font = r.font(theme.FONT_SMALL)
-    r.blit(font.render(w.label, True, theme.TEXT_MUTED), (x, y))
     value = font.render(w.text or f"{w.value} / {w.maximum}", True, tone(w.tone))
+    label = fit_text(font, w.label, width - value.get_width() - 8)
+    r.blit(font.render(label, True, tone(w.label_tone) if w.label_tone else theme.TEXT_MUTED), (x, y))
     r.blit(value, (x + width - value.get_width(), y))
     y += 22
     bar = pygame.Rect(x, y, width, 12)

@@ -93,6 +93,7 @@ class Progress:
     text: str = ""                  # shown instead of "<value> / <maximum>"
     marks: tuple[Mark, ...] = ()
     tooltip: str = ""
+    label_tone: str = ""            # the label's tone ("" = muted)
     kind: str = "progress"
 
 

@@ -110,7 +110,7 @@ beats after the greeting, before the firmware choice. A beat's `focus` names lay
 `core.rules`) or one element of a part by its icon id (`j54.ops/j54_release`, `j54.badges/j54_next`); while it
 shows, the table scene keeps those areas bright above the dialog's shade with a pulsing gold ring. The meter
 hint is a field of J-54's public snapshot (`hint`, None for the agent and for unguided players) that the meter
-part draws as one gold entry; its round is saved with the table, so a resumed run does not show it twice. A
+part draws in gold as the gauge's label in the side column (adding a row would push the Operations out of the column) and as an entry in the run panel; its round is saved with the table, so a resumed run does not show it twice. A
 restored run never cues the start again.
 
 Later, after playtests: a fixed first program for guided players (classic opening, one camp switch in
