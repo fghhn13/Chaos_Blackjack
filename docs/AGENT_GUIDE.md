@@ -65,7 +65,7 @@ Subcommands:
 - `--start-money N`, `--target-money N` — change the economy (defaults 100 → 300).
 - `--profile NAME` — use a balance profile from `data/game.db` (default: `$CHAOS_PROFILE` or `default`). The reply's `run.profile` names it; a resumed run keeps its numbers even if the profile changes.
 - `--max-steps N` — cap on accepted `bet` / `act` commands (default 2000).
-- `--mode ID` — play a game mode's table: `chaos` (Poker Head's build table, §8b) or `j54` (J-54's deck table, a demo; §8a). The mode turns chaos on itself. `--chaos` without a mode keeps the classic Chaos run (300 chips, classic items).
+- `--mode ID` — play a game mode's table: `chaos` (Poker Head's build table, §8b) or `j54` (J-54's deck table, §8a). The mode turns chaos on itself. `--chaos` without a mode keeps the classic Chaos run (300 chips, classic items).
 
 Exit codes: `0` accepted, `1` rejected by the game (`ok: false`), `2` usage problem (no run file, bad state file, `--llm` without a key).
 
@@ -113,9 +113,9 @@ Every reply is `{"ok", "events", "obs", "run"}` (+ `"error"` when `ok` is false)
 | `dealer` | `{"cards": ["K♣", "??"], "total": null}` while the hole card is hidden |
 | `items` | `[{"id", "name", "count", "help", "when", "usable", "reason"?}]` — your inventory; `when` says in which phase it works (e.g. `Before betting`), `reason` why it cannot be used now |
 | `shop` | in `betting`: `{"offers": [{"item", "price", "sold", "affordable", "help", "name"?, "kind"?, "when"?, "reason"?}], "restock_in": n, "reroll_price", "reroll_affordable"}`; else `null` |
-| `choice` | a pending question, else `null`: `{"prompt", "options": [{"id", "label", "help"}], "cancellable"}`. Only `choose` / `cancel` are legal until it is answered |
+| `choice` | a pending question, else `null`: `{"kind", "prompt", "options": [{"id", "label", "help"}], "cancellable"}` (`kind` names the question, e.g. `firmware`, `cut_target`). Only `choose` / `cancel` are legal until it is answered |
 | `table_actions` | a table's own actions: `[{"action", "arg", "label", "enabled", "reason"?}]` (send with `perform`) |
-| `table` | a mode's own table (J-54, Poker Head): `{"info": {label: value}, "fee", "deck", "public"?}`; `public` is the table's public snapshot (Poker Head: core, build, cash, invested, debt, net assets, positions, prepared effects); `null` at plain tables |
+| `table` | a mode's own table (J-54, Poker Head): `{"info": {label: value}, "fee", "deck", "public"?}`; `public` is the table's public snapshot (J-54: compute, condition, meter, heat map, Joker, §8a; Poker Head: core, build, cash, invested, debt, net assets, positions, prepared effects); `null` at plain tables |
 | `chaos` | `{"enabled", "budget", "active_rules": [{"id", "help", ...}]}`; `budget` is `null` at Poker Head's build table (its director changes rules, not the Chaos AI); rule fields there: §8b |
 | `action_help` | one-line explanation of each legal action |
 | `last_round` | result of the most recent round (see below), `null` once you bet again |
@@ -246,27 +246,27 @@ Buy them in the shop, use with `act use_item <id>` during `player_turn`. Each us
 If an item pushes your total over the limit (a `swap`, or a `shield` removing a rule that kept you under), you bust and the round settles at once.
 What `peek`, `fate_oracle` and `danger_radar` reveal only appears in `events`; remember it yourself.
 
-## 8a. J-54's table (`--mode j54`, demo)
+## 8a. J-54's table (`--mode j54`)
 
-J-54 changes the **cards**, not the rules. Design: `docs/design/J54_TABLE.md`.
+J-54 runs an experiment on one deck that lasts the run; its conditions change what **its own** cards are worth, and you reshape the deck with compute. Spec: `docs/design/J54_V2_SPEC.md`; evidence: `docs/design/J54_PRIMITIVES.md`.
 
-- **Persistent deck.** The deck's cards last the whole run; each round shuffles all of them. `obs.table.info.Deck` is its size and `obs.table.deck` its make-up (`{"2": 4, ..., "A": 5}`, every card of the run's deck, never the order). Deleted cards are counted in `obs.table.info.Removed`.
-- **Protocol (goal).** Drawn at random per run, shown in `obs.table.info.Protocol`:
-  - *Single Capture* — draw the Joker yourself (deal, hit or double). It starts **sealed**; `buy j54_start_experiment` (always on the shelf until bought) puts it in the deck. If the dealer would get it, J-54 shuffles it back and adds a low card. `obs.target` is 0.
-  - *Capital* — reach the chip target (`obs.target`).
-- **Compute fee.** Charged before each bet (`events`: "Compute fee: n chips."); grows every few rounds. The minimum bet is at least the fee and `bet_range` already accounts for it.
-- **Entropy.** After every round J-54 adds low cards (more once the experiment started), so waiting makes the deck worse.
-- **Contracts** replace items in the shop. `buy <id>` applies them; they never appear in `obs.items`. Pending ones are listed in `obs.table.info.Contracts`.
+- **Goal, two routes.** 16 rounds from 100 chips. Win when a settlement **from round 9** leaves you at the target (`obs.target`, 175), or by **capture**: hold the Joker when a hand you do not lose (win, push, natural; not a surrender) settles from round 9. Bankruptcy, or round 16 settling without a win, loses.
+- **Opening choice.** The run starts with `obs.choice` (`kind: "firmware"`, not cancellable): three firmwares plus `none`. A firmware is one rule on **your** cards or bust line for the whole run (`fw_mid` your 4-6 count 10, `fw_fives` 5-6 count 10, `fw_low` 2-4 count 10, `fw_margin` you bust only above 22), paid at once from your chips (price in the label).
+- **Persistent deck.** Every round shuffles all of the run's cards. `obs.table.deck` is the make-up by rank (never the order). After every settlement J-54 adds one low card (entropy), so waiting makes the deck worse.
+- **The program.** One condition at a time, 2-4 rounds each, changed at the first betting phase of its segment and announced in `events` ("Condition 3 begins: ..."). It is the single entry of `obs.chaos.active_rules` (`name`, `effect`, `scope` "J-54's cards", `remaining`, `tier` = camp: classic / anti / loner) and `obs.table.public.condition`. On the last round of a condition J-54 announces the next one's camp (`public.announcement`). Conditions: J-54's black cards +1, even ranks +2, hearts ×2, stands on 19 (classic); stands on 15, low cards +3 (anti); J/Q/K count 5 (loner). The Chaos AI never acts here (`chaos.budget` is null).
+- **Compute.** +2 every betting phase, at most 8 (`public.compute`, `compute_cap`). Spend it in `betting` with `perform` (all in `obs.table_actions`, each with `enabled` and a `reason` when not):
 
-| Contract | Effect (profile numbers) |
-| --- | --- |
-| `j54_low_purge` | at once: delete low cards (2-6) |
-| `j54_streamline` | on your next win: delete random cards |
-| `j54_high_injection` | at once: add 10-value cards or aces |
-| `j54_freeze` | at once: J-54 adds no cards for a few rounds |
-| `j54_start_experiment` | at once: release the Joker (Single Capture only) |
+| Action | Cost | Effect |
+| --- | --- | --- |
+| `perform j54_cut <group>` | 1 | removes 2 cards of a rank and colour: `5r` (red 5s), `Kb` (black kings), `10r`, ...; without a group it asks `obs.choice` (`kind: "cut_target"`, cancellable), each option's `help` giving that group's heat (`+0.3 pp · cut`) |
+| `perform j54_hot_purge` | 1 | removes 3 cards of one rank drawn at random among the 3 ranks with the highest heat (announced after) |
+| `perform j54_release` | 6 | puts the sealed Joker into the deck for the rest of the run (once). For you it is a soft ace, never a natural; J-54 never keeps it (it swaps in the next card and adds a low card) |
 
-- **Chaos rules** are deck operations, described in plain English in `obs.chaos.active_rules`: `j54_burn` (after the hand, delete every card drawn), `j54_sample_injection` / `j54_ace_injection` (add cards), `j54_redundancy_purge` (delete cards of one rank), `j54_layered_sort` (high cards to the bottom of this round's deck), `j54_data_backflow` (removed cards return). All changes are announced in `events`.
+  Moves stop at a 16-card deck. Removed cards go to the removed pile (`public.removed`, `removed_cards`).
+- **The meter and the heat map** (`obs.table.public`, from an exact evaluator of the deck the next round is dealt from, under the condition and your firmware): `bar` = win chance of one hand (0-1), `ev` = expected result in bets, `band` = `{"low", "stake_pct", "suggested"}` (bands from 50 / 55 / 60 % suggest 10 / 20 / 30 % of your chips; below 50 % the minimum; advice only, `bet_range` is unchanged), `capture` = chance you draw the Joker in a hand (0 until released), `heat` = `{group: pp}` change of the win chance when one card of the group leaves (positive: cutting it helps you). They show direction, not a plan; they update after every move.
+- **Bounty.** Each condition names the rank J-54 values most under it (`public.bounty`); every card of that rank in your final hand pays 2 chips at settlement, win or lose.
+- **Other snapshot fields:** `joker` (`sealed` / `in the deck` / `captured`), `firmware`, `deck_size`, `target`, `target_from_round`, `round`, `rounds`, `bands`, `groups` (cards per group), `seen` (conditions so far), `program` (the whole schedule, only in profiles that read it out). `obs.table.info` repeats the essentials in words; the shop never sells anything here.
+- **A loop:** read `public.heat`; cut the most positive groups while compute lasts (or Hot Purge); bet `band.suggested`; play the hand by `you.total` (it includes your firmware) against J-54's up card; release the Joker when you can afford it and want the capture route.
 
 ## 8b. Poker Head's build table (`--mode chaos`)
 

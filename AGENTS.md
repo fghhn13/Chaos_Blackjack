@@ -33,7 +33,7 @@ python -m chaos_blackjack.agent --brief act stand     # smaller reply (recommend
 **billed** model instead of the offline stub — only use when told to),
 `--start-money N`, `--target-money N`, `--max-steps N`, `--profile NAME` (a balance
 profile in `data/game.db`; default `$CHAOS_PROFILE` or `default`), `--mode ID`
-(a game mode; `chaos` is Poker Head's build table, `j54` J-54's deck table, a demo — see below;
+(a game mode; `chaos` is Poker Head's build table, `j54` J-54's deck table — see below;
 `--chaos` without `--mode` keeps the classic Chaos run).
 
 Global flags: `--brief` (only summary / hint / legal actions / results),
@@ -119,19 +119,27 @@ rising minimum bet. `obs.table.public` is the public build and money
 snapshot. Guide: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md) §8b; architecture:
 [docs/design/ITEM_ARCHITECTURE.md](docs/design/ITEM_ARCHITECTURE.md).
 
-### J-54's table (`--mode j54`, demo)
+### J-54's table (`--mode j54`)
 
 The deck lasts the whole run (every round reshuffles all of its cards) and
-J-54's Chaos rules add or remove cards instead of changing values. A random
-**protocol** is the goal: *Single Capture* (draw the Joker yourself; it starts
-sealed until you buy `j54_start_experiment`) or *Capital* (reach the chip
-target). A **compute fee** is charged before each bet and grows with the
-round; the minimum bet is at least the fee. The shop sells **contracts**
-(`buy j54_low_purge`, ...) that change the deck at once or on your next win;
-they never enter `obs.items`. `obs.table` = `{"info": {"Protocol", "Joker" or
-"Goal", "Deck", "Removed"?, "Fee", "Contracts"?}, "fee": n, "deck": {rank: count}}`
-(null at other tables; the deck's make-up is public, its order is not); deck
-changes are reported in `events`. Design: [docs/design/J54_TABLE.md](docs/design/J54_TABLE.md).
+J-54 runs a **program** of conditions, one at a time for 2-4 rounds, that
+change what **its own** cards are worth or when it stands (the single entry of
+`obs.chaos.active_rules`, camp in `tier`; the next camp is announced a round
+ahead). 16 rounds from 100 chips; two win routes: the chip target
+(`obs.target`) at a settlement **from round 9**, or a **capture**: hold the
+Joker when a hand you do not lose settles from round 9. The run opens with
+`obs.choice` `kind: "firmware"` (a rule on your cards for the run, paid in
+chips, or `none`). You earn **compute** (+2 a round, cap 8) and spend it while
+betting: `perform j54_cut 5r` (2 cards of a rank+colour group; no arg asks
+`obs.choice` `kind: "cut_target"` with each group's heat), `perform
+j54_hot_purge` (3 cards of one of the 3 hottest ranks), `perform j54_release`
+(6: the sealed Joker enters the deck). `obs.table_actions` lists them with
+reasons. `obs.table.public` = `{compute, compute_cap, condition, announcement,
+firmware, joker, bar, ev, band: {low, stake_pct, suggested}, capture, heat:
+{group: pp}, deck_size, removed, bounty, target, ...}`: `bar` is the win chance
+of a hand from this deck, `heat` > 0 means cutting that group helps you, `band`
+suggests a stake (advice only). `obs.table.deck` is the make-up by rank (never
+the order). The shop sells nothing here. Spec: [docs/design/J54_V2_SPEC.md](docs/design/J54_V2_SPEC.md); guide §8a.
 
 ### Fair play
 

@@ -1,7 +1,10 @@
 # J-54 "Joker Reshuffler": table design
 
-Status: **concept agreed**, 2026-10-12; **demo v1 implemented**, 2026-10-13
-(section 0). Numbers are a first pass, not balanced. Wiki drafts:
+Status: **superseded by v2**, implemented 2026-10-17: the table `j54` now
+follows [J54_V2_SPEC.md](J54_V2_SPEC.md) (program of conditions, compute, deck
+shaping, the meter and heat map, the Joker capture). This file keeps the
+original concept and the v1 demo (concept agreed 2026-10-12; demo v1
+implemented 2026-10-13, section 0) for reference. Wiki drafts:
 `dealer-j54.html`, `table-j54.html`.
 
 **Direction change, 2026-10-15**: the next version is built from composable

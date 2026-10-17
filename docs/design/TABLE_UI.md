@@ -2,7 +2,7 @@
 
 Status: **implemented**, 2026-10-13. The contract for how a table's
 information reaches the screen, so that dealers with very different
-mechanics (J-54's deck today, others later) need no GUI code. Change this
+mechanics (J-54's deck and heat map, Poker Head's builds) need no GUI code. Change this
 file before changing a contract below.
 
 ## 1. Decisions
@@ -27,7 +27,10 @@ layouts (app/layout.py) name which parts go in which column / tab
 
 - **Widgets** (`app/widgets.py`): frozen data, one renderer each — `stat`,
   `badges`, `bars`, `progress`, `list`, `rows`, `slots`, `log`. A clickable
-  element carries an `Act(id, arg, enabled)`. `tone` is a colour hint.
+  element carries an `Act(id, arg, enabled)`. `tone` is a colour hint; a
+  `Bar` also has a `shade` (how strongly its tone shows, for heat maps), its
+  own `tooltip` and `act`; a `Progress` may carry `marks` (ticks, labelled in
+  the panel) and a `text` instead of "value / maximum".
   A new kind is a dataclass plus a renderer in `RENDERERS`; prefer combining
   existing kinds.
 - **Parts** (`app/parts.py`): `register_part(id, build, available=...)`;
@@ -35,8 +38,16 @@ layouts (app/layout.py) name which parts go in which column / tab
   them) and returns widgets. Variants: `compact` (side columns), `full` (the
   panel), `tail` (recent lines). Core parts: `core.items` (each item enabled
   by its own move, with when and why not), `core.actions` (the table's own
-  moves), `core.rules`, `core.log`, `core.run_stats`. J-54: `j54.deck`,
-  `j54.badges`, `j54.contracts`, `j54.goal` (`j54/parts.py`). Poker Head:
+  moves), `core.rules`, `core.log`, `core.run_stats`. J-54 (`j54/parts.py`,
+  reading only `view.table_public`, `view.deck_counts` and `view.moves`):
+  `j54.deck` (compact: one heat-coloured bar per rank, a click asks which
+  group to cut; full: a red and a black strip whose bars cut their group,
+  heat by rank, deck rows, the removed pile), `j54.meter` (the win chance as
+  a progress bar with the betting bands as marks; full adds EV, the
+  suggested stake and the capture chance), `j54.badges` (compute, condition,
+  announcement, Joker, firmware, bounty), `j54.ops` (Cut, Hot Purge, Release
+  as clickable badges, muted with the reason when not allowed), `j54.goal`
+  and `j54.program` (program so far, firmware, removed pile). Poker Head:
   `poker_head.status`, `.loadout`, `.wallet`, `.finance`, `.preparations`
   (`poker_head/parts.py`, reading only `view.table_public`).
 - **Native blocks** (`gui/components/side_column.py`): parts that need the
@@ -63,7 +74,7 @@ layouts (app/layout.py) name which parts go in which column / tab
 |---|---|---|---|
 | Default (Classic, mode-less `--chaos`) | host, rules (compact), feed | deck pile, item slots, buttons | Bag (I), Rules, Log (L), Run |
 | Poker Head (builds) | same | status, item slots, table actions, deck pile, buttons | Build (B), Bag (I), Finance (F), Rules, Log (L), Run |
-| J-54 | same | deck pile, deck strip, badges, item slots, buttons | Bag (I), Deck (K), Contracts, Rules, Log (L), Run (goal + stats) |
+| J-54 | same | deck pile, heat strip, meter, badges, operations, buttons (no item slots: the table sells none) | Bag (I), Deck (K: meter, heat map, table actions), Rules, Log (L), Run (goal, program, firmware, removed pile, stats) |
 
 ## 4. Adding a table with its own mechanics
 
