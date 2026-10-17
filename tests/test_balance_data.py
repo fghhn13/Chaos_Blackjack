@@ -39,10 +39,7 @@ def test_shipped_values_are_unchanged() -> None:
     assert (b.dealer_stand_on, b.blackjack_pays, b.allow_double, b.allow_surrender) == (17, (3, 2), True, True)
     assert (b.shop_slots, b.shop_refresh_rounds) == (3, 2)
     assert {k: v for k, v in b.shop_prices.items() if not k.startswith("ph_")} == {"peek": 2, "danger_radar": 3, "swap": 1, "hole_card_hacker": 2,
-                             "fate_oracle": 4, "shield": 3, "example_trim": 20,
-                             # J-54's contracts (its table only)
-                             "j54_streamline": 20, "j54_low_purge": 10, "j54_high_injection": 20,
-                             "j54_freeze": 15, "j54_start_experiment": 50}
+                             "fate_oracle": 4, "shield": 3, "example_trim": 20}  # J-54's table sells nothing
     assert set(b.shop_bankroll_pct) == {"peek", "danger_radar", "swap", "hole_card_hacker", "fate_oracle", "shield"}
     assert (b.shop_reroll_price, b.chaos_stub_calm_weight, b.meta_chaos_win_bonus, b.meta_bring_kinds) == (3, 15, 0, 2)
     assert (b.meta_vault_start, b.meta_relief_base, b.meta_relief_step, b.meta_relief_cap) == (1000, 40, 10, 100)

@@ -66,8 +66,8 @@ def test_modes_describe_the_supplied_config():
         detail = entry.detail(cfg)
         if entry.id == "chaos":
             assert "Leave with 1600 to 2400 net assets" in detail   # the table's own stake: 400, x4 to x6
-        elif entry.id == "j54":  # J-54's goal is a protocol, not a chip target
-            assert "random protocol" in detail
+        elif entry.id == "j54":  # J-54's goal: its own chip target from round 9, or a capture
+            assert "or capture the Joker" in detail
         else:
             assert "230 chips" in detail and "into 920" in detail
         assert "Bet 7 up to 25%" in detail and "stands on 19" in detail

@@ -227,10 +227,10 @@ register_mode(GameMode(
     shared_items=tuple(POKER_HEAD_ALIASES), layout=_poker_head_layout(),
     requires="classic_max_win", teaser="Win the Classic Table once with the top stake to open this table.",
 ))
-# Demo of the deck-rebuilding table (docs/design/J54_TABLE.md); its mechanics are chaos_blackjack/j54.
-J54_RULES = ("j54_burn", "j54_sample_injection", "j54_redundancy_purge", "j54_ace_injection",
-             "j54_layered_sort", "j54_data_backflow")
-J54_CONTRACTS = ("j54_streamline", "j54_low_purge", "j54_high_injection", "j54_freeze", "j54_start_experiment")
+# J-54's table (docs/design/J54_V2_SPEC.md); its mechanics are chaos_blackjack/j54. Its pool is the seven
+# conditions its program schedules (rules/plugins/j54_conditions.py); it sells no items.
+J54_RULES = ("j54_black_plus", "j54_even_plus", "j54_hearts_scale", "j54_stand_19", "j54_stand_15",
+             "j54_low_plus", "j54_faces_set")
 def _j54_layout() -> "Layout":
     from chaos_blackjack.app.layout import BAG, DEFAULT_LAYOUT, LOG, RULES, Layout, PanelTab
 
@@ -244,11 +244,12 @@ def _j54_layout() -> "Layout":
 
 
 register_mode(GameMode(
-    "j54", "J-54's Table (demo)",
-    "J-54 does not bend the rules; it rewrites the deck, and the deck lasts the whole run. Sign contracts to "
-    "reshape it, pay the compute fee each round and complete the protocol before the deck turns against you.",
+    "j54", "J-54's Table",
+    "J-54 runs an experiment on a deck that lasts the whole run. Its conditions change only its own cards; "
+    "spend compute to cut the deck, read which way each condition points, and reach the target or capture "
+    "the sealed Joker.",
     icon="mode_j54", overrides={"enable_chaos": True}, order=2, host="j54", series="j54",
-    rules=J54_RULES, items=J54_CONTRACTS, exclusive=True, layout=_j54_layout(),
+    rules=J54_RULES, items=(), exclusive=True, layout=_j54_layout(),
     requires="poker_head_win", reveal="classic_max_win", teaser="Beat Poker Head's Table once to open this table.",
 ))
 # The tutorial's practice table (chaos_blackjack/tutorial): never listed, started by the onboarding.

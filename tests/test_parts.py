@@ -87,11 +87,16 @@ def test_item_slots_carry_use_actions_and_hotkeys() -> None:
 
 
 def test_rules_part_lists_the_dealers_pool() -> None:
-    c = _controller("j54")
+    # A Chaos table without rules of its own lists the pool its Chaos AI may use.
+    c = GameController(replace(RunConfig.from_balance(default_balance(), seed=3), enable_chaos=True,
+                               rule_pool=("great_crash", "suit_power")), save_fn=lambda d, n: n)
     full = build_part("core.rules", PartContext(c, c.view()), "full")
     names = {e.title for e in full[1].entries}
-    assert {"Burn Protocol", "Layered Sort", "Data Backflow"} <= names
+    assert names == {"Great Crash", "Suit Power"}
     assert all(not e.text.startswith(e.title) for e in full[1].entries)
+    j54 = _controller("j54")  # J-54 shows the condition its program has in force
+    full = build_part("core.rules", PartContext(j54, j54.view()), "full")
+    assert len(full) == 1 and [e.title for e in full[0].entries] == [f"{j54.table.condition().name} · J-54's cards"]
     off = _controller("normal")
     assert len(build_part("core.rules", PartContext(off, off.view()), "full")) == 1
 
