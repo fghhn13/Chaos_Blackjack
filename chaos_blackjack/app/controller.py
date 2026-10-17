@@ -470,7 +470,7 @@ class GameController:
         dv = self._value(self._st.dealer_hand, "dealer")
         if self.loop.rules.is_bust(dv, ctx):
             self._notify(NoticeKind.DEALER_BUSTS, "Dealer busts.", {"total": dv})
-        elif dv >= self.config.dealer_stand_on:
+        elif dv >= self._dealer_stand_on():
             self._notify(NoticeKind.DEALER_STANDS, f"Dealer stands at {dv}.", {"total": dv})
         elif self._st.deck:
             self.state = self.loop.draw_for_dealer(self._st)
@@ -777,6 +777,10 @@ class GameController:
             return ()
         return tuple(RuleView(str(getattr(m, "id", "?")), describe_modifier(m)) for m in self.loop.modifiers.items)
 
+    def _dealer_stand_on(self) -> int:
+        stand_on = self.config.dealer_stand_on
+        return self.table.dealer_stand_on(stand_on) if self.table is not None else stand_on
+
     def _double_multiplier(self) -> int:
         return self.table.double_multiplier() if self.table is not None else 2
 
@@ -915,7 +919,9 @@ class GameController:
         if self.table is not None:
             self.table.after_settle(st, out, self.loop.modifiers, self.run)
             won = self.table.victory(self.run)
-            self.run_end = RunEndResult(kind="victory", message=won) if won else None
+            lost = None if won else self.table.defeat(self.run)
+            self.run_end = (RunEndResult(kind="victory", message=won) if won else
+                            RunEndResult(kind="defeat", message=lost) if lost else None)
         else:
             delta -= self._cap_at_target()
             self.run_end = self.run_end_policy.check(self.run)

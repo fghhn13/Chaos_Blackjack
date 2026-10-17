@@ -17,7 +17,7 @@ def test_builtins_and_tab_order():
     assert [e.id for e in codex_entries("environment")] == [
         "fixed", "shift", "bust", "tie", "bust_outcome", "profit_cap", "item_ban", "markup", "hidden"]
     assert len(codex_entries("build")) == 43
-    assert len(codex_entries("rule")) == 13  # Poker Head's 7 and J-54's 6
+    assert len(codex_entries("rule")) == 20  # Poker Head's 7, J-54's 7 conditions and its 6 demo deck rules
     assert len(codex_entries("item")) == 6
     assert [e.id for e in codex_entries("mode")] == ["normal", "chaos", "j54"]
     assert [e.id for e in codex_entries("ai")] == ["default"]
@@ -66,8 +66,8 @@ def test_modes_describe_the_supplied_config():
         detail = entry.detail(cfg)
         if entry.id == "chaos":
             assert "Leave with 1600 to 2400 net assets" in detail   # the table's own stake: 400, x4 to x6
-        elif entry.id == "j54":  # J-54's goal is a protocol, not a chip target
-            assert "random protocol" in detail
+        elif entry.id == "j54":  # J-54's goal: its own chip target from round 9, or a capture
+            assert "or capture the Joker" in detail
         else:
             assert "230 chips" in detail and "into 920" in detail
         assert "Bet 7 up to 25%" in detail and "stands on 19" in detail
@@ -116,7 +116,7 @@ def test_provider_plugins_override_metadata_and_add_ai_entries(monkeypatch):
     replacement = replace(codex_entries("rule")[0], name="Replacement", order=-1)
     register_codex_provider("rule", lambda cfg: [replacement])
     assert codex_entries("rule")[0] == replacement
-    assert len(codex_entries("rule")) == 13
+    assert len(codex_entries("rule")) == 20
 
 
 def test_provider_receives_config_and_rejects_wrong_kind(monkeypatch):

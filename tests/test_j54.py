@@ -1,77 +1,94 @@
-"""J-54's table (demo): persistent deck, protocols, fee, contracts, Joker, deck rules."""
+"""J-54's table (v2, docs/design/J54_V2_SPEC.md): program of conditions, compute, deck shaping,
+the Joker, firmware, bounty, goal, snapshot and saves. The evaluator has its own tests."""
 
 from __future__ import annotations
 
+import random
 from dataclasses import replace
 
 import pytest
 
 from chaos_blackjack.agent import AgentSession
 from chaos_blackjack.app.config import RunConfig
-from chaos_blackjack.app.controller import GameController
+from chaos_blackjack.app.controller import ActionError, GameController
 from chaos_blackjack.app.notices import NoticeKind
 from chaos_blackjack.app.view import TablePhase
 from chaos_blackjack.core.game_state import Card, GamePhase, GameState, Rank
+from chaos_blackjack.core.run_state import RunSaveData
 from chaos_blackjack.data.balance import default_balance
-from chaos_blackjack.j54.table import J54Table, joker
-from chaos_blackjack.modes import J54_CONTRACTS, J54_RULES, get_mode
-from chaos_blackjack.rules.modifiers import ActiveModifiers
+from chaos_blackjack.j54.program import Program, Segment, generate, switches
+from chaos_blackjack.j54.table import (CUT, CUT_CHOICE, FIRMWARE_CHOICE, GROUPS, HOT_PURGE, IN_DECK, RELEASE,
+                                       SEALED, J54Table, joker)
+from chaos_blackjack.modes import J54_RULES, get_mode
+from chaos_blackjack.rules.plugins.j54_conditions import CONDITIONS
+from chaos_blackjack.rules.plugins.j54_deck import DECK_RULES
 
 
 def _c(r: str, s: str = "♠") -> Card:
     return Card(Rank(r), s)
 
 
-def _config(seed: int = 1, protocol: str | None = None, **settings) -> RunConfig:
+def _config(seed: int = 1, **settings) -> RunConfig:
     cfg = get_mode("j54").apply(RunConfig.from_balance(default_balance(), seed=seed))
-    extra = {f"j54.{k}": v for k, v in settings.items()}
-    if protocol:
-        extra["j54.protocols"] = protocol
-    return replace(cfg, mode_settings={**cfg.mode_settings, **extra})
+    return replace(cfg, mode_settings={**cfg.mode_settings, **{f"j54.{k}": v for k, v in settings.items()}})
 
 
-def _controller(seed: int = 1, protocol: str | None = None, **settings) -> GameController:
-    c = GameController(_config(seed, protocol, **settings), save_fn=lambda d, n: n)
+def _controller(seed: int = 1, firmware: str | None = "none", **settings) -> GameController:
+    """A J-54 run; `firmware` answers the opening choice (None leaves it open)."""
+    if firmware not in (None, "none"):
+        settings.setdefault("firmwares_offered", 4)
+    c = GameController(_config(seed, **settings), save_fn=lambda d, n: n)
+    if firmware is not None:
+        c.choose(firmware)
     c.drain_notices()
     return c
+
+
+def _force(c: GameController, rule: str = "j54_faces_set") -> None:
+    """Put one condition in force for the whole run (and no bounty)."""
+    t = c.table
+    t.program = Program((Segment(rule, 1, t.rounds),))
+    t.segment = 0
+    t.bounty_rank = None
 
 
 def _rig(c: GameController, player, dealer, deck=()) -> None:
     """Make the next deal fixed (the table's deck is still used for everything else)."""
 
-    def fixed_round(seed=None, *, inventory_override=None, cards=None):
-        c.loop.modifiers = c.loop.modifiers.with_cleared()
+    def fixed_round(seed=None, *, inventory_override=None, cards=None, ordered_cards=None):
         return GameState(tuple(player), tuple(dealer), tuple(deck), GamePhase.PLAYER_TURN,
                          inventory=inventory_override or ())
 
     c.loop.new_round = fixed_round  # type: ignore[method-assign]
 
 
-def _no_chaos(c: GameController) -> None:
-    c.loop.pipeline.llm.choices = ()  # the offline Chaos AI stays calm
+def _hand(c: GameController, player, dealer, deck=(), bet: int = 10, stand: bool = True) -> None:
+    _rig(c, player, dealer, deck)
+    c.place_bet(bet)
+    if stand and c.phase == TablePhase.PLAYER_TURN:
+        c.stand()
+    c.finish_dealer()
 
 
-def _bet(c: GameController, amount: int = 10) -> None:
-    c.place_bet(amount)
-    if c.phase == TablePhase.CHAOS:
-        c.resolve_chaos()
+def _events(c: GameController) -> list[str]:
+    return [n.text for n in c.drain_notices() if n.kind == NoticeKind.TABLE_EVENT]
 
 
 # ------------------------------------------------------------------ mode
 
 
-def test_mode_keeps_its_rules_and_contracts_to_itself() -> None:
+def test_mode_schedules_the_seven_conditions_and_sells_nothing() -> None:
     base = RunConfig.from_balance(default_balance())
     j54 = get_mode("j54").apply(base)
-    assert j54.rule_pool == J54_RULES and set(j54.shop_prices) == set(J54_CONTRACTS)
-    assert j54.enable_chaos and j54.host == "j54" and j54.shop_refresh_rounds == 1
+    mode = get_mode("j54")
+    assert mode.name == "J-54's Table" and j54.host == "j54" and j54.enable_chaos
+    assert j54.rule_pool == J54_RULES and set(J54_RULES) == set(CONDITIONS) and j54.shop_prices == {}
+    assert not set(DECK_RULES) & set(J54_RULES)  # v1's deck rules stay registered, in no pool
+    assert j54.start_money == 100
     for other in ("normal", "chaos"):
         cfg = get_mode(other).apply(base)
-        assert not set(cfg.shop_prices) & set(J54_CONTRACTS)
         assert not {r for r, _, _ in cfg.chaos_stub} & set(J54_RULES)
-        assert cfg.shop_refresh_rounds == 2
     assert set(J54_RULES) <= set(get_mode("chaos").apply(base).disabled_rules)  # Poker Head: "all" but these
-    assert get_mode("normal").apply(base).rule_pool == ()
 
 
 def test_plain_tables_have_no_mechanics() -> None:
@@ -79,187 +96,398 @@ def test_plain_tables_have_no_mechanics() -> None:
     assert c.table is None and c.view().table_info == () and c.view().fee == 0
 
 
-def test_protocol_is_drawn_per_run_and_sets_the_goal() -> None:
-    seen = {_controller(seed).table.protocol for seed in range(30)}
-    assert seen == {"capture", "capital"}
-    capital = _controller(protocol="capital")
-    assert (capital.run.objective, capital.run.target_money) == ("j54_capital", 250)
-    capture = _controller(protocol="capture")
-    assert (capture.run.objective, capture.run.target_money) == ("j54_capture", 0)
-    assert dict(capture.view().table_info)["Joker"] == "sealed"
+def test_the_goal_is_the_target_from_round_nine_or_a_capture() -> None:
+    c = _controller()
+    assert isinstance(c.table, J54Table) and c.run.target_money == 175 and c.view().fee == 0
+    assert J54Table.goal(c.config) == "Reach 175 chips from round 9, or capture the Joker"
+    assert c.bet_limits() == (5, 50) and c.table.should_chaos() is False
 
 
-# --------------------------------------------------------------- economy
+# ------------------------------------------------------------------ program
 
 
-def test_compute_fee_grows_and_is_charged_before_the_bet() -> None:
-    t = _controller().table
-    assert [t.fee(r) for r in (1, 4, 5, 9, 13, 17, 21, 25)] == [0, 0, 1, 2, 4, 8, 16, 32]
-    c = _controller(fee_steps="3")
-    lo, hi = c.bet_limits()
-    assert (lo, hi) == (5, (100 - 3) // 2)
-    _no_chaos(c)
-    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("7", "♦")])
-    c.place_bet(10)
-    assert c.run.money == 97 and any(n.kind == NoticeKind.FEE_PAID for n in c.drain_notices())
+@pytest.mark.parametrize("seed", range(10))
+def test_program_covers_the_run_with_the_configured_switches(seed: int) -> None:
+    t = _controller(seed).table
+    segs = t.program.segments
+    assert segs[0].start == 1 and segs[-1].end == 16
+    assert all(a.end + 1 == b.start for a, b in zip(segs, segs[1:]))
+    assert all(2 <= s.length <= 4 for s in segs)
+    assert all(a.rule != b.rule for a, b in zip(segs, segs[1:]))
+    assert t.conditions[segs[0].rule].camp == "classic"
+    assert 1 <= switches([t.conditions[s.rule].camp for s in segs]) <= 2
+    assert t.program == _controller(seed).table.program  # drawn from the seed
 
 
-def test_minimum_bet_follows_the_fee() -> None:
-    c = _controller(fee_steps="12")
-    assert c.bet_limits()[0] == 12
+def test_switch_count_and_options_follow_the_profile() -> None:
+    assert switches(["classic", "anti", "classic"]) == 2
+    assert switches(["classic", "loner", "anti"]) == 1   # two halves
+    assert switches(["classic", "loner", "classic"]) == 1
+    assert switches(["anti", "loner"]) == 0              # a half, rounded down
+    camps = {r: m for r, (_, _, d) in CONDITIONS.items() for m in [d["camp"]]}
+    p = generate(3, 16, camps, (4, 4), (0, 0), False)
+    assert [s.length for s in p.segments] == [4, 4, 4, 4]
+    assert switches([camps[s.rule] for s in p.segments]) == 0
 
 
-# ------------------------------------------------------------------ deck
-
-
-def test_deck_persists_and_entropy_adds_low_cards() -> None:
-    c = _controller(protocol="capital")
-    _no_chaos(c)
-    assert c.table.deck_size == 52
-    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("7", "♦")])
-    _bet(c)
-    c.stand()
-    c.finish_dealer()
-    assert c.table.deck_size == 53
-    added = c.table.cards[-1]
-    assert str(added.rank) in ("2", "3", "4", "5", "6")
-    assert len(c.table.round_cards()) == 53  # the next round shuffles the changed deck
-
-
-def test_contract_now_applies_at_once_and_is_not_an_item() -> None:
-    c = _controller(protocol="capital")
-    offer = next(o for o in c.shop.offers if o.item == "j54_low_purge") if any(
-        o.item == "j54_low_purge" for o in c.shop.offers) else None
-    if offer is None:
-        c.shop = replace(c.shop, offers=c.shop.offers + (replace(c.shop.offers[0], item="j54_low_purge", price=10),))
-    lows_before = sum(str(x.rank) in "23456" and len(str(x.rank)) == 1 for x in c.table.cards)
-    c.buy("j54_low_purge")
-    lows_after = sum(str(x.rank) in "23456" and len(str(x.rank)) == 1 for x in c.table.cards)
-    assert lows_before - lows_after == 6 and c.table.deck_size == 46
-    assert c.run.items == () and c.view().items == ()
-
-
-def test_triggered_contract_waits_for_a_win() -> None:
-    c = _controller(protocol="capital", entropy=0)
-    _no_chaos(c)
-    c.table.buy("j54_streamline", c.run)
-    assert c.table.pending == ["j54_streamline"]
-    assert dict(c.table.info(c.run))["Contracts"] == "Streamline Contract"
-    _rig(c, [_c("10"), _c("6")], [_c("10", "♥"), _c("9", "♦")])  # 16 vs 19: a loss
-    _bet(c)
-    c.stand()
-    c.finish_dealer()
-    assert c.table.pending == ["j54_streamline"] and c.table.deck_size == 52
-    c.next_round()
-    _rig(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("8", "♦")])  # 19 vs 18: a win
-    _bet(c)
-    c.stand()
-    c.finish_dealer()
-    assert c.table.pending == [] and c.table.deck_size == 47
-
-
-def test_deletions_stop_at_the_minimum_deck() -> None:
-    t = _controller(protocol="capital").table
-    for _ in range(20):
-        t._fire("j54_streamline")
-    assert t.deck_size == 12
-
-
-# ----------------------------------------------------------------- Joker
-
-
-def test_start_experiment_is_pinned_until_bought() -> None:
-    c = _controller(protocol="capture")
-    assert [o.item for o in c.shop.offers].count("j54_start_experiment") == 1
-    assert len(c.shop.offers) == c.config.shop_slots
-    c.run.money = 200
-    c.buy("j54_start_experiment")
-    assert c.table.jokers_in_deck == 1 and c.table.experiment
-    assert sum(1 for x in c.table.round_cards() if str(x.rank) == "JK") == 1
-    c.shop = c._roll_shop()
-    assert "j54_start_experiment" not in [o.item for o in c.shop.offers]
-    assert "j54_start_experiment" not in [o.item for o in _controller(protocol="capital").shop.offers]
-
-
-def test_drawing_the_joker_wins_the_capture_protocol() -> None:
-    c = _controller(protocol="capture")
-    _no_chaos(c)
-    c.table.jokers_sealed, c.table.jokers_in_deck, c.table.experiment = 0, 1, True
-    _rig(c, [_c("10"), _c("4")], [_c("10", "♥"), _c("7", "♦")], deck=[joker(), _c("9")])
-    _bet(c)
-    c.hit()
-    v = c.view()
-    assert v.phase == TablePhase.RUN_OVER and v.run_end.kind == "victory"
-    assert all(str(x.rank) != "JK" for x in c.state.player_hand)
-    assert v.last_result.outcome == "push" and v.money == 100
-    assert dict(c.table.info(c.run))["Joker"] == "captured"
-
-
-def test_the_dealer_never_keeps_the_joker() -> None:
-    c = _controller(protocol="capture")
-    _no_chaos(c)
-    c.table.jokers_sealed, c.table.jokers_in_deck, c.table.experiment = 0, 1, True
-    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("4", "♦")], deck=[joker(), _c("3"), _c("9"), _c("K")])
-    _bet(c)
-    c.stand()
-    c.finish_dealer()
-    dealer = [str(x.rank) for x in c.state.dealer_hand]
-    assert "JK" not in dealer and dealer[2] == "3"
-    assert "JK" in [str(x.rank) for x in c.state.deck] and c.state.deck[0] != joker()
-    assert not c.table.won and c.table.jokers_in_deck == 1
-    # penalty (1) + entropy (2 once the experiment started)
-    assert c.table.deck_size == 53 + 1 + 2
-
-
-def test_capital_protocol_wins_at_the_target() -> None:
-    c = _controller(protocol="capital")
-    _no_chaos(c)
-    c.run.money = 245
-    _rig(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
-    _bet(c)
-    c.stand()
-    c.finish_dealer()
-    assert c.phase == TablePhase.RUN_OVER and c.run_end.kind == "victory"
-
-
-# ------------------------------------------------------------ deck rules
-
-
-def test_injection_and_purge_change_this_round_and_the_rest_of_the_run() -> None:
-    c = _controller(protocol="capital")
+def test_condition_changes_at_the_segment_start_and_is_announced_a_round_ahead() -> None:
+    c = _controller(4)
     t = c.table
-    t.round_cards()
-    state = GameState((_c("10"), _c("8")), (_c("10", "♥"), _c("7", "♦")),
-                      (_c("5", "♦"), _c("5", "♣"), _c("9", "♦"), _c("K", "♦")), GamePhase.PLAYER_TURN)
-    mods = ActiveModifiers(items=(c.registry.build_chaos_rule("j54_sample_injection", {"count": 3, "select": "rank:Q"}),))
-    state, mods = t.after_chaos(state, mods)
-    assert len(state.deck) == 7 and t.deck_size == 55
-    assert "3 cards of rank Q" in mods.items[0].describe()
-    mods = mods.with_added(c.registry.build_chaos_rule("j54_redundancy_purge", {"count": 3, "select": "rank:5"}))
-    before = t.deck_size
-    state, mods = t.after_chaos(state, mods)
-    assert [str(x.rank) for x in state.deck].count("5") == 0 and t.deck_size == before - 2
-    assert len(mods.items) == 2 and t.after_chaos(state, mods)[0] == state  # applied once
+    seen = {}
+    while c.run.round <= 12 and c.phase != TablePhase.RUN_OVER:
+        r = c.run.round
+        seg = t.program.at(r)
+        assert t.condition().id == seg.rule and t.rounds_left() == seg.end - r + 1
+        nxt = t.program.next_after(r)
+        if r == seg.end and nxt is not None:
+            assert t.announcement == f"Next condition: {t.conditions[nxt.rule].camp} camp."
+            assert t.public().announcement == t.announcement
+        else:
+            assert t.announcement is None
+        seen[r] = t.condition().id
+        c.run.money = 100  # keep playing
+        _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
+        c.next_round()
+        events = _events(c)
+        if c.run.round == t.program.at(c.run.round).start:
+            assert any(e.startswith(f"Condition {t.segment + 1} begins") for e in events)
+    assert len(set(seen.values())) >= 2
 
 
-def test_burn_protocol_removes_the_drawn_cards() -> None:
-    c = _controller(protocol="capital", entropy=0)
-    _no_chaos(c)
-    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("7", "♦")])
-    _bet(c)
-    c.loop.modifiers = c.loop.modifiers.with_added(c.registry.build_chaos_rule("j54_burn", {}))
-    c.stand()
-    c.finish_dealer()
-    assert c.table.deck_size == 48
-    assert _c("10") not in c.table.cards and _c("7", "♦") not in c.table.cards
+def test_announcement_modes() -> None:
+    def last_round_of_first(c):
+        return c.table.program.segments[0].end
+
+    c = _controller(4, announce="rule")
+    end = last_round_of_first(c)
+    c.table._enter_round(end)
+    nxt = c.table.conditions[c.table.program.segments[1].rule]
+    assert c.table.announcement == f"Next condition: {nxt.text}."
+    c = _controller(4, announce="none")
+    c.table._enter_round(last_round_of_first(c))
+    assert c.table.announcement is None and c.table.public().program is None
+    c = _controller(4, announce="schedule")
+    program = c.table.public().program
+    assert [p["id"] for p in program] == [s.rule for s in c.table.program.segments]
+    assert program[0]["start"] == 1 and program[-1]["end"] == 16
 
 
-# ------------------------------------------------------- save / agents
+def test_program_and_condition_survive_a_save() -> None:
+    c = _controller(6)
+    _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
+    c.next_round()
+    data = c.save("x")
+    loaded = GameController.from_save(RunSaveData.from_dict(data.to_dict()), save_fn=lambda d, n: n)
+    assert loaded.table.to_dict() == c.table.to_dict()
+    assert loaded.table.program == c.table.program and loaded.table.condition() == c.table.condition()
+    assert loaded.view().active_rules == c.view().active_rules
+
+
+# ------------------------------------------------------------------ values
+
+
+def test_conditions_change_only_j54s_cards() -> None:
+    c = _controller()
+    _force(c, "j54_black_plus")
+    hand = (_c("10", "♣"), _c("7", "♠"))
+    assert c.hand_value(hand, "dealer") == 19 and c.hand_value(hand, "player") == 17
+    _force(c, "j54_hearts_scale")
+    assert c.hand_value((_c("A", "♥"), _c("9", "♣")), "dealer") == 11  # A♥ is 22 or 2
+    _force(c, "j54_faces_set")
+    assert c.hand_value((_c("K"), _c("Q", "♦")), "dealer") == 10 and c.hand_value((_c("K"), _c("Q")), "player") == 20
+    rule = c.table.conditions["j54_black_plus"]
+    assert rule.adjust_rank_value(_c("5"), 5) == 5 and rule.adjust_rank_value_for(_c("5"), 5, "dealer") == 6
+
+
+def test_a_stand_threshold_changes_when_j54_stops_drawing() -> None:
+    c = _controller()
+    _force(c, "j54_stand_15")
+    _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("5", "♦")], deck=[_c("K")])
+    assert c.last_result.dealer_total == 15 and c.last_result.outcome == "player"
+    c.next_round()
+    _force(c, "j54_stand_19")
+    _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")], deck=[_c("2"), _c("5")])
+    assert c.last_result.dealer_total == 19 and c.last_result.outcome == "push"
+
+
+def test_firmware_changes_the_players_values_only_and_costs_chips() -> None:
+    c = _controller(firmware="fw_fives")
+    assert c.run.money == 80 and c.table.firmware.id == "fw_fives"
+    _force(c)  # a condition that leaves these cards alone
+    hand = (_c("5"), _c("6", "♥"))
+    assert c.hand_value(hand, "player") == 20 and c.hand_value(hand, "dealer") == 11
+    m = _controller(firmware="fw_margin")
+    assert m.run.money == 70
+    hand = (_c("10"), _c("8"), _c("4"))
+    pc, dc = m.loop.context("player"), m.loop.context("dealer")
+    assert not m.loop.rules.is_bust(22, pc) and m.loop.rules.is_bust(22, dc)
+    _force(m)
+    _rig(m, [_c("10"), _c("8")], [_c("10", "♥"), _c("9", "♦")], deck=[_c("4")])
+    m.place_bet(10)
+    m.hit()
+    assert m.phase == TablePhase.PLAYER_TURN and m.view().player_total == 22
+
+
+def test_firmware_choice_offers_three_and_none() -> None:
+    c = _controller(firmware=None)
+    choice = c.view().choice
+    assert choice.kind == FIRMWARE_CHOICE and not choice.cancellable
+    ids = [o.id for o in choice.options]
+    assert len(ids) == 4 and ids[-1] == "none" and all("chips" in o.label for o in choice.options[:3])
+    assert c.moves() and all(m.action == "choose" for m in c.moves())
+    with pytest.raises(ActionError):
+        c.place_bet(10)
+    c.choose(ids[0])
+    assert c.run.money == 100 - c.table.firmware_price(ids[0]) and c.table.firmware.id == ids[0]
+
+
+def test_the_joker_is_a_soft_ace_for_the_player_and_zero_for_j54() -> None:
+    c = _controller()
+    _force(c)
+    assert c.hand_value((joker(), _c("9")), "player") == 20
+    assert c.hand_value((joker(), _c("9"), _c("5")), "player") == 15
+    assert c.hand_value((joker(), _c("9")), "dealer") == 9
+
+
+# ------------------------------------------------------------------ compute and moves
+
+
+def test_compute_income_cap_and_costs() -> None:
+    c = _controller()
+    t = c.table
+    assert t.compute == 2 and dict(c.view().table_info)["Compute"] == "2/8"
+    _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
+    c.next_round()
+    assert t.compute == 4
+    t.compute = 7
+    _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
+    c.next_round()
+    assert t.compute == 8  # the cap
+    c.perform(CUT, "5r")
+    c.perform(HOT_PURGE)
+    assert t.compute == 6
+    c.perform(RELEASE)
+    assert t.compute == 0 and t.joker == IN_DECK
+
+
+def test_cut_removes_two_cards_of_the_group() -> None:
+    c = _controller()
+    t = c.table
+    c.perform(CUT, "5r")
+    assert t.group_counts()["5r"] == 0 and t.group_counts()["5b"] == 2 and len(t.cards) == 50
+    assert {(str(x.rank), x.suit) for x in t.removed} == {("5", "♥"), ("5", "♦")}
+    moves = {(m.action, m.arg): m for m in c.moves()}
+    assert not moves[(CUT, "5r")].enabled and "No 5 red" in moves[(CUT, "5r")].reason
+    with pytest.raises(ActionError):
+        c.perform(CUT, "5r")
+    assert dict(c.view().table_info)["Removed"] == "2 cards"
+
+
+def test_cut_without_a_group_asks_which() -> None:
+    c = _controller()
+    c.perform(CUT)
+    choice = c.view().choice
+    assert choice.kind == CUT_CHOICE and choice.cancellable and len(choice.options) == len(GROUPS)
+    c.cancel_choice()
+    assert c.table.compute == 2
+    c.perform(CUT)
+    c.choose("Kb")
+    assert c.table.group_counts()["Kb"] == 0 and c.table.compute == 1
+
+
+def test_hot_purge_takes_a_hottest_rank_until_the_evaluator_is_wired() -> None:
+    c = _controller()
+    c.perform(HOT_PURGE)
+    counts = dict(c.table.deck_counts())
+    purged = [r for r, n in counts.items() if n == 1]
+    assert len(purged) == 1 and purged[0] in ("2", "3", "4") and len(c.table.cards) == 49
+    assert any(e.startswith(f"Hot Purge drew rank {purged[0]}") for e in _events(c))
+
+
+def test_moves_stop_at_the_deck_floor_and_without_compute() -> None:
+    c = _controller()
+    c.table.settings["min_deck"] = 52
+    moves = {(m.action, m.arg): m for m in c.moves() if m.table}
+    for key in ((CUT, ""), (CUT, "5r"), (HOT_PURGE, "")):
+        assert not moves[key].enabled and "minimum of 52" in moves[key].reason
+    assert "Not enough compute" in moves[(RELEASE, "")].reason
+    with pytest.raises(ActionError):
+        c.perform(HOT_PURGE)
+    c.table.settings["min_deck"] = 51
+    c.table.compute = 8
+    c.perform(CUT, "Ab")  # stops at the floor: one card goes
+    assert len(c.table.cards) == 51 and c.table.group_counts()["Ab"] == 1
+
+
+def test_moves_are_offered_while_betting_only() -> None:
+    c = _controller()
+    _rig(c, [_c("10"), _c("6")], [_c("10", "♥"), _c("8", "♦")], deck=[_c("2")])
+    c.place_bet(10)
+    assert not [m for m in c.moves() if m.table]
+    with pytest.raises(ActionError):
+        c.perform(HOT_PURGE)
+
+
+# ------------------------------------------------------------------ the Joker
+
+
+def test_release_puts_the_joker_in_the_deck_once() -> None:
+    c = _controller()
+    c.table.compute = 8
+    c.perform(RELEASE)
+    t = c.table
+    assert t.joker == IN_DECK and t.deck_size == 53 and joker() in t.round_cards()
+    move = next(m for m in c.moves() if m.action == RELEASE)
+    assert not move.enabled and move.reason == "The Joker is already released."
+    with pytest.raises(ActionError):
+        c.perform(RELEASE)
+
+
+def _released(c: GameController) -> None:
+    c.table.compute = 8
+    c.perform(RELEASE)
+    _force(c)
+
+
+def test_a_capture_wins_only_from_round_nine_on_a_hand_not_lost() -> None:
+    c = _controller()
+    _released(c)
+    _hand(c, [joker(), _c("9")], [_c("10", "♥"), _c("7", "♦")])  # round 1: a win, but too early
+    assert c.last_result.outcome == "player" and c.table.joker == IN_DECK and c.run_end is None
+    assert any("not recorded yet" in e for e in _events(c))
+    c.next_round()
+    c.run.round = 9
+    _hand(c, [joker(), _c("6")], [_c("10", "♥"), _c("9", "♦")])  # a loss: the Joker returns
+    assert c.last_result.outcome == "dealer" and c.table.joker == IN_DECK and c.run_end is None
+    c.next_round()
+    _hand(c, [joker(), _c("7")], [_c("10", "♥"), _c("8", "♦")])  # a push from round 9: captured
+    assert c.last_result.outcome == "push"
+    assert c.phase == TablePhase.RUN_OVER and c.run_end.kind == "victory" and "captured" in c.run_end.message
+    assert c.table.joker == "captured" and c.table.public().joker == "captured"
+
+
+def test_a_surrender_never_captures() -> None:
+    c = _controller()
+    _released(c)
+    c.run.round = 10
+    _rig(c, [joker(), _c("5")], [_c("10", "♥"), _c("9", "♦")])
+    c.place_bet(10)
+    c.surrender()
+    assert c.table.joker == IN_DECK and c.run_end is None
+
+
+def test_j54_never_keeps_the_joker() -> None:
+    c = _controller()
+    _released(c)
+    _rig(c, [_c("10"), _c("7")], [joker(), _c("8", "♦")], deck=[_c("9", "♣"), _c("4"), _c("3")])
+    c.place_bet(10)
+    dealer = c.state.dealer_hand
+    assert joker() not in dealer and dealer[0] == _c("9", "♣")
+    assert joker() in c.state.deck and c.state.deck[0] != joker()  # shuffled back, never on top
+    assert len(c.table.cards) == 53 and any("J-54 drew the Joker" in e for e in _events(c))
+
+
+# ------------------------------------------------------------------ round end
+
+
+def test_entropy_adds_a_low_card_after_every_settlement() -> None:
+    c = _controller()
+
+    def lows() -> int:
+        return sum(1 for x in c.table.cards if str(x.rank) in ("2", "3", "4", "5", "6"))
+
+    assert lows() == 20
+    _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
+    assert len(c.table.cards) == 53 and lows() == 21
+    assert any(e.startswith("Entropy: J-54 added") for e in _events(c))
+
+
+def test_the_bounty_pays_for_every_named_rank_in_your_hand() -> None:
+    c = _controller()
+    _force(c)
+    c.table.bounty_rank = "7"
+    _hand(c, [_c("7"), _c("7", "♥")], [_c("10", "♥"), _c("8", "♦")])
+    assert c.last_result.outcome == "dealer" and c.last_result.delta == -10 + 4 and c.run.money == 94
+    assert any(e.startswith("Bounty: 4 chips") for e in _events(c))
+
+
+def test_each_condition_names_a_bounty_rank() -> None:
+    c = _controller()
+    t = c.table
+    _force(c, "j54_hearts_scale")
+    assert t._bounty_rank() == "A"
+    _force(c, "j54_low_plus")
+    assert t._bounty_rank() == "2"
+    assert t.public().bounty is None or t.public().bounty["chips"] == 2
+
+
+def test_the_target_wins_only_from_round_nine() -> None:
+    c = _controller()
+    _force(c)
+    c.run.money = 170
+    c.run.round = 8
+    _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
+    assert c.run.money == 180 and c.run_end is None and c.phase == TablePhase.ROUND_OVER
+    c.next_round()
+    _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
+    assert c.run_end.kind == "victory" and "190 chips" in c.run_end.message
+
+
+def test_the_run_is_lost_when_round_sixteen_settles_without_a_win() -> None:
+    c = _controller()
+    _force(c)
+    c.run.round = 16
+    _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
+    assert c.run_end.kind == "defeat" and "Round 16" in c.run_end.message and c.phase == TablePhase.RUN_OVER
+
+
+# ------------------------------------------------------------------ public snapshot and agent
+
+
+def test_public_snapshot_and_agent_observation() -> None:
+    c = _controller(firmware="fw_low")
+    snap = c.table.public()
+    d = snap.to_dict()
+    assert d["kind"] == "j54" and d["compute"] == 2 and d["compute_cap"] == 8
+    assert set(d["condition"]) == {"id", "name", "camp", "rounds_left"}
+    assert d["firmware"] == {"id": "fw_low", "name": "Low Firmware"} and d["joker"] == SEALED
+    assert d["deck_size"] == 52 and d["removed"] == 0 and d["bounty"]["chips"] == 2
+    assert d["bar"] is None and d["heat"] is None  # package C fills them from the evaluator
+    assert c.view().table_public == snap
+
+    s = AgentSession.new(seed=5, mode="j54")
+    obs = s.observe()
+    assert obs["choice"] and [o["id"] for o in obs["choice"]["options"]][-1] == "none"
+    obs = s.execute({"cmd": "choose", "option": "none"})["obs"]
+    assert obs["phase"] == "betting" and obs["table"]["public"]["compute"] == 2
+    assert {a["action"] for a in obs["table_actions"]} == {CUT, HOT_PURGE, RELEASE}
+    assert sum(obs["table"]["deck"].values()) == 52 and obs["shop"]["offers"] == []
+    reply = s.execute({"cmd": "perform", "action": CUT, "arg": "9b"})
+    assert reply["ok"] and reply["obs"]["table"]["public"]["removed"] == 2
+    assert AgentSession.new(seed=5).observe()["table"] is None
+
+
+# ------------------------------------------------------------------ saves
+
+
+def test_a_save_in_the_middle_of_a_choice_restores_it() -> None:
+    c = _controller(firmware=None)
+    data = c.save("x")
+    loaded = GameController.from_save(RunSaveData.from_dict(data.to_dict()), save_fn=lambda d, n: n)
+    assert loaded.choice == c.choice and loaded.table.to_dict() == c.table.to_dict()
+    loaded.choose("none")
+    loaded.perform(CUT)
+    data = loaded.save("y")
+    again = GameController.from_save(RunSaveData.from_dict(data.to_dict()), save_fn=lambda d, n: n)
+    assert again.choice.kind == CUT_CHOICE
+    again.choose("Qr")
+    assert again.table.group_counts()["Qr"] == 0 and again.table.compute == 1
 
 
 def test_save_and_agent_state_restore_the_table() -> None:
     s = AgentSession.new(seed=5, mode="j54")
-    for cmd in ({"cmd": "bet", "amount": 10}, {"cmd": "act", "action": "stand"}):
+    for cmd in ({"cmd": "choose", "option": "none"}, {"cmd": "perform", "action": HOT_PURGE, "arg": ""},
+                {"cmd": "bet", "amount": 10}, {"cmd": "act", "action": "stand"}):
         s.execute(cmd)
     resumed = AgentSession.from_state(s.to_state())
     assert resumed.controller.table.to_dict() == s.controller.table.to_dict()
@@ -268,43 +496,43 @@ def test_save_and_agent_state_restore_the_table() -> None:
         assert resumed.execute(cmd) == s.execute(cmd)
 
     data = s.controller.save("x")
-    assert data.table == s.controller.table.to_dict()
     loaded = GameController.from_save(type(data).from_dict(data.to_dict()), save_fn=lambda d, n: n)
     assert loaded.table.to_dict() == s.controller.table.to_dict()
-    assert (loaded.run.objective, loaded.run.target_money) == (s.controller.run.objective,
-                                                                s.controller.run.target_money)
+    assert loaded.run.target_money == s.controller.run.target_money == 175
 
 
-def test_agent_observation_shows_the_table() -> None:
-    obs = AgentSession.new(seed=5, mode="j54").observe()
-    assert obs["table"]["info"]["Protocol"] in ("Single Capture", "Capital") and obs["table"]["fee"] == 0
-    assert all(o["item"].startswith("j54_") and o["help"] for o in obs["shop"]["offers"])
-    assert AgentSession.new(seed=5).observe()["table"] is None
+def test_a_demo_save_is_refused() -> None:
+    c = _controller()
+    with pytest.raises(ValueError):
+        c.table.restore({"protocol": "capture", "cards": []})
 
 
-@pytest.mark.parametrize("seed", range(12))
+@pytest.mark.parametrize("seed", range(20))
 def test_runs_finish_without_errors(seed: int) -> None:
-    c = _controller(seed)
-    for _ in range(400):
+    rng = random.Random(seed)
+    c = _controller(seed, firmware=None)
+    for _ in range(600):
         v = c.view()
         if v.phase == TablePhase.RUN_OVER:
             break
-        if v.phase == TablePhase.BETTING:
-            for o in v.shop_offers:
-                if o.affordable and v.money - o.price > 40:
-                    c.buy(o.item)
-                    v = c.view()
-            c.place_bet(v.bet_min)
-        elif v.phase == TablePhase.CHAOS:
-            c.resolve_chaos()
+        if v.choice is not None:
+            options = [o.id for o in v.choice.options]
+            c.choose(rng.choice(options))
+        elif v.phase == TablePhase.BETTING:
+            moves = [m for m in v.moves if m.table and m.enabled]
+            if moves and rng.random() < 0.6:
+                m = rng.choice(moves)
+                c.perform(m.action, m.arg)
+                continue
+            c.place_bet(rng.randint(v.bet_min, v.bet_max))
         elif v.phase == TablePhase.PLAYER_TURN:
             c.hit() if v.player_total < 15 else c.stand()
         elif v.phase == TablePhase.DEALER_TURN:
             c.dealer_step()
         elif v.phase == TablePhase.ROUND_OVER:
             c.next_round()
-    assert c.view().phase == TablePhase.RUN_OVER
-    assert isinstance(c.table, J54Table)
+    assert c.view().phase == TablePhase.RUN_OVER and c.run.round <= 16
+    assert len(c.table.cards) >= c.table.min_deck
 
 
 def test_meta_run_saves_resumes_and_finishes() -> None:
@@ -317,7 +545,8 @@ def test_meta_run_saves_resumes_and_finishes() -> None:
         run = meta.start_run(p.id, "j54", seed=9)
         c = run.controller
         assert c.table is not None and run.config.mode == "j54"
-        _bet(c)
+        c.choose("none")
+        c.place_bet(10)
         c.stand()
         c.finish_dealer()
         c.next_round()
@@ -328,9 +557,7 @@ def test_meta_run_saves_resumes_and_finishes() -> None:
         while rc.phase != TablePhase.RUN_OVER:
             v = rc.view()
             if rc.phase == TablePhase.BETTING:
-                rc.place_bet(v.bet_max)
-            elif rc.phase == TablePhase.CHAOS:
-                rc.resolve_chaos()
+                rc.place_bet(v.bet_min)
             elif rc.phase == TablePhase.PLAYER_TURN:
                 rc.stand()
             elif rc.phase == TablePhase.DEALER_TURN:
@@ -347,13 +574,11 @@ def test_meta_run_saves_resumes_and_finishes() -> None:
 
 
 def _ctx(cards=None, deck=None, removed=None, player=(), dealer=(), min_deck=0):
-    import random as _random
-
     from chaos_blackjack.j54.deck_ops import DeckContext
 
     counter = iter(range(10**6))
     return DeckContext(list(cards if cards is not None else []), list(removed or []),
-                       lambda: _random.Random(next(counter)), min_deck, deck, tuple(player), tuple(dealer))
+                       lambda: random.Random(next(counter)), min_deck, deck, tuple(player), tuple(dealer))
 
 
 def test_deck_operations_are_validated() -> None:
@@ -366,31 +591,6 @@ def test_deck_operations_are_validated() -> None:
             DeckOp.from_params(bad)
 
 
-def test_moves_only_reorder_this_round() -> None:
-    from chaos_blackjack.j54.deck_ops import DeckOp, apply
-
-    deck = [_c("K"), _c("2"), _c("A", "♥"), _c("5"), joker()]
-    ctx = _ctx(cards=[*deck[:4]], deck=list(deck))
-    result = apply(DeckOp.from_params({"op": "move_bottom", "select": "high", "count": "all"}), ctx)
-    assert [str(c.rank) for c in ctx.deck[:3]] == ["2", "5", "JK"] and len(result.cards) == 2
-    assert {str(c.rank) for c in ctx.deck[3:]} == {"K", "A"} and len(ctx.cards) == 4
-    apply(DeckOp.from_params({"op": "move_top", "select": "rank:5", "count": 1}), ctx)
-    assert str(ctx.deck[0].rank) == "5"
-
-
-def test_return_and_copy_bring_cards_back() -> None:
-    from chaos_blackjack.j54.deck_ops import DeckOp, apply
-
-    ctx = _ctx(cards=[_c("9")], removed=[_c("2"), _c("3"), _c("4")], deck=[_c("9")],
-               player=(_c("10"), _c("7")), dealer=(_c("Q", "♥"), _c("6")))
-    back = apply(DeckOp.from_params({"op": "return", "select": "removed", "count": 2}), ctx)
-    assert len(back.cards) == 2 and len(ctx.removed) == 1 and len(ctx.cards) == 3 and len(ctx.deck) == 3
-    copied = apply(DeckOp.from_params({"op": "copy", "select": "dealer_up", "count": "all"}), ctx)
-    assert [str(c.rank) for c in copied.cards] == ["Q"] and len(ctx.cards) == 4
-    apply(DeckOp.from_params({"op": "copy", "select": "player_hand", "count": "all"}), ctx)
-    assert len(ctx.cards) == 6
-
-
 def test_deletions_keep_the_minimum_and_feed_the_removed_pile() -> None:
     from chaos_blackjack.j54.deck_ops import DeckOp, apply
 
@@ -399,33 +599,7 @@ def test_deletions_keep_the_minimum_and_feed_the_removed_pile() -> None:
     assert len(gone.cards) == 2 and len(ctx.cards) == 2 and ctx.removed == gone.cards
 
 
-def test_backflow_returns_deleted_cards_at_the_table() -> None:
-    c = _controller(protocol="capital")
-    c.buy("j54_low_purge") if any(o.item == "j54_low_purge" for o in c.shop.offers) else c.table._fire("j54_low_purge")
-    assert len(c.table.removed) == 6 and dict(c.view().table_info)["Removed"] == "6 cards"
-    _no_chaos(c)
-    _rig(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("7", "♦")], deck=[_c("9")])
-    _bet(c)
-    rule = c.registry.build_chaos_rule("j54_data_backflow", {})
-    c.state, c.loop.modifiers = c.table.after_chaos(c.state, c.loop.modifiers.with_added(rule))
-    assert len(c.table.removed) == 2 and len(c.state.deck) == 5
-
-
-def test_new_rules_are_data_and_describe_themselves() -> None:
-    from chaos_blackjack.rules.plugins.j54_deck import DECK_RULES
-
-    cfg = _config()
-    assert set(DECK_RULES) == set(J54_RULES) == set(cfg.rule_pool)
-    reg = _controller().registry
-    for rid in DECK_RULES:
-        m = reg.build_chaos_rule(rid, cfg.chaos_rule_params.get(rid, {}))
-        assert m.describe().startswith(DECK_RULES[rid][0] + ": ")
-    assert "bottom" in reg.build_chaos_rule("j54_layered_sort", {}).describe()
-
-
 def test_deck_make_up_is_public() -> None:
-    c = _controller(protocol="capture")
+    c = _controller()
     counts = dict(c.view().deck_counts)
     assert counts == {r: 4 for r in ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A")}
-    obs = AgentSession.new(seed=5, mode="j54").observe()
-    assert sum(obs["table"]["deck"].values()) == 52
