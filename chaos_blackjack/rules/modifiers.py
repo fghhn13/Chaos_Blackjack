@@ -19,6 +19,14 @@ class RuleModifier(Protocol):
         ...
 
 
+def adjust_rank_value_for(modifier: RuleModifier, card: Card, base_value: int, actor: str) -> int:
+    """`modifier`'s value of `actor`'s card ("player" or "dealer"). A modifier that changes one side only
+    (J-54's conditions change J-54's cards) defines `adjust_rank_value_for(card, base_value, actor)`;
+    every other modifier changes both sides alike through `adjust_rank_value`."""
+    hook = getattr(modifier, "adjust_rank_value_for", None)
+    return hook(card, base_value, actor) if hook is not None else modifier.adjust_rank_value(card, base_value)
+
+
 def merge_chaos_flags(modifiers: tuple[RuleModifier, ...]) -> frozenset[str]:
     out: set[str] = set()
     for m in modifiers:

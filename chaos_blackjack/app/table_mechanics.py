@@ -81,6 +81,10 @@ class TableMechanics:
         """A message when the run is won, else None."""
         return None
 
+    def defeat(self, run: "RunState") -> str | None:
+        """A message when the settled round lost the run (e.g. the last round passed without a win), else None."""
+        return None
+
     def goal_progress(self, run: "RunState") -> tuple[str, int, int] | None:
         """(label, value, target) when the goal is not the bankroll itself (e.g. net assets), else None."""
         return None
@@ -230,6 +234,10 @@ class TableMechanics:
 
     def entered_player(self) -> None:
         """The player's turn began."""
+
+    def dealer_stand_on(self, default: int) -> int:
+        """The total the dealer stands on this round (`default`: the profile's)."""
+        return default
 
     def double_multiplier(self) -> int:
         """How many times the bet a double stakes."""
