@@ -15,6 +15,7 @@ import pygame
 
 from chaos_blackjack.app.notices import Notice, NoticeKind
 from chaos_blackjack.app.view import GameView, TablePhase
+from chaos_blackjack.content.ai_profile import PERSONA_EVENTS
 from chaos_blackjack.gui import theme
 from chaos_blackjack.gui.anim import Tween, out_back
 from chaos_blackjack.gui.texts import asset_name
@@ -136,6 +137,9 @@ class ChaosPanel(Widget):
             self._busted = False
         if n.kind == NoticeKind.ROUND_SETTLED:
             event = f"outcome_{getattr(n.data.get('result'), 'outcome', '')}"
+        elif n.kind == NoticeKind.TABLE_EVENT:  # a table's own event, by its effect (e.g. table_condition)
+            event = f"table_{n.data.get('effect', '')}"
+            event = event if event in PERSONA_EVENTS else ""
         else:
             event = PERSONA_NOTICE_EVENT.get(n.kind, "")
         if n.kind in (NoticeKind.CHAOS_NARRATION, NoticeKind.CHAOS_POKE_REPLY):

@@ -402,6 +402,9 @@ class J54Table(TableMechanics):
     def victory(self, run: "RunState") -> str | None:
         return self.won
 
+    def host_variant(self, event: str) -> str:
+        return "capture" if event == "victory" and self.joker == CAPTURED else ""
+
     def defeat(self, run: "RunState") -> str | None:
         return self.lost
 

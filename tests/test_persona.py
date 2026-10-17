@@ -75,6 +75,22 @@ def test_panel_uses_persona_moods_lines_and_keeps_the_bust_remark(persona, tmp_p
     assert panel.speech == "As you wish."
 
 
+
+def test_panel_speaks_a_tables_own_events(tmp_path):
+    from chaos_blackjack.content.builtin_persona import host_persona
+
+    j54 = host_persona("j54")
+    panel = ChaosPanel(AssetManager((tmp_path / "empty",)), (0, 0, 240, 640), persona=j54)
+    panel.chaos_enabled = True
+    panel.react(notice(NoticeKind.TABLE_EVENT, effect="condition"))
+    assert panel.speech in j54.lines["table_condition"] and panel.mood == j54.moods["table_condition"]
+    panel.react(notice(NoticeKind.TABLE_EVENT, effect="release"))
+    assert panel.speech in j54.lines["table_release"]
+    before = panel.speech
+    panel.react(notice(NoticeKind.TABLE_EVENT, effect="entropy"))  # no lines for it: the speech stays
+    assert panel.speech == before
+
+
 def test_panel_without_persona_is_unchanged(tmp_path):
     panel = ChaosPanel(AssetManager((tmp_path / "empty",)), (0, 0, 240, 640))
     panel.chaos_enabled = True

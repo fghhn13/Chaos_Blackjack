@@ -375,6 +375,7 @@ def test_a_capture_wins_only_from_round_nine_on_a_hand_not_lost() -> None:
     assert c.last_result.outcome == "push"
     assert c.phase == TablePhase.RUN_OVER and c.run_end.kind == "victory" and "captured" in c.run_end.message
     assert c.table.joker == "captured" and c.table.public().joker == "captured"
+    assert c.table.host_variant("victory") == "capture" and c.table.host_variant("defeat") == ""
 
 
 def test_a_surrender_never_captures() -> None:
@@ -529,6 +530,23 @@ def test_an_empty_shop_is_never_announced() -> None:
         _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
         c.next_round()
         assert not [n for n in c.drain_notices() if n.kind == NoticeKind.SHOP_RESTOCKED]
+
+
+def test_host_lines_cover_v2_and_the_capture_victory() -> None:
+    from chaos_blackjack.content.builtin_persona import host_persona
+    from chaos_blackjack.content.host_script import host_script, host_scripts
+
+    expressions = set(host_persona("j54").portraits)
+    capture = host_scripts("j54", "victory", mode="j54", variant="capture")
+    assert capture and capture != host_scripts("j54", "victory", mode="j54")
+    for event in ("intro", "victory", "defeat"):
+        for script in host_scripts("j54", event, mode="j54") + capture:
+            assert script and all(b.mood in expressions and b.text for b in script)
+    assert host_script("j54", "victory", random.Random(1), variant="capture") in capture
+    assert _controller().table.host_variant("victory") == ""
+    persona = host_persona("j54")
+    assert persona.line("table_condition") and persona.line("table_release")
+    assert {persona.moods["table_condition"], persona.moods["table_release"]} <= expressions
 
 
 # ------------------------------------------------------------------ saves

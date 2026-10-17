@@ -312,7 +312,9 @@ class TableScene(Scene):
             event = "victory" if v.run_end is not None and v.run_end.kind == "victory" else "defeat"
             config = self.controller.config
             host = config.host if config.ai_id == "default" else None
-            beats = host_script(host, event, mode=config.mode) if config.ai_id == "default" else []
+            table = self.controller.table
+            variant = table.host_variant(event) if table is not None else ""
+            beats = host_script(host, event, mode=config.mode, variant=variant) if config.ai_id == "default" else []
             self.outro = HostDialog(self.app.assets, beats, self.persona, finish="Enter for results")
         return self.outro.done
     def handle_event(self, event: pygame.event.Event) -> None:

@@ -85,6 +85,10 @@ class TableMechanics:
         """A message when the settled round lost the run (e.g. the last round passed without a win), else None."""
         return None
 
+    def host_variant(self, event: str) -> str:
+        """Which of the host's `<event>.<variant>` scripts fits how the run ended (e.g. "capture"), "" = the plain one."""
+        return ""
+
     def goal_progress(self, run: "RunState") -> tuple[str, int, int] | None:
         """(label, value, target) when the goal is not the bankroll itself (e.g. net assets), else None."""
         return None
