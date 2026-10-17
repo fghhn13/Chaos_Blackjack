@@ -4,6 +4,12 @@ Status: **concept agreed**, 2026-10-12; **demo v1 implemented**, 2026-10-13
 (section 0). Numbers are a first pass, not balanced. Wiki drafts:
 `dealer-j54.html`, `table-j54.html`.
 
+**Direction change, 2026-10-15**: the next version is built from composable
+primitives (global sub-mode, draw policies, deck operations, per-side effect
+rules, J-54's advantage, goals); the Joker hunt becomes one goal among
+several. See [J54_PRIMITIVES.md](J54_PRIMITIVES.md). Sections 1–10 below
+describe v1 and the original concept.
+
 Theme: probability, calculation, rebuilding the deck. Poker Head bends the
 *rules*; J-54, a clown-shaped calculating machine with a pixel face and a
 cold, programmatic voice, changes the *cards*.

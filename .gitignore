@@ -66,3 +66,6 @@ black-jack-sim/
 
 # start_game.bat version worktrees (scripts/launch.py)
 .launch/
+
+# J-54 rule lab (separate git repository, not wired to the game)
+j54-lab/
