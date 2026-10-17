@@ -35,7 +35,7 @@ from chaos_blackjack.app.table_mechanics import Notify, TableMechanics, register
 from chaos_blackjack.app.view import RuleView, TablePhase
 from chaos_blackjack.core.game_state import Card, GameState, Rank
 from chaos_blackjack.j54 import onboarding as first_visit
-from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, is_joker
+from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, card_list, is_joker
 from chaos_blackjack.j54.firmware import CATALOG as FIRMWARES, NO_FIRMWARE, Firmware, firmware
 from chaos_blackjack.j54.program import Program, generate, int_range
 from chaos_blackjack.j54.public import J54Snapshot, heat_text, hottest_ranks, measure, rank_heat, snapshot
@@ -574,7 +574,7 @@ class J54Table(TableMechanics):
         rank = self._rng().choice(candidates)
         op = DeckOp("remove", f"rank:{rank}", self._int("hot_purge_size"))
         result = self._run(op)
-        self._say(f"Hot Purge drew rank {rank}: {_plural(len(result.cards), 'card')} removed "
+        self._say(f"Hot Purge drew rank {rank}: {card_list(result.cards)} removed "
                   f"({self.compute} compute left).", effect="hot_purge", rank=rank, cards=len(result.cards))
 
     def _release(self) -> None:
@@ -614,7 +614,7 @@ class J54Table(TableMechanics):
                 deck.insert(self._rng().randint(min(1, len(deck)), len(deck)), card)
                 penalty = self._int("dealer_joker_penalty")
                 added = self._run(DeckOp("add", "low", penalty)).cards if penalty else []
-                extra = f" and adds {', '.join(str(c.rank) for c in added)}" if added else ""
+                extra = f" and adds {card_list(added)} to the deck" if added else ""
                 self._say(f"J-54 drew the Joker. It shuffles it back{extra}.", effect="dealer_joker")
         return replace(state, dealer_hand=tuple(dealer), deck=tuple(deck))
 

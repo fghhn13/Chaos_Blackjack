@@ -396,7 +396,9 @@ def test_j54_never_keeps_the_joker() -> None:
     dealer = c.state.dealer_hand
     assert joker() not in dealer and dealer[0] == _c("9", "♣")
     assert joker() in c.state.deck and c.state.deck[0] != joker()  # shuffled back, never on top
-    assert len(c.table.cards) == 53 and any("J-54 drew the Joker" in e for e in _events(c))
+    added = c.table.cards[-1]
+    assert len(c.table.cards) == 53 and str(added.rank) in "23456"
+    assert f"J-54 drew the Joker. It shuffles it back and adds a {added.rank}{added.suit} to the deck." in _events(c)
 
 
 # ------------------------------------------------------------------ round end
@@ -411,7 +413,8 @@ def test_entropy_adds_a_low_card_after_every_settlement() -> None:
     assert lows() == 20
     _hand(c, [_c("10"), _c("8")], [_c("10", "♥"), _c("8", "♦")])
     assert len(c.table.cards) == 53 and lows() == 21
-    assert any(e.startswith("Entropy: J-54 added") for e in _events(c))
+    added = c.table.cards[-1]
+    assert f"Entropy: J-54 added a {added.rank}{added.suit} to the deck." in _events(c)
 
 
 def test_the_bounty_pays_for_every_named_rank_in_your_hand() -> None:
@@ -723,6 +726,17 @@ def test_deletions_keep_the_minimum_and_feed_the_removed_pile() -> None:
     ctx = _ctx(cards=[_c(r) for r in ("2", "3", "4", "K")], min_deck=2)
     gone = apply(DeckOp.from_params({"op": "remove", "select": "low", "count": "all"}), ctx)
     assert len(gone.cards) == 2 and len(ctx.cards) == 2 and ctx.removed == gone.cards
+
+
+def test_operation_summaries_name_the_cards() -> None:
+    from chaos_blackjack.j54.deck_ops import DeckOp, OpResult, card_list
+
+    add, remove = DeckOp.from_params({"op": "add"}), DeckOp.from_params({"op": "remove"})
+    assert OpResult([_c("3")]).summary(add) == "added a 3♠ to the deck"
+    assert OpResult([_c("8", "♥")]).summary(add) == "added an 8♥ to the deck"
+    assert OpResult([_c("5", "♥"), _c("5", "♦")]).summary(remove) == "deleted 5♥ and 5♦ from the deck"
+    assert OpResult().summary(add) == "added nothing"
+    assert card_list([_c("2"), _c("3", "♥"), joker()]) == "2♠, 3♥ and Joker"
 
 
 def test_deck_make_up_is_public() -> None:
