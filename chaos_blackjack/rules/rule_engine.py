@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from chaos_blackjack.core.game_state import Card, GameState
-from chaos_blackjack.rules.modifiers import ActiveModifiers
+from chaos_blackjack.rules.modifiers import ActiveModifiers, adjust_rank_value_for
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ class DefaultBlackjackRules:
         for card in hand:
             v = self._card_base_value(card)
             for m in ctx.modifiers.items:
-                v = m.adjust_rank_value(card, v)
+                v = adjust_rank_value_for(m, card, v, ctx.actor)
             if card.rank.upper() == "A":
                 soft_aces += 1
             total += v

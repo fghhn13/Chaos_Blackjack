@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from chaos_blackjack.core.game_state import Card
 from chaos_blackjack.poker_head import environment as env
+from chaos_blackjack.rules.modifiers import adjust_rank_value_for
 from chaos_blackjack.rules.rule_engine import BLACKJACK, DefaultBlackjackRules, RuleContext, bust_limit
 
 if TYPE_CHECKING:
@@ -53,7 +54,8 @@ class BuildRules(DefaultBlackjackRules):
         """(high, low) of one card for the actor; equal unless it is a switching ace."""
         high, low = env.card_values(card, ctx.actor, self._env())
         for m in ctx.modifiers.items:  # legacy Chaos modifiers (until the director replaces them)
-            high, low = m.adjust_rank_value(card, high), m.adjust_rank_value(card, low)
+            high, low = (adjust_rank_value_for(m, card, high, ctx.actor),
+                         adjust_rank_value_for(m, card, low, ctx.actor))
         if ctx.actor == "player":
             for e in self.table.effects():
                 high, low = e.card_value(card, high), e.card_value(card, low)

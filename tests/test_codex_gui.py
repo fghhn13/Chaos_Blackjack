@@ -218,7 +218,9 @@ def test_sections_place_every_entry_by_series():
     placed |= {("mode", s.mode.id) for s in sections.values() if s.mode is not None}
     for kind in ("item", "mode", "environment"):
         assert {(kind, e.id) for e in codex_entries(kind)} <= placed, kind
-    assert {("rule", e.id) for e in codex_entries("rule") if e.id.startswith("j54_")} <= placed
+    from chaos_blackjack.modes import J54_RULES
+
+    assert {("rule", r) for r in J54_RULES} <= placed  # J-54's conditions (its demo deck rules are in no pool)
 
 
 def test_sections_follow_mode_pools(monkeypatch):

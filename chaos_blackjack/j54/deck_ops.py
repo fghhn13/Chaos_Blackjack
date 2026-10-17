@@ -144,12 +144,26 @@ class OpResult:
     rank: str | None = None                            # the rank drawn for `random_rank`
 
     def summary(self, op: DeckOp) -> str:
-        names = ", ".join(str(c.rank) for c in self.cards) if self.cards else "nothing"
-        verb = {"add": "added", "remove": "deleted", "copy": "copied", "return": "returned",
-                "move_top": "moved to the top", "move_bottom": "moved to the bottom"}[op.op]
+        """What the operation did, naming the cards: "added a 3♠ to the deck", "deleted 5♥ and 5♦ from the deck"."""
         if op.op.startswith("move"):
-            return f"{len(self.cards)} card{'s' if len(self.cards) != 1 else ''} {verb}"
-        return f"{verb} {names}"
+            where = "top" if op.op == "move_top" else "bottom"
+            return f"moved {len(self.cards)} card{'s' if len(self.cards) != 1 else ''} to the {where}"
+        verb, place = {"add": ("added", "to"), "remove": ("deleted", "from"), "copy": ("copied", "into"),
+                       "return": ("returned", "to")}[op.op]
+        return f"{verb} {card_list(self.cards)} {place} the deck" if self.cards else f"{verb} nothing"
+
+
+def card_name(card: Card) -> str:
+    """"3♠"; the Joker is "Joker"."""
+    return "Joker" if is_joker(card) else f"{card.rank}{card.suit}"
+
+
+def card_list(cards: list[Card]) -> str:
+    """"a 3♠", "an 8♥", "5♥ and 5♦", "2♠, 3♥ and 6♦"."""
+    names = [card_name(c) for c in cards]
+    if len(names) == 1:
+        return f"{'an' if names[0][0] in '8A' else 'a'} {names[0]}"
+    return ", ".join(names[:-1]) + f" and {names[-1]}" if names else "nothing"
 
 
 def _matches(card: Card, kind: str, rank: str | None) -> bool:

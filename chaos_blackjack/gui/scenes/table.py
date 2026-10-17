@@ -16,6 +16,7 @@ Keys: Tab run panel, L its log, I its bag, 1-9 use an item (your turn), B shop.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import replace
@@ -49,6 +50,7 @@ from chaos_blackjack.gui.worker import start_worker
 from chaos_blackjack.modes import get_mode, intro_script
 
 W, H = LOGICAL_SIZE
+SCREEN = pygame.Rect((0, 0), LOGICAL_SIZE)
 
 # Three columns: Chaos AI + rules | play area | shoe + items.
 LEFT_PANEL = pygame.Rect(16, 60, 240, 644)
@@ -312,7 +314,9 @@ class TableScene(Scene):
             event = "victory" if v.run_end is not None and v.run_end.kind == "victory" else "defeat"
             config = self.controller.config
             host = config.host if config.ai_id == "default" else None
-            beats = host_script(host, event, mode=config.mode) if config.ai_id == "default" else []
+            table = self.controller.table
+            variant = table.host_variant(event) if table is not None else ""
+            beats = host_script(host, event, mode=config.mode, variant=variant) if config.ai_id == "default" else []
             self.outro = HostDialog(self.app.assets, beats, self.persona, finish="Enter for results")
         return self.outro.done
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -439,7 +443,31 @@ class TableScene(Scene):
         self.left.draw_overlay(surface)
         self.right.draw_overlay(surface)
         if self.intro_open():
-            self.dialog().draw(surface)
+            dialog = self.dialog()
+            lit = [(r, surface.subsurface(r).copy()) for r in self.focus_rects(dialog.focus)]
+            dialog.draw(surface)
+            self._draw_focus(surface, lit)
+
+    def focus_rects(self, keys: tuple[str, ...]) -> list[pygame.Rect]:
+        """Screen areas of what a host's beat points at ("<part id>" or "<part id>/<element icon>")."""
+        rects = []
+        for key in keys:
+            part, _, element = key.partition("/")
+            for column in (self.left, self.right):
+                rect = column.focus_rect(part, element)
+                if rect is not None:
+                    rect = rect.inflate(8, 8).clip(SCREEN)
+                    if rect.w and rect.h:
+                        rects.append(rect)
+        return rects
+
+    def _draw_focus(self, surface: pygame.Surface, lit: list[tuple[pygame.Rect, pygame.Surface]]) -> None:
+        """Lit areas stay bright above the dialog's shade, ringed by a slow gold pulse."""
+        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 1000 * 5)
+        for rect, image in lit:
+            surface.blit(image, rect)
+            grow = 2 + round(pulse * 4)
+            pygame.draw.rect(surface, theme.GOLD, rect.inflate(grow, grow), 2, border_radius=10)
 
     def _draw_bet_zone(self, surface: pygame.Surface, v: GameView) -> None:
         """Betting circle on the felt; shows the wager while a round is live."""

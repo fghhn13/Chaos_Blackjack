@@ -14,7 +14,7 @@ from chaos_blackjack.gui.components.intro import HostDialog
 from chaos_blackjack.gui.scene import register_scene
 from chaos_blackjack.gui.scenes.table import TableScene, RUN_END_DELAY
 from chaos_blackjack.gui.texts import BAD
-from chaos_blackjack.meta.onboarding import PH_INTRO_BUILD, PH_INTRO_RULES
+from chaos_blackjack.meta.onboarding import ALL as ALL_MILESTONES, PH_INTRO_BUILD, PH_INTRO_RULES
 from chaos_blackjack.registry import get_registry
 from chaos_blackjack.tutorial.lessons import PH_INTRO_BUILD as BUILD_LINES, PH_INTRO_RULES as RULES_LINES, beats
 
@@ -36,20 +36,26 @@ class MetaTableScene(TableScene):
         self.save_name = f"player-{player_id}-run-{self.run_id}"
         super().on_enter(controller=started.controller, intro=intro)
         self.onboard(started, intro)
+        self.view = self.controller.view()  # with what the onboarding changed (e.g. J-54's meter hint)
+        self._sync_widgets()
         self.checkpoint()
 
     def onboard(self, started, intro):
         """A guided player's first visit: the host adds a new player's notes (e.g. the bet cap) to the
         greeting, explains builds at Poker Head's Table and its rules when the first one arrives
-        (docs/design/TUTORIAL.md)."""
+        (docs/design/TUTORIAL.md). A table with its own first-visit explanations (J-54) hands them out
+        through `TableMechanics.onboarding`; those due at the start come before its opening choice."""
         try:
             reached = meta.milestones(self.player_id)
+            self.guided = meta.get_player(self.player_id).guided
         except (meta.MetaError, sqlite3.Error, OSError):
-            reached = frozenset({PH_INTRO_BUILD, PH_INTRO_RULES})
+            reached, self.guided = frozenset(ALL_MILESTONES), False
+        self.reached = set(reached)
         extra = [*beats(tuple(("neutral", note) for note in getattr(started, "notes", ()) if intro))]
         if started.mode == "chaos" and PH_INTRO_BUILD not in reached:
             extra += beats(BUILD_LINES)
             self.reach(PH_INTRO_BUILD)
+        extra += self.table_lines()
         if extra:
             before = self.intro.beats if self.intro is not None else []
             self.intro = HostDialog(self.app.assets, before + extra, self.persona)
@@ -63,9 +69,24 @@ class MetaTableScene(TableScene):
             return
         self.explain_rules = False
         self.reach(PH_INTRO_RULES)
-        self.pending_lines = beats(RULES_LINES)
+        self.pending_lines = (*self.pending_lines, *beats(RULES_LINES))
 
     pending_lines = ()
+    guided = False
+    reached: set = frozenset()
+
+    def table_lines(self):
+        """The table's first-visit explanations due now that the player has not reached (recorded here)."""
+        table = self.controller.table
+        if table is None:
+            return []
+        lines = []
+        for milestone, script in table.onboarding(self.guided):
+            if milestone not in self.reached:
+                self.reached.add(milestone)
+                self.reach(milestone)
+                lines += script
+        return lines
 
     def reach(self, milestone):
         try:
@@ -83,6 +104,8 @@ class MetaTableScene(TableScene):
             self.feed.push("Could not save this run. Your current game can continue.", BAD)
 
     def _after_command(self):
+        if not self._busy():
+            self.pending_lines = (*self.pending_lines, *self.table_lines())
         super()._after_command()
         self.checkpoint()
 

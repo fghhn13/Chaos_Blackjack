@@ -470,7 +470,7 @@ class GameController:
         dv = self._value(self._st.dealer_hand, "dealer")
         if self.loop.rules.is_bust(dv, ctx):
             self._notify(NoticeKind.DEALER_BUSTS, "Dealer busts.", {"total": dv})
-        elif dv >= self.config.dealer_stand_on:
+        elif dv >= self._dealer_stand_on():
             self._notify(NoticeKind.DEALER_STANDS, f"Dealer stands at {dv}.", {"total": dv})
         elif self._st.deck:
             self.state = self.loop.draw_for_dealer(self._st)
@@ -530,7 +530,8 @@ class GameController:
             used = self.shop.free_rerolls_used
             self.shop = self._roll_shop()
             self.shop = ShopState(self.shop.stock_round, self.shop.offers, free_rerolls_used=used)
-            self._notify(NoticeKind.SHOP_RESTOCKED, "The shop has new stock.")
+            if self.shop.offers:  # a table that sells nothing never announces stock
+                self._notify(NoticeKind.SHOP_RESTOCKED, "The shop has new stock.")
         self._check_can_bet()
 
     def save(self, name: str) -> RunSaveData:
@@ -662,6 +663,7 @@ class GameController:
             table_public=self.table.public() if self.table is not None else None,
             goal=self.table.goal_progress(self.run) if self.table is not None else None,
             chaos_budget_shown=self.table is None or self.table.uses_chaos_budget,
+            has_shop=self.table is None or self.table.has_shop,
         )
 
     def moves(self) -> tuple[Move, ...]:
@@ -741,7 +743,9 @@ class GameController:
         """The phase's actions before any item check (tables use this to test
         whether e.g. a double or surrender is allowed)."""
         actions = _ACTIONS_BY_PHASE[self.phase]
-        if self.phase == TablePhase.BETTING and self.shop.offers:
+        if self.table is not None and not self.table.has_shop:
+            actions = actions - {Action.BUY}
+        elif self.phase == TablePhase.BETTING and self.shop.offers:
             price = self.reroll_price()
             if price is not None and self.can_bet(self.run.money - price):
                 actions = actions | {Action.REROLL}
@@ -776,6 +780,10 @@ class GameController:
         if st is None and not (self.table is not None and self.table.persistent_rules):
             return ()
         return tuple(RuleView(str(getattr(m, "id", "?")), describe_modifier(m)) for m in self.loop.modifiers.items)
+
+    def _dealer_stand_on(self) -> int:
+        stand_on = self.config.dealer_stand_on
+        return self.table.dealer_stand_on(stand_on) if self.table is not None else stand_on
 
     def _double_multiplier(self) -> int:
         return self.table.double_multiplier() if self.table is not None else 2
@@ -915,7 +923,9 @@ class GameController:
         if self.table is not None:
             self.table.after_settle(st, out, self.loop.modifiers, self.run)
             won = self.table.victory(self.run)
-            self.run_end = RunEndResult(kind="victory", message=won) if won else None
+            lost = None if won else self.table.defeat(self.run)
+            self.run_end = (RunEndResult(kind="victory", message=won) if won else
+                            RunEndResult(kind="defeat", message=lost) if lost else None)
         else:
             delta -= self._cap_at_target()
             self.run_end = self.run_end_policy.check(self.run)

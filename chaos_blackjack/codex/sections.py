@@ -17,7 +17,7 @@ when a listed table can apply it. Headless; the GUI only lays the sections out.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from chaos_blackjack.app.config import RunConfig
 from chaos_blackjack.codex.models import CodexEntry
@@ -132,6 +132,9 @@ def codex_sections(config: RunConfig | None = None) -> list[CodexSection]:
                 build_groups.append(CodexGroup("build_" + kind, label,
                                               tuple(e for e in entries if PRODUCTS[e.id].kind == kind)))
             groups = build_groups + groups
+        if series.id == "j54":  # the player's firmware first; the rules are J-54's conditions
+            groups = [CodexGroup("firmware", "Firmware", tuple(codex_entries("firmware", cfg))),
+                      replace(groups[0], label="Conditions"), *groups[1:]]
         if len(own) > 1:
             groups.insert(0, CodexGroup("tables", "Tables", tuple(mode_entries[m.id] for m, _ in own
                                                                   if m.id in mode_entries)))

@@ -75,6 +75,7 @@ def rule_entries(config: RunConfig) -> list[CodexEntry]:
         getattr(factory, "codex_detail", partial(_rule_detail, rid)),
         getattr(factory, "codex_demo", RULE_DEMOS.get(rid)),
         getattr(factory, "codex_order", 0),
+        getattr(factory, "codex_category", ""),
     ) for rid, factory in tuple(registry._chaos_rules.items())]
 
 
@@ -115,6 +116,25 @@ def item_entries(config: RunConfig) -> list[CodexEntry]:
         getattr(cls, "codex_detail", partial(_item_detail, iid)),
         getattr(cls, "codex_demo", ITEM_DEMOS.get(iid)), getattr(cls, "codex_order", 0),
     ) for iid, cls in tuple(registry._items.items()) if getattr(cls, "codex_kind", "item") == "item"]
+
+
+def _firmware_detail(firmware_id: str, config: RunConfig) -> str:
+    from chaos_blackjack.j54.firmware import CATALOG
+    from chaos_blackjack.j54.table import _settings
+
+    fw, s = CATALOG[firmware_id], _settings(config)
+    return (f"{fw.text} It changes your cards only, for the whole run. A J-54 run opens with "
+            f"{s['firmwares_offered']} firmwares on offer and No firmware; this one costs "
+            f"{s[f'firmware.{firmware_id}.price']} chips from your starting chips. The meter and the heat map "
+            "count it from the first hand.")
+
+
+def firmware_entries(config: RunConfig) -> list[CodexEntry]:
+    """J-54's firmwares (j54/firmware.py): the player's one build pick at its table."""
+    from chaos_blackjack.j54.firmware import CATALOG
+
+    return [CodexEntry("firmware", fw.id, fw.name, fw.id, fw.text, partial(_firmware_detail, fw.id), None, i)
+            for i, fw in enumerate(CATALOG.values())]
 
 
 def _build_detail(item_id: str, config: RunConfig) -> str:
@@ -308,5 +328,5 @@ def _pack_ai_detail(ai_id: str, config: RunConfig) -> str:
 def install() -> None:
     for kind, provider in (("rule", rule_entries), ("mode", mode_entries),
                            ("item", item_entries), ("ai", ai_entries), ("build", build_entries),
-                           ("environment", environment_entries)):
+                           ("environment", environment_entries), ("firmware", firmware_entries)):
         register_codex_provider(kind, provider)

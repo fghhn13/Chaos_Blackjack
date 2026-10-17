@@ -1,8 +1,8 @@
-"""J-54 "Joker Reshuffler": the deck-rebuilding expansion table (demo).
+"""J-54's table: an experiment on a deck that lasts the run (docs/design/J54_V2_SPEC.md).
 
-Design: docs/design/J54_TABLE.md. `deck_ops` is the deck-operation engine
-shared by the table's rules, contracts and entropy; `table` holds the
-mechanics (registered for the `j54` mode when imported); `contracts` is the
-shop catalog. The mode itself is in chaos_blackjack/modes and its rules in
-rules/plugins/j54_deck.py.
+`table` holds the mechanics (registered for the `j54` mode when imported);
+`program` is the schedule of conditions; `firmware` the player's build pick;
+`deck_ops` the deck-operation engine behind removals and entropy. The mode is
+in chaos_blackjack/modes and its conditions in rules/plugins/j54_conditions.py
+(v1's deck rules stay in rules/plugins/j54_deck.py for the Collection).
 """

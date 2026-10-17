@@ -132,6 +132,7 @@ class ButtonsBlock(Block):
         self.shop = Button(assets, (0, 0, 10, 48), "Shop", on_shop, hotkey=pygame.K_b, font_size=theme.FONT_BODY)
         self.panel = Button(assets, (0, 0, 10, 48), "Panel", on_panel, hotkey=pygame.K_TAB, font_size=theme.FONT_BODY)
         self.restock_in = 0
+        self.stocked = True
         self.assets = assets
 
     def height(self, width: int) -> int:
@@ -139,22 +140,25 @@ class ButtonsBlock(Block):
 
     def place(self, rect: pygame.Rect) -> None:
         self.rect = rect
-        half = (rect.w - 8) // 2
-        self.shop.rect = pygame.Rect(rect.x, rect.bottom - 48, half, 48)
+        half = (rect.w - 8) // 2 if self.shop.visible else -8  # a table without a shop: Panel takes the row
+        self.shop.rect = pygame.Rect(rect.x, rect.bottom - 48, max(half, 0), 48)
         self.panel.rect = pygame.Rect(rect.x + half + 8, rect.bottom - 48, rect.w - half - 8, 48)
 
     def sync(self, view: GameView) -> None:
+        self.shop.visible = view.has_shop
         self.shop.enabled = view.can(Action.BUY)
         self.restock_in = view.shop_restock_in
+        self.stocked = bool(view.shop_offers)  # a table that sells nothing has no stock to announce
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         return self.shop.handle_event(event) or self.panel.handle_event(event)
 
     def draw(self, surface: pygame.Surface) -> None:
         n = self.restock_in
-        note = self.assets.font(theme.FONT_TINY).render(f"New stock in {n} round{'s' if n != 1 else ''}", True,
-                                                        theme.TEXT_MUTED)
-        surface.blit(note, note.get_rect(midbottom=(self.rect.centerx, self.shop.rect.y - 4)))
+        if self.stocked:
+            note = self.assets.font(theme.FONT_TINY).render(f"New stock in {n} round{'s' if n != 1 else ''}", True,
+                                                            theme.TEXT_MUTED)
+            surface.blit(note, note.get_rect(midbottom=(self.rect.centerx, self.shop.rect.y - 4)))
         self.shop.draw(surface)
         self.panel.draw(surface)
 
@@ -229,9 +233,11 @@ class SideColumn:
         self.blocks: list[Block] = []
         self.visible: list[Block] = []
         self.hidden = 0
+        self.parts: dict[str, Block] = {}
         for entry in entries:
             part, variant = split_entry(entry, "compact")
             self.blocks.append(natives[part] if part in natives else DataBlock(assets, part, variant, on_act))
+            self.parts[part] = self.blocks[-1]
 
     def block(self, kind: type) -> Block | None:
         return next((b for b in self.blocks if isinstance(b, kind)), None)
@@ -270,6 +276,15 @@ class SideColumn:
             flex.place(pygame.Rect(inner.x, y, inner.w, max(40, bottom - y - (18 if self.hidden else 0))))
             self.visible.append(flex)
         self._more_y = bottom - 16
+
+    def focus_rect(self, part: str, element: str = "") -> pygame.Rect | None:
+        """Where a part (or one element of it, by icon id) is drawn in this column, None when it is not shown."""
+        b = self.parts.get(part)
+        if b is None or b not in self.visible:
+            return None
+        if element:
+            return b.view.element(element) if isinstance(b, DataBlock) else None
+        return pygame.Rect(b.rect)
 
     def update(self, dt: float) -> None:
         for b in self.blocks:

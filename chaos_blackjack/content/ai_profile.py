@@ -23,6 +23,8 @@ PERSONA_EVENTS = (
     "idle", "off", "round_started", "rule_applied", "narration", "poke", "item_used",
     "player_bust", "player_blackjack", "dealer_blackjack", "dealer_busts",
     "outcome_dealer", "outcome_player", "outcome_blackjack", "outcome_push", "outcome_surrender",
+    # A table's own events (TABLE_EVENT notices, by their `effect`): J-54's condition change and Joker release.
+    "table_condition", "table_release",
 )
 
 

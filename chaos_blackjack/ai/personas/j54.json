@@ -28,7 +28,9 @@
     "outcome_player": "guarded",
     "outcome_blackjack": "irritated",
     "outcome_push": "paranoid_analysis",
-    "outcome_surrender": "obsessive_lecture"
+    "outcome_surrender": "obsessive_lecture",
+    "table_condition": "obsessive_lecture",
+    "table_release": "paranoid_analysis"
   },
   "lines": {
     "idle": [
@@ -41,9 +43,8 @@
       "Executing round. Your move."
     ],
     "rule_applied": [
-      "Deck revision applied: {rule}.",
-      "{rule}. The deck has been updated. You will want to update yourself.",
-      "Patch notes: {rule}."
+      "Condition applied: {rule}.",
+      "{rule}. My cards have been updated. You will want to update yourself."
     ],
     "item_used": [
       "External interference logged.",
@@ -78,6 +79,15 @@
     ],
     "outcome_surrender": [
       "Retreat accepted. Half the stake returned, as specified."
+    ],
+    "table_condition": [
+      "New condition loaded. Read the meter.",
+      "Condition changed. My cards, my values.",
+      "Parameters updated. Adjust, or do not."
+    ],
+    "table_release": [
+      "The sample is loose in the deck. Try to hold it.",
+      "Joker released. Probability of capture: nonzero."
     ]
   }
 }

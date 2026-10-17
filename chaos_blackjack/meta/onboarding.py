@@ -18,9 +18,15 @@ PH_INTRO_RULES = "ph_intro_rules"    # heard how Poker Head's rules work
 BET_CAP_LIFTED = "bet_cap_lifted"    # played enough Classic runs to bet freely
 FIRST_RELIEF = "first_relief"        # heard Poker Head's first relief speech (later reliefs get a short one)
 J54_SALE = "j54_sale"                # J-54's looks are sold (nothing reaches it while J-54's table is a demo)
+# J-54's first visit, explained inside the first run (chaos_blackjack/j54/onboarding.py decides when).
+J54_INTRO_TABLE = "j54_intro_table"          # the deck, the heat strip, compute and the two goals
+J54_INTRO_FIRMWARE = "j54_intro_firmware"    # what a firmware is, as the choice opens
+J54_INTRO_CONDITION = "j54_intro_condition"  # conditions and camps, at the first announcement
+J54_INTRO_RELEASE = "j54_intro_release"      # the sealed Joker, once Release is affordable
 
 ALL: tuple[str, ...] = (TUTORIAL, CLASSIC_MAX_WIN, POKER_HEAD_WIN, PH_INTRO_BUILD, PH_INTRO_RULES, BET_CAP_LIFTED,
-                        FIRST_RELIEF, J54_SALE)
+                        FIRST_RELIEF, J54_SALE, J54_INTRO_TABLE, J54_INTRO_FIRMWARE, J54_INTRO_CONDITION,
+                        J54_INTRO_RELEASE)
 
 # A dealer's looks are sold once the player has reached this (series -> milestone, why not yet).
 SALE_LOCKS: dict[str, tuple[str, str]] = {
@@ -85,5 +91,5 @@ def after_run(db: sqlite3.Connection, player_id: int, mode: str, result: str, st
 
 
 __all__ = ["ALL", "BET_CAP_LIFTED", "CAPPED_RUNS", "CAP_FRACTION", "CLASSIC_MAX_WIN", "FIRST_RELIEF", "PH_INTRO_BUILD",
-           "J54_SALE", "PH_INTRO_RULES", "POKER_HEAD_WIN", "SALE_LOCKS", "TUTORIAL", "after_run", "sale_lock", "guided_default", "is_guided", "reach",
+           "J54_INTRO_CONDITION", "J54_INTRO_FIRMWARE", "J54_INTRO_RELEASE", "J54_INTRO_TABLE", "J54_SALE", "PH_INTRO_RULES", "POKER_HEAD_WIN", "SALE_LOCKS", "TUTORIAL", "after_run", "sale_lock", "guided_default", "is_guided", "reach",
            "reached"]

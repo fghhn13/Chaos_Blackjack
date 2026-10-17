@@ -50,7 +50,7 @@ def _play_round(c: GameController) -> None:
 def test_modes_choose_their_layout() -> None:
     assert layout_for("normal") is DEFAULT_LAYOUT and layout_for("unknown") is DEFAULT_LAYOUT
     j54 = layout_for("j54")
-    assert "j54.badges" in j54.right and j54.tab("deck") is not None and j54.tab("contracts") is not None
+    assert "j54.badges" in j54.right and j54.tab("deck") is not None and j54.tab("contracts") is None
     assert [t.id for t in DEFAULT_LAYOUT.panel] == ["bag", "rules", "log", "run"]
     assert split_entry("j54.deck:compact", "full") == ("j54.deck", "compact")
     assert split_entry("core.log", "full") == ("core.log", "full")
@@ -61,9 +61,33 @@ def test_parts_only_show_where_they_apply() -> None:
     assert build_part("j54.deck", PartContext(plain, plain.view())) == ()
     assert build_part("no.such.part", PartContext(plain, plain.view())) == ()
     kinds = [w.kind for w in build_part("j54.deck", PartContext(j54, j54.view()), "full")]
-    assert kinds == ["bars", "list", "rows"]
+    assert kinds == ["bars", "bars", "list", "rows", "list"]  # red and black heat strips, heat by rank, pile
     compact = build_part("j54.deck", PartContext(j54, j54.view()), "compact")[0]
     assert compact.compact and compact.act == Act("gui:panel", "deck") and len(compact.bars) == 13
+
+
+def test_j54_heat_strip_cuts_its_groups_and_the_ops_follow_their_moves() -> None:
+    c = _controller("j54")
+    ctx = PartContext(c, c.view())
+    compact = build_part("j54.deck", ctx, "compact")[0]
+    heat = c.view().table_public.heat
+    assert all(b.tone == ("good" if heat.get(f"{b.label}r", 0) + heat.get(f"{b.label}b", 0) > 0 else "bad")
+               for b in compact.bars if b.tone)
+    assert all(b.act == Act("j54_cut", "", True) and " pp" in b.tooltip for b in compact.bars if b.value)
+    red, black = build_part("j54.deck", ctx, "full")[:2]
+    assert [b.act.arg for b in red.bars] == [f"{r}r" for r in ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J",
+                                                                   "Q", "K", "A")]
+    assert all(b.act.arg.endswith("b") for b in black.bars) and "pp" in red.bars[0].tooltip
+    ops = {b.icon: b for b in build_part("j54.ops", ctx)[0].items}
+    assert ops["j54_cut"].act.enabled and not ops["j54_release"].act.enabled
+    assert "compute" in ops["j54_release"].tooltip and ops["j54_release"].tone == "muted"
+    meter = build_part("j54.meter", ctx, "full")
+    assert meter[0].kind == "progress" and [m.label for m in meter[0].marks] == ["50%", "55%", "60%"]
+    assert meter[0].text.endswith("%") and 0 <= meter[0].value <= meter[0].maximum
+    _play_round(c)  # after the deal nothing can be cut
+    v = c.view()
+    assert all(b.act is None for b in build_part("j54.deck", PartContext(c, v), "full")[0].bars)
+    assert build_part("j54.ops", PartContext(c, v)) == ()
 
 
 def test_a_new_mechanic_is_a_part_plus_a_layout() -> None:
@@ -87,11 +111,16 @@ def test_item_slots_carry_use_actions_and_hotkeys() -> None:
 
 
 def test_rules_part_lists_the_dealers_pool() -> None:
-    c = _controller("j54")
+    # A Chaos table without rules of its own lists the pool its Chaos AI may use.
+    c = GameController(replace(RunConfig.from_balance(default_balance(), seed=3), enable_chaos=True,
+                               rule_pool=("great_crash", "suit_power")), save_fn=lambda d, n: n)
     full = build_part("core.rules", PartContext(c, c.view()), "full")
     names = {e.title for e in full[1].entries}
-    assert {"Burn Protocol", "Layered Sort", "Data Backflow"} <= names
+    assert names == {"Great Crash", "Suit Power"}
     assert all(not e.text.startswith(e.title) for e in full[1].entries)
+    j54 = _controller("j54")  # J-54 shows the condition its program has in force
+    full = build_part("core.rules", PartContext(j54, j54.view()), "full")
+    assert len(full) == 1 and [e.title for e in full[0].entries] == [f"{j54.table.condition().name} · J-54's cards"]
     off = _controller("normal")
     assert len(build_part("core.rules", PartContext(off, off.view()), "full")) == 1
 
@@ -187,10 +216,49 @@ def test_table_builds_its_columns_from_the_layout(app) -> None:
 
     t = _open(app, _controller("j54"))
     right = [b.part for b in t.right.visible if isinstance(b, DataBlock)]
-    assert right == ["j54.deck", "j54.badges", "core.items"]
+    assert right == ["j54.deck", "j54.meter", "j54.badges", "j54.ops"]
     plain = _open(app, _controller("normal"))
     assert [b.part for b in plain.right.visible if isinstance(b, DataBlock)] == ["core.items"]
     assert plain.deck_rect.size == t.deck_rect.size
+
+
+def test_j54_parts_draw_at_betting_and_during_a_hand(app) -> None:
+    from chaos_blackjack.gui.components.widget_view import WidgetView
+
+    c = _controller("j54")
+    c.table.compute = 8
+    c.perform("j54_release")
+    surface = pygame.Surface((900, 3000))
+    for during_hand in (False, True):
+        if during_hand:
+            c.place_bet(10)
+        ctx = PartContext(c, c.view())
+        for part in ("j54.deck", "j54.meter", "j54.badges", "j54.ops", "j54.goal", "j54.program"):
+            for variant, width, full in (("compact", 220, False), ("full", 860, True)):
+                widgets = build_part(part, ctx, variant)
+                view = WidgetView(app.assets, widgets, width, full=full)
+                assert view.draw(surface, (0, 0)) == view.measure()
+                if widgets:
+                    assert view.measure() > 0
+    t = _open(app, c)
+    for tab in ("deck", "run"):
+        t._open_panel(tab)  # noqa: SLF001
+        app.scenes.apply_pending()
+        app._render()  # noqa: SLF001
+        assert app.scenes.top.tab.id == tab
+        _key(app, pygame.K_ESCAPE)
+
+
+def test_clicking_a_heat_bar_cuts_its_group(app) -> None:
+    c = _controller("j54")
+    t = _open(app, c)
+    t._open_panel("deck")  # noqa: SLF001
+    app.scenes.apply_pending()
+    panel = app.scenes.top
+    app._render()  # noqa: SLF001
+    hit = next(h for h in panel.view.hits if h.act is not None and h.act.id == "j54_cut" and h.act.arg == "Kb")
+    app.scenes.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, {"pos": hit.rect.center, "button": 1}))
+    assert c.table.group_counts()["Kb"] == 0 and c.table.compute == 1
 
 
 def test_panel_opens_on_keys_and_switches_tabs(app) -> None:

@@ -87,7 +87,10 @@ def next_step_hint(v: GameView, acts: list[str]) -> str:
         if "perform" in acts:
             extra.append("perform <action>")
         if extra:
-            return bet + f" Or first: {' / '.join(extra)} (see obs.shop, obs.items)."
+            see = [*(["obs.shop"] if Action.BUY in acts or Action.REROLL in acts else []),
+                   *(["obs.items"] if Action.USE_ITEM in acts else []),
+                   *(["obs.table_actions"] if "perform" in acts else [])]
+            return bet + f" Or first: {' / '.join(extra)} (see {', '.join(see)})."
         return bet
     parts = [a if a != Action.USE_ITEM else "use_item <item_id>" for a in acts if a != "perform"]
     hint = "Your move: act " + " | ".join(parts)
@@ -107,10 +110,12 @@ def summary(v: GameView) -> str:
         total = "?" if v.dealer_total is None else str(v.dealer_total)
         lines.append(f"Dealer: {dealer} = {total}.")
     if v.active_rules:
-        lines.append("Active chaos rules: " + "; ".join(r.description for r in v.active_rules))
+        # A table's own rules (they say what they do) are in force for a while; Chaos AI modifiers for this round.
+        label = "Rules in force" if any(r.effect for r in v.active_rules) else "Active chaos rules"
+        lines.append(f"{label}: " + "; ".join(r.description for r in v.active_rules))
     if v.items:
         lines.append("Items: " + ", ".join(f"{i.id} x{i.count}" for i in v.items) + ".")
-    if v.phase == TablePhase.BETTING:
+    if v.phase == TablePhase.BETTING and v.shop_offers:  # a table that sells nothing has no shop line
         on_sale = [f"{o.item} {o.price}" for o in v.shop_offers if not o.sold]
         stock = ", ".join(on_sale) if on_sale else "sold out"
         reroll = ""
@@ -143,6 +148,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
                    **({"note": i.note} if i.note else {})}
                   for i in v.items],
         "choice": {
+            "kind": v.choice.kind,
             "prompt": v.choice.prompt,
             "options": [{"id": o.id, "label": o.label, "help": o.description} for o in v.choice.options],
             "cancellable": v.choice.cancellable,
@@ -161,7 +167,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             "restock_in": v.shop_restock_in,
             "reroll_price": v.shop_reroll_price,
             "reroll_affordable": v.can(Action.REROLL),
-        } if v.phase == TablePhase.BETTING else None,
+        } if v.phase == TablePhase.BETTING and v.has_shop else None,
         "chaos": {
             "enabled": v.chaos_enabled,
             "budget": v.chaos_budget if v.chaos_budget_shown else None,
@@ -170,7 +176,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
                                   "removal": r.removal, "silenced": r.silenced, "tier": r.tier} if r.effect else {})}
                              for r in v.active_rules],
         },
-        # A mode's own mechanics (J-54: protocol, Joker, deck, fee; Poker Head: build and money); None elsewhere.
+        # A mode's own mechanics (J-54: compute, meter, Joker, deck; Poker Head: build and money); None elsewhere.
         "table": {"info": dict(v.table_info), "fee": v.fee, "deck": dict(v.deck_counts),
                   **({"public": v.table_public.to_dict()} if v.table_public is not None else {})}
                  if v.table_info else None,

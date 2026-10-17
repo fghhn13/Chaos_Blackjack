@@ -185,7 +185,7 @@ python -m chaos_blackjack.gui              # --fullscreen, --scene codex, --prof
 
 The window scales a fixed 1280×720 canvas with letterboxing. At the table,
 **Tab** opens the run panel (Bag, Rules, Log, Run, plus a table's own tabs such
-as J-54's Deck and Contracts), **L** opens its log, **I** its bag, and **1–9** use
+as J-54's Deck), **L** opens its log, **I** its bag, and **1–9** use
 an item from the quick slots on your turn. The run log is saved with the run. Choose **Poker Head's Table** in New run's table list for Chaos rules.
 
 Chaos AI calls run in a background thread. An animated "The Chaos AI is thinking..."
@@ -387,7 +387,7 @@ Black_jack/
 │   ├── app/                  # GameController, views, notices, config
 │   ├── data/                 # SQLite: migrations/, seed/default.sql, balances, saves, prefs
 │   ├── meta/  modes/          # players, upgrades, run tracking, rewards and mode registry
-│   ├── j54/                  # J-54's deck table (demo): persistent deck, protocols, contracts
+│   ├── j54/                  # J-54's deck table: persistent deck, program, compute, evaluator
 │   ├── codex/                 # providers, live descriptions and controller demos
 │   ├── cosmetics/  achievements/  # look catalog; stats and achievement registries
 │   ├── content/  audio/       # content packs and casino sound catalog

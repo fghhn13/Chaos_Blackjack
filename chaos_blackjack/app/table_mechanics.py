@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from chaos_blackjack.app.products import ProductDef
     from chaos_blackjack.app.shop import ShopOffer, ShopState
     from chaos_blackjack.app.view import RuleView, TablePublic
+    from chaos_blackjack.content.host_script import HostLine
     from chaos_blackjack.contracts.items import ItemResult
     from chaos_blackjack.rules.modifiers import ActiveModifiers
 
@@ -41,6 +42,8 @@ class TableMechanics:
     uses_chaos_budget = True
     # The table changes the rules itself (Poker Head's environment), instead of the Chaos AI's registry rules.
     environment_rules = False
+    # The table has a shop (False: it sells nothing; no buying or rerolling, and no Shop button).
+    has_shop = True
 
     @classmethod
     def enabled(cls, config: "RunConfig") -> bool:
@@ -81,6 +84,14 @@ class TableMechanics:
         """A message when the run is won, else None."""
         return None
 
+    def defeat(self, run: "RunState") -> str | None:
+        """A message when the settled round lost the run (e.g. the last round passed without a win), else None."""
+        return None
+
+    def host_variant(self, event: str) -> str:
+        """Which of the host's `<event>.<variant>` scripts fits how the run ended (e.g. "capture"), "" = the plain one."""
+        return ""
+
     def goal_progress(self, run: "RunState") -> tuple[str, int, int] | None:
         """(label, value, target) when the goal is not the bankroll itself (e.g. net assets), else None."""
         return None
@@ -92,6 +103,12 @@ class TableMechanics:
     def public(self) -> "TablePublic | None":
         """A frozen snapshot of what any player may see (never undealt cards)."""
         return None
+
+    def onboarding(self, guided: bool) -> "tuple[tuple[str, tuple[HostLine, ...]], ...]":
+        """First-visit explanations due since the last call (docs/design/TUTORIAL.md): (onboarding milestone,
+        the host's beats), each handed out once. `guided`: whether the player follows the onboarding (an
+        unguided player gets none); the GUI shows a milestone not reached yet and records it."""
+        return ()
 
     # --- economy ----------------------------------------------------------
 
@@ -230,6 +247,10 @@ class TableMechanics:
 
     def entered_player(self) -> None:
         """The player's turn began."""
+
+    def dealer_stand_on(self, default: int) -> int:
+        """The total the dealer stands on this round (`default`: the profile's)."""
+        return default
 
     def double_multiplier(self) -> int:
         """How many times the bet a double stakes."""

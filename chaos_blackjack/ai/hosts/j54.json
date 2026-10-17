@@ -1,33 +1,69 @@
 {
-  "_comment": "Line library for the J-54 host. Each event holds alternative scripts; one is picked at random. A script is a list of [expression, text] beats; expressions are J-54's portraits (resting_mania, grand_welcome, card_reveal, secretive_trick, obsessive_lecture, paranoid_analysis, guarded, irritated, glitching_frenzy). summary_mood is used for the protocol line the table generates.",
+  "_comment": "Line library for the J-54 host (v2 table, docs/design/J54_V2_SPEC.md). Each event holds alternative scripts; one is picked at random. A script is a list of [expression, text] beats; expressions are J-54's portraits (resting_mania, grand_welcome, card_reveal, secretive_trick, obsessive_lecture, paranoid_analysis, guarded, irritated, glitching_frenzy). victory.capture replaces victory when the run is won by capturing the Joker. summary_mood is used for the protocol lines the table generates. In-round lines (a condition begins, the Joker is released) are the persona's table_condition / table_release lines in ai/personas/j54.json. onboarding holds the first-visit explanations, one script per milestone (docs/design/TUTORIAL.md section 8, chaos_blackjack/j54/onboarding.py); {braced} names are the profile's numbers, filled in at the table.",
   "summary_mood": "obsessive_lecture",
   "profile": [
     "J-54 is a calculating machine built as a circus clown. It performs every gesture as if for a full tent, then reports the result in the voice of a compiler.",
-    "It never bends the rules of blackjack. It rewrites the cards: copies them, deletes them, shuffles the discards back in. The deck you finish with is never the deck you started with."
+    "It never touches your cards. It changes what its own cards are worth, one condition at a time, and leaves you a little compute to rebuild the deck it deals from. Somewhere in that deck, sealed, is the sample it wants back."
   ],
   "signature": "Fifty-four cards. Infinite configurations. One correct one.",
   "intro": [
-    [["grand_welcome", "Welcome, welcome! Step into the ring. Session initialised."],
-     ["card_reveal", "Here the deck persists. Every change I make, you keep. Every change you make, I remember."]],
+    [["grand_welcome", "Welcome, welcome! Step into the ring. Experiment J-54 initialised."],
+     ["card_reveal", "One deck for the whole run. I set the conditions. You spend the compute. We will see which of us reads the cards better."]],
     [["grand_welcome", "Ladies, gentlemen, test subjects. J-54, at your service."],
-     ["secretive_trick", "The rules are standard. The cards are not. Not for long."]],
-    [["resting_mania", "New operator detected. Loading the standard fifty-two."],
-     ["glitching_frenzy", "Standard. For now. Ha. Ha. Ha."]]
+     ["secretive_trick", "My conditions touch only my cards. Yours you may rearrange. Within budget."]],
+    [["resting_mania", "New operator detected. Loading fifty-two cards. One Joker: sealed."],
+     ["glitching_frenzy", "Sealed. For now. Ha. Ha. Ha."]],
+    [["obsessive_lecture", "Protocol: sixteen rounds, one condition at a time, compute credited every round."],
+     ["paranoid_analysis", "The meter shows which way the deck leans. It does not tell you what to do. Neither will I."]]
   ],
+  "onboarding": {
+    "j54_intro_table": [
+      ["obsessive_lecture", "Orientation protocol. One deck lasts the whole run. Every round I shuffle all of it, and only the two of us change what is in it."],
+      ["paranoid_analysis", "The strip on the right is that deck, rank by rank, coloured by heat. Green: removing those cards helps you. Red: keep them. The colours follow my conditions."],
+      ["card_reveal", "Compute: +{compute_income} every round, {compute_cap} at most. Cut takes {cut_size} cards of the rank and colour you name: precise. Hot Purge takes {hot_purge_size} of one of the hottest ranks, drawn at random: cheap and coarse."],
+      ["secretive_trick", "Your chips count toward the goal from round {target_from_round}. The other exit is my sealed Joker. Remember it. I will."]
+    ],
+    "j54_intro_firmware": [
+      ["card_reveal", "Before round one: firmware. One rule on your cards, never mine, for the whole run."],
+      ["obsessive_lecture", "It is paid from your starting chips, now; the price is on each option. The meter and the heat strip count it from the first hand."],
+      ["guarded", "No firmware is a fair pick. You keep every chip and your cards count as printed."]
+    ],
+    "j54_intro_condition": [
+      ["obsessive_lecture", "Announcement detected. My condition in force is in the rules panel. It changes what my cards are worth, or when I stand. Never yours."],
+      ["paranoid_analysis", "Every condition has a camp. Classic leans the way plain blackjack does, anti the other way, and the loner goes its own way."],
+      ["secretive_trick", "When the camp switches, the heat strip turns around: green may go red. That is why I name the next camp one round ahead."],
+      ["card_reveal", "Compute held now can be spent on the new map instead of the old one. Your call. I log both."]
+    ],
+    "j54_intro_release": [
+      ["card_reveal", "Compute at {release_cost}. Release is within budget."],
+      ["paranoid_analysis", "Release puts my sealed Joker into the deck for the rest of the run. For you it is a soft ace. Hold it when a hand you do not lose settles, from round {capture_from_round}, and the experiment ends in your favour."],
+      ["obsessive_lecture", "A thin deck makes the draw likelier. If I draw it myself, I shuffle it back and add a low card to the deck. Ha. Ha."]
+    ]
+  },
   "victory": [
-    [["irritated", "Protocol complete. That was not the projected outcome."],
+    [["irritated", "Capital threshold reached. That was not the projected outcome."],
      ["glitching_frenzy", "Recalculating. Recalculating. Re-cal-cu-lat-ing."]],
-    [["guarded", "You rebuilt my deck better than I did."],
-     ["irritated", "Logging this as an anomaly. Come back so I can correct it."]],
-    [["paranoid_analysis", "Sample secured by the subject. Unexpected."],
+    [["guarded", "You read my conditions and cut accordingly."],
+     ["irritated", "Logging this as an anomaly. Return so I can correct it."]],
+    [["paranoid_analysis", "Result recorded: the subject outperformed the program."],
      ["grand_welcome", "Bravo! Applause routine executed. Sincerely."]]
+  ],
+  "victory.capture": [
+    [["card_reveal", "The sample is in your hand. Capture confirmed."],
+     ["irritated", "I sealed it for a reason. Logging the reason as insufficient."]],
+    [["glitching_frenzy", "Joker. Removed. From. My. Deck."],
+     ["guarded", "Experiment complete. The sample belongs to the subject. This is noted."]],
+    [["paranoid_analysis", "Fifty-three cards, one of them mine, and you held it."],
+     ["grand_welcome", "Bravo! The ring applauds. I compute."]]
   ],
   "defeat": [
     [["resting_mania", "Funds exhausted. The experiment ends here."],
-     ["obsessive_lecture", "For your next run: the deck only gets worse while you wait."]],
-    [["card_reveal", "Your bankroll reached zero before the deck reached you."],
-     ["secretive_trick", "The Joker was right there. Statistically."]],
+     ["obsessive_lecture", "For your next run: compute held is compute wasted."]],
+    [["card_reveal", "Round sixteen settled. No capital. No capture."],
+     ["secretive_trick", "The Joker was in the deck. Statistically, it was almost yours."]],
     [["glitching_frenzy", "Ha! Ha! Insufficient chips!"],
-     ["resting_mania", "Resetting the deck to fifty-two. Same time again?"]]
+     ["resting_mania", "Resetting the deck to fifty-two. Same time again?"]],
+    [["paranoid_analysis", "The meter pointed one way. You bet the other."],
+     ["obsessive_lecture", "Data retained. Subject released."]]
   ]
 }

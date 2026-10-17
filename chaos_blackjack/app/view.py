@@ -158,6 +158,8 @@ class GameView:
     goal: tuple[str, int, int] | None = None
     # Whether the Chaos AI's action budget applies (False at a table whose own director changes the rules).
     chaos_budget_shown: bool = True
+    # Whether the table has a shop at all (False: it sells nothing, e.g. J-54's).
+    has_shop: bool = True
 
     def move(self, action: str, arg: str = "") -> Move | None:
         return next((m for m in self.moves if m.action == action and m.arg == arg), None)

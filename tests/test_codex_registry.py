@@ -13,11 +13,11 @@ from chaos_blackjack.registry import get_registry
 
 
 def test_builtins_and_tab_order():
-    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment"]
+    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment", "firmware"]
     assert [e.id for e in codex_entries("environment")] == [
         "fixed", "shift", "bust", "tie", "bust_outcome", "profit_cap", "item_ban", "markup", "hidden"]
     assert len(codex_entries("build")) == 43
-    assert len(codex_entries("rule")) == 13  # Poker Head's 7 and J-54's 6
+    assert len(codex_entries("rule")) == 20  # Poker Head's 7, J-54's 7 conditions and its 6 demo deck rules
     assert len(codex_entries("item")) == 6
     assert [e.id for e in codex_entries("mode")] == ["normal", "chaos", "j54"]
     assert [e.id for e in codex_entries("ai")] == ["default"]
@@ -66,8 +66,8 @@ def test_modes_describe_the_supplied_config():
         detail = entry.detail(cfg)
         if entry.id == "chaos":
             assert "Leave with 1600 to 2400 net assets" in detail   # the table's own stake: 400, x4 to x6
-        elif entry.id == "j54":  # J-54's goal is a protocol, not a chip target
-            assert "random protocol" in detail
+        elif entry.id == "j54":  # J-54's goal: its own chip target from round 9, or a capture
+            assert "or capture the Joker" in detail
         else:
             assert "230 chips" in detail and "into 920" in detail
         assert "Bet 7 up to 25%" in detail and "stands on 19" in detail
@@ -116,7 +116,7 @@ def test_provider_plugins_override_metadata_and_add_ai_entries(monkeypatch):
     replacement = replace(codex_entries("rule")[0], name="Replacement", order=-1)
     register_codex_provider("rule", lambda cfg: [replacement])
     assert codex_entries("rule")[0] == replacement
-    assert len(codex_entries("rule")) == 13
+    assert len(codex_entries("rule")) == 20
 
 
 def test_provider_receives_config_and_rejects_wrong_kind(monkeypatch):
@@ -171,3 +171,24 @@ def test_build_references_use_live_effects_prices_and_slot_limit():
     for entry in entries.values():
         assert entry.category and entry.style and entry.timing and entry.price
         assert all(target in entries for target in entry.related)
+
+
+def test_j54s_tab_lists_its_firmwares_and_conditions_in_plain_words() -> None:
+    from chaos_blackjack.codex.sections import codex_sections
+    from chaos_blackjack.data.balance import default_balance
+    from chaos_blackjack.j54.firmware import CATALOG
+    from chaos_blackjack.rules.plugins.j54_conditions import CONDITIONS
+
+    cfg = RunConfig.from_balance(default_balance())
+    j54 = next(s for s in codex_sections(cfg) if s.id == "j54")
+    groups = {g.id: g for g in j54.groups}
+    assert [g.id for g in j54.groups][:2] == ["firmware", "rules"] and groups["rules"].label == "Conditions"
+    firmwares = groups["firmware"].entries
+    assert [e.id for e in firmwares] == list(CATALOG) and all(e.name == CATALOG[e.id].name for e in firmwares)
+    assert "50 chips from your starting chips" in next(e for e in firmwares if e.id == "fw_mid").detail(cfg)
+    conditions = groups["rules"].entries
+    assert {e.id for e in conditions} == set(CONDITIONS) and all(e.category == "condition" for e in conditions)
+    for e in conditions:
+        assert e.name == CONDITIONS[e.id][0] and e.summary.endswith(" camp.") and "(J-54" not in e.summary
+        detail = e.detail(cfg)
+        assert detail.startswith(e.summary.split(". ")[0]) and "never yours" in detail and "Active rule" not in detail

@@ -128,21 +128,36 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
     (:profile, 'ph_stock', 'fixed', 30, '{"payout":100,"probability":0.5,"rounds":2}'),
     (:profile, 'ph_loan', 'fixed', 0, '{"advance":100,"repay":120,"rounds":3}');
 
--- J-54's table (demo, docs/design/J54_TABLE.md). First pass from a scripted bot:
--- a focused contract player wins ~17 % (capture) / ~11 % (capital), never
--- buying wins ~0 % / ~5 % and dies around round 18. Not balanced yet.
--- `mode.j54.config.<field>` overrides a RunConfig field at this table only.
+-- J-54's table (docs/design/J54_V2_SPEC.md section 9): first values, tuned by
+-- playing. `mode.j54.config.<field>` overrides a RunConfig field at this table only.
 INSERT INTO setting (profile_id, key, value, type, min, max, description) VALUES
-    (:profile, 'mode.j54.protocols',        'capture,capital', 'str', NULL, NULL, 'Protocols (win conditions) a J-54 run draws from'),
-    (:profile, 'mode.j54.capital_target',   '250',   'int', 1,    NULL, 'Capital protocol: bankroll that wins the run'),
-    (:profile, 'mode.j54.experiment_jokers','1',     'int', 1,    NULL, 'Capture protocol: Jokers released by Start Experiment (all must be drawn)'),
-    (:profile, 'mode.j54.fee_steps',        '0,1,2,4,8', 'str', NULL, NULL, 'Compute fee per round, one value per fee step; doubles after the last'),
-    (:profile, 'mode.j54.fee_step_rounds',  '4',     'int', 1,    NULL, 'Rounds per compute fee step'),
-    (:profile, 'mode.j54.entropy',          '1',     'int', 0,    NULL, 'Low cards J-54 adds to the deck after each round'),
-    (:profile, 'mode.j54.entropy_experiment','2',    'int', 0,    NULL, 'Low cards J-54 adds after each round once the experiment started'),
-    (:profile, 'mode.j54.dealer_joker_penalty','1',  'int', 0,    NULL, 'Low cards J-54 adds when it takes a Joker back from the dealer'),
-    (:profile, 'mode.j54.min_deck',         '12',    'int', 8,    NULL, 'Deletions never shrink the deck below this many cards'),
-    (:profile, 'mode.j54.config.shop_refresh_rounds', '1', 'int', 1, NULL, 'J-54 restocks its contracts every round');
+    (:profile, 'mode.j54.rounds',             '16',   'int',   1,    NULL, 'Rounds of a J-54 run; the last settlement ends it'),
+    (:profile, 'mode.j54.target_multiple',    '1.75', 'float', 0.05, NULL, 'Chip target as a multiple of the starting chips (rounded down to a multiple of 5)'),
+    (:profile, 'mode.j54.target_from_round',  '9',    'int',   1,    NULL, 'The chip target wins only at a settlement from this round on'),
+    (:profile, 'mode.j54.compute_income',     '2',    'int',   0,    NULL, 'Compute credited when a round enters betting (round 1 included)'),
+    (:profile, 'mode.j54.compute_cap',        '8',    'int',   1,    NULL, 'Most compute the player can hold'),
+    (:profile, 'mode.j54.cut_cost',           '1',    'int',   0,    NULL, 'Compute a Cut costs'),
+    (:profile, 'mode.j54.cut_size',           '2',    'int',   1,    NULL, 'Cards of the chosen rank and colour a Cut removes (all that remain if fewer)'),
+    (:profile, 'mode.j54.hot_purge_cost',     '1',    'int',   0,    NULL, 'Compute a Hot Purge costs'),
+    (:profile, 'mode.j54.hot_purge_size',     '3',    'int',   1,    NULL, 'Cards of the drawn rank a Hot Purge removes'),
+    (:profile, 'mode.j54.hot_purge_candidates','3',   'int',   1,    NULL, 'Hot Purge draws its rank among this many hottest ranks'),
+    (:profile, 'mode.j54.release_cost',       '6',    'int',   0,    NULL, 'Compute the Joker release costs (once per run)'),
+    (:profile, 'mode.j54.capture_from_round', '9',    'int',   1,    NULL, 'Holding the Joker at a non-losing settlement wins from this round on'),
+    (:profile, 'mode.j54.dealer_joker_penalty','1',   'int',   0,    NULL, 'Low cards J-54 adds when it shuffles back a Joker it drew'),
+    (:profile, 'mode.j54.entropy',            '1',    'int',   0,    NULL, 'Low cards J-54 adds to the deck after each settlement'),
+    (:profile, 'mode.j54.min_deck',           '16',   'int',   1,    NULL, 'Removals never shrink the deck below this many cards'),
+    (:profile, 'mode.j54.segment_len',        '2,4',  'str',   NULL, NULL, 'Rounds per condition of the program (lowest,highest)'),
+    (:profile, 'mode.j54.cross_switches',     '1,2',  'str',   NULL, NULL, 'Classic <-> anti camp switches per program (lowest,highest; to or from the loner counts half)'),
+    (:profile, 'mode.j54.classic_opening',    '1',    'int',   0,    1,    'The first condition is a classic one (1) or any (0)'),
+    (:profile, 'mode.j54.announce',           'camp', 'str',   NULL, NULL, 'What J-54 says a round ahead about the next condition: camp, rule, none, or schedule (the whole program from round 1)'),
+    (:profile, 'mode.j54.bands',              '50:10,55:20,60:30', 'str', NULL, NULL, 'Meter bands: win probability %:suggested stake % of the bankroll (below the first: the minimum bet)'),
+    (:profile, 'mode.j54.firmwares_offered',  '3',    'int',   0,    NULL, 'Firmwares offered at the start of a run (plus No firmware)'),
+    (:profile, 'mode.j54.firmware.fw_mid.price',    '50', 'int', 0, NULL, 'Chips for the firmware: your 4, 5 and 6 count 10'),
+    (:profile, 'mode.j54.firmware.fw_fives.price',  '20', 'int', 0, NULL, 'Chips for the firmware: your 5s and 6s count 10'),
+    (:profile, 'mode.j54.firmware.fw_low.price',    '40', 'int', 0, NULL, 'Chips for the firmware: your 2, 3 and 4 count 10'),
+    (:profile, 'mode.j54.firmware.fw_margin.price', '30', 'int', 0, NULL, 'Chips for the firmware: you bust only above 22'),
+    (:profile, 'mode.j54.bounty',             '2',    'int',   0,    NULL, 'Chips per card of the bounty rank in your hand at settlement'),
+    (:profile, 'mode.j54.config.start_money', '100',  'int',   2,    NULL, 'Chips at the start of a J-54 run');
 
 -- Prices revised from agent playtest feedback. `params` is item tuning (JSON).
 -- `bankroll_pct`: `price` is a percentage of the bankroll when the stock is
@@ -160,16 +175,6 @@ INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
 INSERT INTO shop_item (profile_id, item_id, price_mode, price) VALUES
     (:profile, 'example_trim', 'fixed', 20);
 
--- J-54's run contracts (sold only at its table). `params`: a trigger (now, win,
--- loss, natural) and a deck operation (select / op / count, see
--- chaos_blackjack/j54/deck_ops.py) or a special effect (freeze, release_jokers).
-INSERT INTO shop_item (profile_id, item_id, price_mode, price, params) VALUES
-    (:profile, 'j54_streamline',        'fixed',  20, '{"trigger": "win", "select": "any", "op": "remove", "count": 5}'),
-    (:profile, 'j54_low_purge',         'fixed',  10, '{"trigger": "now", "select": "low", "op": "remove", "count": 6}'),
-    (:profile, 'j54_high_injection',    'fixed',  20, '{"trigger": "now", "select": "high", "op": "add", "count": 3}'),
-    (:profile, 'j54_freeze',            'fixed',  15, '{"trigger": "now", "effect": "freeze", "rounds": 3}'),
-    (:profile, 'j54_start_experiment',  'fixed',  50, '{"trigger": "now", "effect": "release_jokers"}');
-
 -- Chaos rules. `params`: fixed tuning that wins over the AI's params.
 -- `stub_weight` / `stub_params`: how often the offline Chaos AI (no LLM) picks
 -- the rule and what it sends; `chaos.stub_calm_weight` is the weight of a calm
@@ -183,15 +188,23 @@ INSERT INTO chaos_rule (profile_id, rule_id, enabled, params, stub_weight, stub_
     (:profile, 'suit_power',        1, '{"red_delta": 1, "black_delta": -1}', 20, NULL),                   --  -5 %
     (:profile, 'fragile_bust',      1, '{"bust_limit": 19}',                  15, NULL),                   --  +8 %
     (:profile, 'tiebreaker_shift',  1, NULL,                                  15, '{"ties_to": "dealer"}'), --  -9 %
-    -- J-54's deck rules (its table only): `params` is the deck operation
-    -- (when / select / op / count, chaos_blackjack/j54/deck_ops.py). A new rule
-    -- is a row here plus a name in rules/plugins/j54_deck.py.
-    (:profile, 'j54_burn',              1, '{"when": "round_end", "select": "drawn", "op": "remove", "count": "all"}', 20, NULL),
-    (:profile, 'j54_sample_injection',  1, '{"select": "random_rank", "op": "add", "count": 3}',      25, NULL),
-    (:profile, 'j54_redundancy_purge',  1, '{"select": "random_rank", "op": "remove", "count": 3}',   25, NULL),
-    (:profile, 'j54_ace_injection',     1, '{"select": "rank:A", "op": "add", "count": 1}',           10, NULL),
-    (:profile, 'j54_layered_sort',      1, '{"select": "high", "op": "move_bottom", "count": "all"}', 10, NULL),
-    (:profile, 'j54_data_backflow',     1, '{"select": "removed", "op": "return", "count": 4}',       10, NULL);
+    -- J-54's experiment conditions (its table only; rules/plugins/j54_conditions.py): `params`
+    -- is the camp and the change to J-54's cards or stand threshold. J-54's program picks them,
+    -- not the offline Chaos AI, so they have no stub weight.
+    (:profile, 'j54_black_plus',    1, '{"camp": "classic", "op": "bonus", "filter": "color:black", "amount": 1}', 0, NULL),
+    (:profile, 'j54_even_plus',     1, '{"camp": "classic", "op": "bonus", "filter": "parity:even", "amount": 2}', 0, NULL),
+    (:profile, 'j54_hearts_scale',  1, '{"camp": "classic", "op": "scale", "filter": "suit:♥", "factor": 2}',     0, NULL),
+    (:profile, 'j54_stand_19',      1, '{"camp": "classic", "threshold": 19}',                                    0, NULL),
+    (:profile, 'j54_stand_15',      1, '{"camp": "anti", "threshold": 15}',                                       0, NULL),
+    (:profile, 'j54_low_plus',      1, '{"camp": "anti", "op": "bonus", "filter": "low", "amount": 3}',           0, NULL),
+    (:profile, 'j54_faces_set',     1, '{"camp": "loner", "op": "set", "filter": "face", "value": 5}',            0, NULL),
+    -- J-54's demo deck rules: registered for the Collection, in no table's pool, never picked offline.
+    (:profile, 'j54_burn',              1, '{"when": "round_end", "select": "drawn", "op": "remove", "count": "all"}', 0, NULL),
+    (:profile, 'j54_sample_injection',  1, '{"select": "random_rank", "op": "add", "count": 3}',      0, NULL),
+    (:profile, 'j54_redundancy_purge',  1, '{"select": "random_rank", "op": "remove", "count": 3}',   0, NULL),
+    (:profile, 'j54_ace_injection',     1, '{"select": "rank:A", "op": "add", "count": 1}',           0, NULL),
+    (:profile, 'j54_layered_sort',      1, '{"select": "high", "op": "move_bottom", "count": "all"}', 0, NULL),
+    (:profile, 'j54_data_backflow',     1, '{"select": "removed", "op": "return", "count": 4}',       0, NULL);
 
 -- Meta upgrades bought with tokens between runs (tuned with black-jack-sim). Effects
 -- are code (chaos_blackjack/meta/effects.py); each row is one upgrade.
