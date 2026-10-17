@@ -132,6 +132,7 @@ class ButtonsBlock(Block):
         self.shop = Button(assets, (0, 0, 10, 48), "Shop", on_shop, hotkey=pygame.K_b, font_size=theme.FONT_BODY)
         self.panel = Button(assets, (0, 0, 10, 48), "Panel", on_panel, hotkey=pygame.K_TAB, font_size=theme.FONT_BODY)
         self.restock_in = 0
+        self.stocked = True
         self.assets = assets
 
     def height(self, width: int) -> int:
@@ -146,15 +147,17 @@ class ButtonsBlock(Block):
     def sync(self, view: GameView) -> None:
         self.shop.enabled = view.can(Action.BUY)
         self.restock_in = view.shop_restock_in
+        self.stocked = bool(view.shop_offers)  # a table that sells nothing has no stock to announce
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         return self.shop.handle_event(event) or self.panel.handle_event(event)
 
     def draw(self, surface: pygame.Surface) -> None:
         n = self.restock_in
-        note = self.assets.font(theme.FONT_TINY).render(f"New stock in {n} round{'s' if n != 1 else ''}", True,
-                                                        theme.TEXT_MUTED)
-        surface.blit(note, note.get_rect(midbottom=(self.rect.centerx, self.shop.rect.y - 4)))
+        if self.stocked:
+            note = self.assets.font(theme.FONT_TINY).render(f"New stock in {n} round{'s' if n != 1 else ''}", True,
+                                                            theme.TEXT_MUTED)
+            surface.blit(note, note.get_rect(midbottom=(self.rect.centerx, self.shop.rect.y - 4)))
         self.shop.draw(surface)
         self.panel.draw(surface)
 

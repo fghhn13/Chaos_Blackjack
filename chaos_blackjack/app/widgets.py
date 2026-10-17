@@ -58,6 +58,9 @@ class Bar:
     label: str
     value: int
     tone: str = ""
+    shade: float = 1.0      # how strongly the tone shows, 0..1 (e.g. a heat map's magnitude)
+    tooltip: str = ""       # "" = "<label>: <value>"
+    act: Act | None = None  # clicking this bar (else the widget's act)
 
 
 @dataclass(frozen=True)
@@ -73,12 +76,23 @@ class Bars:
 
 
 @dataclass(frozen=True)
+class Mark:
+    """A tick on a progress bar (e.g. a betting band's lower bound)."""
+
+    value: int
+    label: str = ""
+
+
+@dataclass(frozen=True)
 class Progress:
     label: str
     value: int
     maximum: int
     tone: str = ""
     title: str = ""
+    text: str = ""                  # shown instead of "<value> / <maximum>"
+    marks: tuple[Mark, ...] = ()
+    tooltip: str = ""
     kind: str = "progress"
 
 

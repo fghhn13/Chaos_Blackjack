@@ -39,6 +39,25 @@ def tone(name: str) -> tuple[int, int, int]:
     return TONES.get(name, theme.IVORY)
 
 
+def _blend(a: tuple[int, int, int], b: tuple[int, int, int], k: float) -> tuple[int, int, int]:
+    """`a` moved towards `b` by `k` (0..1)."""
+    k = max(0.0, min(1.0, k))
+    return tuple(round(x + (y - x) * k) for x, y in zip(a, b))  # type: ignore[return-value]
+
+
+def _bar_color(b: Any, empty: tuple[int, int, int]) -> tuple[int, int, int]:
+    """A bar's fill: its tone at its shade (a faint shade stays close to the plain bar colour)."""
+    if not b.value:
+        return empty
+    if not b.tone:
+        return theme.GOLD_DIM
+    return _blend(theme.TEXT_MUTED, tone(b.tone), 0.35 + 0.65 * b.shade)
+
+
+def _bar_tip(b: Any) -> str:
+    return b.tooltip or f"{b.label}: {b.value}"
+
+
 def _dim(color: tuple[int, int, int]) -> tuple[int, int, int]:
     """A disabled element's edge: the colour at about 60%."""
     return tuple(round(c * 0.6) for c in color)  # type: ignore[return-value]
@@ -146,9 +165,12 @@ def _bars(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         for i, b in enumerate(w.bars):
             h = max(2, round(30 * b.value / most)) if b.value else 1
             rect = pygame.Rect(round(x + i * step + 1), y + 30 - h, max(2, round(step) - 3), h)
-            r.rect(BAD if b.tone == "bad" else theme.GOLD_DIM if b.value else theme.TEXT_MUTED, rect, 0, 2)
-            r.hits.append(Hit(pygame.Rect(round(x + i * step), y, max(2, round(step)), 34), w.act,
-                              f"{b.label}: {b.value}"))
+            spot = pygame.Rect(round(x + i * step), y, max(2, round(step)), 34)
+            act = b.act or w.act
+            if b.act is not None and b.act.enabled and r.hovered(spot):
+                r.rect(theme.FELT, spot, 0, 2)
+            r.rect(_bar_color(b, theme.TEXT_MUTED), rect, 0, 2)
+            r.hits.append(Hit(spot, act, _bar_tip(b)))
         y += 34
         area = pygame.Rect(x, top, width, y - top)
         r.hits.insert(0, Hit(area, w.act, ""))  # fallback for the gaps between bars
@@ -185,11 +207,15 @@ def _bars(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         spot = count.get_rect(midbottom=(cx, y + chart - h - 2))
         r.rect(theme.PANEL, spot.inflate(6, 0))
         r.blit(count, spot)
+        spot = pygame.Rect(cx - step / 2, y, step, chart + 26)
+        if b.act is not None and b.act.enabled and r.hovered(spot):
+            r.rect(theme.FELT, spot, 0, 4)
         if h:
-            r.rect(tone(b.tone) if b.tone else theme.GOLD_DIM, pygame.Rect(cx - bar_w // 2, y + chart - h, bar_w, h), 0, 3)
-        label = r.font(theme.FONT_SMALL, bold=True).render(b.label, True, tone(b.tone) if b.tone else theme.IVORY)
+            r.rect(_bar_color(b, theme.GOLD_DIM), pygame.Rect(cx - bar_w // 2, y + chart - h, bar_w, h), 0, 3)
+        label = r.font(theme.FONT_SMALL, bold=True).render(b.label, True, _bar_color(b, theme.TEXT_MUTED)
+                                                           if b.tone else theme.IVORY)
         r.blit(label, (cx - label.get_width() // 2, y + chart + 6))
-        r.hits.append(Hit(pygame.Rect(cx - step / 2, y, step, chart + 26), None, f"{b.label}: {b.value}"))
+        r.hits.append(Hit(spot, b.act, _bar_tip(b)))
     return y + chart + 30 - top
 
 
@@ -198,7 +224,7 @@ def _progress(r: _Render, w: Any, x: int, y: int, width: int) -> int:
     y = r.heading(w.title, x, y, width)
     font = r.font(theme.FONT_SMALL)
     r.blit(font.render(w.label, True, theme.TEXT_MUTED), (x, y))
-    value = font.render(f"{w.value} / {w.maximum}", True, tone(w.tone))
+    value = font.render(w.text or f"{w.value} / {w.maximum}", True, tone(w.tone))
     r.blit(value, (x + width - value.get_width(), y))
     y += 22
     bar = pygame.Rect(x, y, width, 12)
@@ -207,7 +233,21 @@ def _progress(r: _Render, w: Any, x: int, y: int, width: int) -> int:
     if k:
         r.rect(tone(w.tone) if w.tone else theme.GOLD_DIM, pygame.Rect(x, y, max(8, round(width * k)), 12), 0, 6)
     r.rect(theme.GOLD_DIM, bar, 1, 6)
-    return y + 18 - top
+    if w.tooltip:
+        r.hits.append(Hit(pygame.Rect(x, top, width, y + 12 - top), None, w.tooltip))
+    for m in w.marks:  # a tick through the bar (its label under it in the panel)
+        mx = x + round(width * max(0.0, min(1.0, m.value / max(1, w.maximum))))
+        if r.surface is not None:
+            pygame.draw.line(r.surface, theme.IVORY, (mx, y - 3), (mx, y + 14), 1)
+    if not (r.full and any(m.label for m in w.marks)):
+        return y + 18 - top
+    tiny = r.font(theme.FONT_TINY)
+    for m in w.marks:
+        mx = x + round(width * max(0.0, min(1.0, m.value / max(1, w.maximum))))
+        if m.label:
+            label = tiny.render(m.label, True, theme.TEXT_MUTED)
+            r.blit(label, (min(max(x, mx - label.get_width() // 2), x + width - label.get_width()), y + 15))
+    return y + 15 + tiny.get_linesize() + 2 - top
 
 
 def _list(r: _Render, w: Any, x: int, y: int, width: int) -> int:

@@ -232,14 +232,16 @@ register_mode(GameMode(
 J54_RULES = ("j54_black_plus", "j54_even_plus", "j54_hearts_scale", "j54_stand_19", "j54_stand_15",
              "j54_low_plus", "j54_faces_set")
 def _j54_layout() -> "Layout":
+    """J-54's table: the heat strip, meter, badges and operations on the right; the full heat map in the
+    Deck tab; the goal, the program and the firmware in the Run tab (docs/design/TABLE_UI.md)."""
     from chaos_blackjack.app.layout import BAG, DEFAULT_LAYOUT, LOG, RULES, Layout, PanelTab
 
     return Layout(
         left=DEFAULT_LAYOUT.left,
-        right=("core.deck_pile", "j54.deck:compact", "j54.badges", "core.items:compact", "core.buttons"),
-        panel=(BAG, PanelTab("deck", "Deck", ("j54.deck",), hotkey="k"),
-               PanelTab("contracts", "Contracts", ("j54.contracts",)), RULES, LOG,
-               PanelTab("run", "Run", ("j54.goal", "core.run_stats"))),
+        # No item slots on the right: this table sells no items (the Bag tab stays).
+        right=("core.deck_pile", "j54.deck:compact", "j54.meter:compact", "j54.badges", "j54.ops", "core.buttons"),
+        panel=(BAG, PanelTab("deck", "Deck", ("j54.meter", "j54.deck", "core.actions"), hotkey="k"), RULES, LOG,
+               PanelTab("run", "Run", ("j54.goal", "j54.program", "core.run_stats"))),
     )
 
 
