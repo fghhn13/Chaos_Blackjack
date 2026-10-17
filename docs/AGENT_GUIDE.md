@@ -268,6 +268,82 @@ J-54 runs an experiment on one deck that lasts the run; its conditions change wh
 - **Other snapshot fields:** `joker` (`sealed` / `in the deck` / `captured`), `firmware`, `deck_size`, `target`, `target_from_round`, `round`, `rounds`, `bands`, `groups` (cards per group), `seen` (conditions so far), `program` (the whole schedule, only in profiles that read it out), `hint` (always null for an agent: a GUI hint for new players). `obs.table.info` repeats the essentials in words. The table sells nothing: `obs.shop` is null and `buy` / `reroll` are never legal.
 - **A loop:** read `public.heat`; cut the most positive groups while compute lasts (or Hot Purge); bet `band.suggested`; play the hand by `you.total` (it includes your firmware) against J-54's up card; release the Joker when you can afford it and want the capture route.
 
+**Glossary.**
+
+- **Condition**: the one rule J-54 has in force; it changes only J-54's card values or the total it stands on, for 2-4 rounds.
+- **Camp**: a condition's direction. Classic leans like plain blackjack (the heat map keeps its usual colours), anti leans the other way (the map turns around), loner goes its own way.
+- **Compute**: the shaping budget, +2 each betting phase, 8 at most; it buys Cut, Hot Purge and Release only.
+- **Heat**: the change of one hand's win chance, in percentage points, when one card of a group leaves the deck. Positive (green) = cutting helps you; negative (red) = keep it.
+- **Meter and bands**: the win chance of one hand from this deck. From 50 / 55 / 60 % the band suggests 10 / 20 / 30 % of your chips; below 50 % the minimum. Advice only.
+- **Firmware**: the opening pick, one rule on your cards (or bust line) for the run, paid from your starting chips.
+- **Release and capture**: Release (6 compute) puts the sealed Joker into the deck; holding it when a hand you do not lose settles from round 9 is a capture and wins the run.
+- **Bounty**: the rank J-54 names with each condition; every card of it in your final hand pays 2 chips, win or lose.
+
+**Strategy notes.**
+
+- Spend the whole budget every round on the greenest group. The map is recomputed after every move, so look again after each cut. Held compute earns nothing, and entropy adds a low card every round.
+- Cut is precise (you pick the group, 2 cards); Hot Purge costs the same and removes 3 cards, but of a rank drawn from the 3 hottest. Cut when one group clearly leads; Purge when the top ranks are close.
+- When J-54 announces a switch to the anti camp, keep that round's compute: next round the map turns around, and what you would cut now may be what you want to keep.
+- Bet `band.suggested`; below 50 % bet the minimum.
+- Consider releasing the Joker once the deck is in the twenties: the thinner the deck, the likelier you draw it, and a draw before round 9 does not count.
+
+**Worked run, seed 28** (`--brief --compact`, `table` and `run` omitted; the same commands replay the same game). Firmware first: Midrange costs half the chips but lifts the meter from 48.6 % to 56.8 %.
+
+```text
+$ python -m chaos_blackjack.agent new --seed 28 --mode j54
+{"ok":true,"events":[],"obs":{"phase":"betting","summary":"Round 1. Bankroll 100/175. Compute: 2/8. Meter: 48.6% win, EV +0.06 bets, suggested stake 5. ... Rules in force: Even Bias: J-54's even ranks (2 4 6 8 10 Q) count +2. 3 rounds left in this condition.","hint":"Answer the question: choose <option> (see obs.choice).","legal_actions":["choose"],"choice":{"kind":"firmware","options":[{"id":"fw_margin","label":"Margin Firmware (30 chips)",...},{"id":"fw_mid","label":"Midrange Firmware (50 chips)","help":"Your 4, 5 and 6 count 10."},{"id":"fw_fives","label":"Fives Firmware (20 chips)",...},{"id":"none","label":"No firmware",...}],"cancellable":false},...}}
+
+$ python -m chaos_blackjack.agent --brief --compact choose fw_mid
+{"ok":true,"events":["Firmware installed: Midrange Firmware. Your 4, 5 and 6 count 10. (50 chips)"],"obs":{"phase":"betting","summary":"Round 1. Bankroll 50/175. Compute: 2/8. Meter: 56.8% win, EV +0.25 bets, suggested stake 10. ...","hint":"Place a bet: bet <amount> with 5 <= amount <= 25. Or first: perform <action> (see obs.table_actions).","legal_actions":["bet","perform"],...}}
+```
+
+`public.heat` puts `7r` and `7b` on top (+0.58 pp each), so both points go there; then the band's stake.
+
+```text
+$ python -m chaos_blackjack.agent --brief --compact perform j54_cut 7r
+{"ok":true,"events":["Cut 7 red: 7♦, 7♥ removed (1 compute left)."],"obs":{"summary":"Round 1. Bankroll 50/175. Compute: 1/8. Meter: 58.0% win, ...",...}}
+$ python -m chaos_blackjack.agent --brief --compact perform j54_cut 7b
+$ python -m chaos_blackjack.agent --brief --compact bet 10
+$ python -m chaos_blackjack.agent --brief --compact act stand
+{"ok":true,"events":["Dealer stands at 18.","Entropy: J-54 added a 5♦ to the deck.","Compute +2 (2/8)."],"obs":{"phase":"betting","summary":"Round 2. Bankroll 60/175. ...",
+ "last_round":{"round":1,"outcome":"player","delta":10,"your_cards":["9♦","10♥"],"dealer_cards":["6♠","8♥"],...}}}
+```
+
+Rounds 2-6 repeat the loop: the two hottest groups (aces, then 3s), and after condition 2 begins in round 4 (Black Bias, bounty 9) the new map's black 9s and 8s. Round 3's 12 against a 10 busts (−24): the meter is a probability. Round 6 ends with the announcement:
+
+```text
+$ python -m chaos_blackjack.agent --brief --compact act stand
+{"ok":true,"events":["Dealer draws: 2","Dealer draws: 6","Dealer stands at 19.","Entropy: J-54 added a 4♥ to the deck.","Compute +2 (3/8).","Next condition: anti camp."],"obs":{"phase":"betting","summary":"Round 7. Bankroll 66/175. Compute: 3/8. Meter: 64.1% win, EV +0.40 bets, suggested stake 19. Next condition: anti camp. ...",...}}
+```
+
+An anti switch is coming, so round 7 cuts nothing (`bet 19`, a push). In round 8 the map has turned: `10b` went from −0.50 to +0.74 and the 5s are now the reddest (−0.98).
+
+```text
+$ python -m chaos_blackjack.agent --brief --compact act stand
+{"ok":true,"events":["Dealer draws: 6","Dealer stands at 18.","Entropy: J-54 added a 4♦ to the deck.","Compute +2 (5/8).","Condition 3 begins: J-54's low cards (2-6) count +3. It holds for 4 rounds. Bounty: 2 chips for every 2 in your hand."],"obs":{"summary":"Round 8. Bankroll 66/175. Compute: 5/8. Meter: 73.0% win, ...",...}}
+$ python -m chaos_blackjack.agent --brief --compact perform j54_cut 2r
+{"ok":true,"events":["Cut 2 red: 2♥, 2♦ removed (4 compute left)."],"obs":{"summary":"Round 8. Bankroll 66/175. Compute: 4/8. Meter: 78.6% win, ...",...}}
+```
+
+The rest of the compute is kept for the release. From round 9 the target counts; round 9 wins (+25, 110 chips). In round 10, with 7 compute:
+
+```text
+$ python -m chaos_blackjack.agent --brief --compact perform j54_release
+{"ok":true,"events":["Joker released: the sample is in the deck. Hold it when a hand you do not lose settles from round 9."],"obs":{"summary":"Round 10. Bankroll 110/175. Compute: 1/8. Meter: 83.0% win, EV +0.78 bets, suggested stake 33, capture 5.3%. ...",...}}
+```
+
+At 37 cards the capture chance is small (5.3 % a hand, 6.8 % once the deck is down to 29), so this release is insurance for a second route rather than the plan. The last point cuts `Jr`. Round 10 pushes, round 11 wins 33 (143 chips). Round 12 begins condition 4 (Face Reset, loner): the 6s are now the greenest (+1.18), so four cuts (`6r` twice, `6b`, `8r`) take the meter from 60.6 % to 81.1 % on a 29-card deck, and the band's 30 % stake finishes the run:
+
+```text
+$ python -m chaos_blackjack.agent --brief --compact bet 42
+{"ok":true,"events":["Round 12 started, bet 42"],"obs":{"phase":"player_turn","summary":"Round 12. Bankroll 143/175. ... Bet 42. You: 5♥ K♦ = 20. Dealer: 9♦ ?? = ?. ...",...}}
+$ python -m chaos_blackjack.agent --brief --compact act stand
+{"ok":true,"events":["Dealer draws: 4","Dealer stands at 18.","Entropy: J-54 added a 6♣ to the deck.","Capital reached: 185 chips. The experiment is complete."],"obs":{"phase":"run_over",...,
+ "last_round":{"round":12,"outcome":"player","player_total":20,"dealer_total":18,"delta":42,"your_cards":["5♥","K♦"],...},"run_end":{"kind":"victory","message":"Capital reached: 185 chips. The experiment is complete."}}}
+```
+
+(5♥ K♦ is 20 because the Midrange firmware counts your 5 as 10.)
+
 ## 8b. Poker Head's build table (`--mode chaos`)
 
 The GUI's "Poker Head's Table". Design: `docs/design/POKER_HEAD_BUILDS.zh-CN.md`, effects in `docs/design/POKER_HEAD_EFFECTS.zh-CN.md`, architecture in `docs/design/ITEM_ARCHITECTURE.md`.
