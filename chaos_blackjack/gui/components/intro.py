@@ -46,6 +46,11 @@ class HostDialog(Widget):
         return [b.text for b in self.beats]
 
     @property
+    def focus(self) -> tuple[str, ...]:
+        """What the beat on screen points at on the table (HostLine.focus)."""
+        return () if self.done else self.beats[self.index].focus
+
+    @property
     def done(self) -> bool:
         return self.index >= len(self.beats)
 

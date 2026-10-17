@@ -96,3 +96,24 @@ def test_panel_without_persona_is_unchanged(tmp_path):
     panel.chaos_enabled = True
     panel.react(notice(NoticeKind.PLAYER_BUST))
     assert panel.mood == "laugh" and panel.speech == BUST_LINE and panel._face().startswith("chaos_")
+
+
+def test_host_onboarding_lines_validate_and_use_the_hosts_portraits(tmp_path, monkeypatch):
+    import json
+
+    from chaos_blackjack.content import host_script
+    from chaos_blackjack.content.builtin_persona import host_persona
+    from chaos_blackjack.j54.onboarding import MILESTONES
+
+    expressions = set(host_persona("j54").portraits)
+    for milestone in MILESTONES:
+        script = host_script.host_onboarding("j54", milestone)
+        assert script and all(b.mood in expressions and b.text for b in script)
+    (tmp_path / "broken.json").write_text(json.dumps({"onboarding": {"x": [["calm"]]}}), encoding="utf-8")
+    monkeypatch.setattr(host_script, "_FOLDER", tmp_path)
+    host_script._library.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="onboarding x"):
+            host_script.host_onboarding("broken", "x")
+    finally:
+        host_script._library.cache_clear()

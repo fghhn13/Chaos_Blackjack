@@ -232,9 +232,11 @@ class SideColumn:
         self.blocks: list[Block] = []
         self.visible: list[Block] = []
         self.hidden = 0
+        self.parts: dict[str, Block] = {}
         for entry in entries:
             part, variant = split_entry(entry, "compact")
             self.blocks.append(natives[part] if part in natives else DataBlock(assets, part, variant, on_act))
+            self.parts[part] = self.blocks[-1]
 
     def block(self, kind: type) -> Block | None:
         return next((b for b in self.blocks if isinstance(b, kind)), None)
@@ -273,6 +275,15 @@ class SideColumn:
             flex.place(pygame.Rect(inner.x, y, inner.w, max(40, bottom - y - (18 if self.hidden else 0))))
             self.visible.append(flex)
         self._more_y = bottom - 16
+
+    def focus_rect(self, part: str, element: str = "") -> pygame.Rect | None:
+        """Where a part (or one element of it, by icon id) is drawn in this column, None when it is not shown."""
+        b = self.parts.get(part)
+        if b is None or b not in self.visible:
+            return None
+        if element:
+            return b.view.element(element) if isinstance(b, DataBlock) else None
+        return pygame.Rect(b.rect)
 
     def update(self, dt: float) -> None:
         for b in self.blocks:

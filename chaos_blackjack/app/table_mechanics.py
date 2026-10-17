@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from chaos_blackjack.app.products import ProductDef
     from chaos_blackjack.app.shop import ShopOffer, ShopState
     from chaos_blackjack.app.view import RuleView, TablePublic
+    from chaos_blackjack.content.host_script import HostLine
     from chaos_blackjack.contracts.items import ItemResult
     from chaos_blackjack.rules.modifiers import ActiveModifiers
 
@@ -100,6 +101,12 @@ class TableMechanics:
     def public(self) -> "TablePublic | None":
         """A frozen snapshot of what any player may see (never undealt cards)."""
         return None
+
+    def onboarding(self, guided: bool) -> "tuple[tuple[str, tuple[HostLine, ...]], ...]":
+        """First-visit explanations due since the last call (docs/design/TUTORIAL.md): (onboarding milestone,
+        the host's beats), each handed out once. `guided`: whether the player follows the onboarding (an
+        unguided player gets none); the GUI shows a milestone not reached yet and records it."""
+        return ()
 
     # --- economy ----------------------------------------------------------
 

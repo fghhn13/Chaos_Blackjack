@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from chaos_blackjack.j54.deck_ops import RANKS
 from chaos_blackjack.j54.evaluator import Evaluator, HandStats, Valuation
+from chaos_blackjack.j54.onboarding import meter_hint
 
 if TYPE_CHECKING:
     from chaos_blackjack.j54.table import J54Table
@@ -53,6 +54,7 @@ class J54Snapshot:
     groups: dict[str, int] | None = None      # cards per group present
     removed_cards: tuple[str, ...] = ()       # the removed pile, oldest first ("5♥")
     seen: tuple[dict[str, Any], ...] = ()     # the conditions begun so far: {"id", "name", "camp", "start", "end"}
+    hint: str | None = None                   # a guided player's one-time line beside the meter (j54/onboarding.py)
     kind: str = "j54"
 
     def to_dict(self) -> dict[str, Any]:
@@ -155,6 +157,7 @@ def snapshot(table: "J54Table") -> J54Snapshot:
     run = table.c.run
     lo, hi = table.c.bet_limits()
     groups = {g: n for g, n in table.group_counts().items() if n}
+    band = band_for(stats.win, bands, run.money, lo, hi)
     return J54Snapshot(
         compute=table.compute, compute_cap=table.compute_cap, condition=condition,
         announcement=table.announcement, program=program,
@@ -163,11 +166,11 @@ def snapshot(table: "J54Table") -> J54Snapshot:
         bounty={"rank": table.bounty_rank, "chips": table._int("bounty")} if table.bounty_rank else None,  # noqa: SLF001
         target=run.target_money, target_from_round=table._int("target_from_round"),  # noqa: SLF001
         round=table.entered_round, rounds=table.rounds,
-        bar=round(stats.win, 4), ev=round(stats.ev, 4), band=band_for(stats.win, bands, run.money, lo, hi),
+        bar=round(stats.win, 4), ev=round(stats.ev, 4), band=band,
         capture=round(stats.capture, 4), heat={g: round(pp, 2) for g, pp in heat.items()},
         bands=tuple({"low": low, "stake_pct": pct} for low, pct in bands), groups=groups,
         removed_cards=tuple(f"{c.rank}{c.suit}" for c in table.removed),
-        seen=segments[:table.segment + 1],
+        seen=segments[:table.segment + 1], hint=meter_hint(table, band["suggested"]),
     )
 
 

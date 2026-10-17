@@ -34,6 +34,7 @@ from chaos_blackjack.app.notices import NoticeKind
 from chaos_blackjack.app.table_mechanics import Notify, TableMechanics, register_table
 from chaos_blackjack.app.view import RuleView, TablePhase
 from chaos_blackjack.core.game_state import Card, GameState, Rank
+from chaos_blackjack.j54 import onboarding as first_visit
 from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, is_joker
 from chaos_blackjack.j54.firmware import CATALOG as FIRMWARES, NO_FIRMWARE, Firmware, firmware
 from chaos_blackjack.j54.program import Program, generate, int_range
@@ -241,6 +242,7 @@ class J54Table(TableMechanics):
         self._bounty_paid = 0           # chips the settling hand's bounty paid (settlement -> after_settle)
         self._ops = 0                   # RNG counter (saved), see _rng
         self._meter: tuple | None = None  # the evaluator's last reading (j54/public.py measure)
+        self.guide = first_visit.Guide()  # first-visit explanations and the meter hint (j54/onboarding.py)
 
     def _pool(self) -> tuple[str, ...]:
         pool = self.config.rule_pool
@@ -342,12 +344,14 @@ class J54Table(TableMechanics):
     # --- run --------------------------------------------------------------
 
     def start(self, run: "RunState") -> None:
+        first_visit.run_started(self)
         run.objective = "j54"
         run.target_money = target_money(self.config)
         self._enter_round(run.round)
         self._ask_firmware()
 
     def _ask_firmware(self) -> None:
+        first_visit.firmware_offered(self)
         count = min(self._int("firmwares_offered"), len(FIRMWARES))
         offered = random.Random(f"{self.seed}:j54:firmware").sample(sorted(FIRMWARES), count)
         options = tuple(ChoiceOption(f, f"{FIRMWARES[f].name} ({self.firmware_price(f)} chips)", FIRMWARES[f].text)
@@ -420,6 +424,9 @@ class J54Table(TableMechanics):
     def public(self) -> J54Snapshot:
         return snapshot(self)
 
+    def onboarding(self, guided: bool) -> tuple:
+        return first_visit.take(self, guided)
+
     # --- program and compute -------------------------------------------------
 
     def entered_betting(self) -> None:
@@ -448,6 +455,7 @@ class J54Table(TableMechanics):
         self.announcement = self._announce(round_no)
         if self.announcement:
             self._say(self.announcement, effect="announcement")
+        first_visit.entered_betting(self)
 
     def _announce(self, round_no: int) -> str | None:
         """What J-54 says on the last round of a condition about the next one."""
@@ -663,6 +671,7 @@ class J54Table(TableMechanics):
             "won": self.won,
             "lost": self.lost,
             "ops": self._ops,
+            "onboarding": self.guide.to_dict(),
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -688,6 +697,7 @@ class J54Table(TableMechanics):
         self.won = data.get("won")
         self.lost = data.get("lost")
         self._ops = int(data.get("ops", 0))
+        self.guide.restore(data.get("onboarding", {}))
 
 
 register_table("j54", J54Table)

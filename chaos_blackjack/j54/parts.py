@@ -129,13 +129,17 @@ def _meter(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
     tone = "good" if band["stake_pct"] else "muted"
     gauge = Progress("Win chance", round(d.bar * 1000), 1000, tone=tone, text=f"{d.bar:.1%}", marks=marks,
                      tooltip=tip, title="" if variant == "compact" else "Meter")
+    # A guided player's one-time line, the first time the meter reaches its second band (j54/onboarding.py).
+    hint = ((ListWidget((Entry("Band two reached", d.hint, tone="gold",
+                               tooltip=f"J-54: {d.hint} Advice only; the bet range is unchanged."),)),)
+            if d.hint else ())
     if variant == "compact":
-        return (gauge,)
+        return (gauge, *hint)
     rows = [Row("Expected result", f"{d.ev:+.2f} bets per hand", "good" if d.ev > 0 else "bad" if d.ev < 0 else ""),
             Row("Suggested stake", stake, "gold" if band["stake_pct"] else "")]
     if d.joker == IN_DECK:
         rows.append(Row("Capture chance", f"{d.capture:.1%} per hand", "gold"))
-    return (gauge, Rows(tuple(rows)))
+    return (gauge, *hint, Rows(tuple(rows)))
 
 
 # ------------------------------------------------------------------ badges and operations

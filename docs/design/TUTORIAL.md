@@ -25,6 +25,7 @@ it; onboarding tests turn it back on).
 | `ph_intro_rules` | Poker Head's first rule of that visit | the rules explanation is not repeated |
 | `bet_cap_lifted` | 3 settled Classic runs | Classic bets are no longer capped at a quarter of the cash |
 | `first_relief` | Poker Head's first relief (the vault topped up for the Classic Table) | later reliefs get the short speech |
+| `j54_intro_table`, `j54_intro_firmware`, `j54_intro_condition`, `j54_intro_release` | J-54's first-visit moments (section 8) | each explanation is not repeated |
 
 `RunReward.milestones` lists the milestones a settled run reached; the result screen announces a table it
 opened.
@@ -100,6 +101,17 @@ line beside the meter says what the band suggests ("The meter says two tenths of
 once per run and never for unguided players. Every beat and hint is skippable (Enter advances, Esc skips);
 unguided players (`player.guided` 0) get none of them. The milestones are rows of `player_milestone` like
 the others; a run that is resumed from a save does not repeat a beat already reached.
+
+How it is built: `J54Table` calls `j54/onboarding.py` at the four moments (`run_started`, `firmware_offered`,
+`entered_betting`), which cues each milestone once per run; `TableMechanics.onboarding(guided)` hands the cues
+out with their beats (`HostLine`s, the profile's numbers filled into `{braced}` names), and the GUI's meta table
+(`gui/components/meta_run.py`) shows those not reached yet, records them as it queues them, and puts the start's
+beats after the greeting, before the firmware choice. A beat's `focus` names layout parts (`j54.deck`,
+`core.rules`) or one element of a part by its icon id (`j54.ops/j54_release`, `j54.badges/j54_next`); while it
+shows, the table scene keeps those areas bright above the dialog's shade with a pulsing gold ring. The meter
+hint is a field of J-54's public snapshot (`hint`, None for the agent and for unguided players) that the meter
+part draws as one gold entry; its round is saved with the table, so a resumed run does not show it twice. A
+restored run never cues the start again.
 
 Later, after playtests: a fixed first program for guided players (classic opening, one camp switch in
 round 7, the next rule named rather than its camp) so the beats land predictably, and an offline "Click to

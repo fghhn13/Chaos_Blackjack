@@ -7,6 +7,10 @@ Each bundled host has `chaos_blackjack/ai/hosts/<host>.json`: per event
 a host can sound different at a table where it bends no rules; a key
 `<event>.<variant>` (e.g. `victory.capture`, named by the table's
 `host_variant`) replaces it for one way a run ends. Adding lines is data only. Design: docs/design/AI_MODES.md §3.
+
+A library may also hold `onboarding`: per onboarding milestone one script
+(a list of [mood, text] beats), the host's first-visit explanations
+(docs/design/TUTORIAL.md; `host_onboarding`).
 """
 
 from __future__ import annotations
@@ -25,6 +29,9 @@ _FOLDER = Path(__file__).resolve().parents[1] / "ai" / "hosts"
 class HostLine:
     mood: str
     text: str
+    # What on the table the beat talks about: layout part ids ("j54.deck"), or "<part id>/<element>" for one
+    # element of it (a badge or list entry by its icon id). The table lights them up while the beat shows.
+    focus: tuple[str, ...] = ()
 
 
 @lru_cache(maxsize=None)
@@ -38,10 +45,16 @@ def _library(host: str) -> dict:
         if event not in HOST_EVENTS:
             continue
         for script in data[key]:
-            if not script or any(len(beat) != 2 or not all(isinstance(x, str) and x for x in beat)
-                                 for beat in script):
+            if not _beats_ok(script):
                 raise ValueError(f"Host {host}: every {event} script needs [mood, text] beats")
+    for milestone, script in data.get("onboarding", {}).items():
+        if not _beats_ok(script):
+            raise ValueError(f"Host {host}: onboarding {milestone} needs [mood, text] beats")
     return data
+
+
+def _beats_ok(script) -> bool:
+    return bool(script) and all(len(beat) == 2 and all(isinstance(x, str) and x for x in beat) for beat in script)
 
 
 def _resolve(host: str | None) -> str:
@@ -65,6 +78,12 @@ def host_script(host: str | None, event: str, rng: random.Random | None = None, 
     if not scripts:
         return []
     return [HostLine(mood, text) for mood, text in (rng or random).choice(scripts)]
+
+
+def host_onboarding(host: str | None, milestone: str) -> list[HostLine]:
+    """The host's first-visit explanation for an onboarding milestone ([] when it has none)."""
+    script = _library(_resolve(host)).get("onboarding", {}).get(milestone, [])
+    return [HostLine(mood, text) for mood, text in script]
 
 
 def host_profile(host: str | None) -> tuple[tuple[str, ...], str]:

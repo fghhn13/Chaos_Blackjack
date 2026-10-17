@@ -68,6 +68,7 @@ class Hit:
     rect: pygame.Rect
     act: Act | None = None
     tooltip: str = ""
+    key: str = ""           # the element's icon id (badges, list entries): what a host's beat may point at
 
 
 @dataclass
@@ -143,7 +144,7 @@ def _badges(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         r.rect(tone(b.tone) if b.tone else theme.GOLD_DIM, chip, 1, 15)
         r.icon(b.icon, pygame.Rect(chip.x + 8, chip.y + 5, 20, 20))
         r.blit(text, (chip.x + 34, chip.centery - text.get_height() // 2))
-        r.hits.append(Hit(chip, b.act, b.tooltip))
+        r.hits.append(Hit(chip, b.act, b.tooltip, b.icon))
         cx = chip.right + 6
     return (cy + h) - top if w.items else 0
 
@@ -279,7 +280,7 @@ def _list(r: _Render, w: Any, x: int, y: int, width: int) -> int:
                     rect.topleft = (cx, y)
                 r.rect(theme.DARK, rect, 0, 8)
                 r.blit(text, (rect.x + 8, rect.centery - text.get_height() // 2))
-            r.hits.append(Hit(rect, e.act, e.tooltip or (f"{e.title}: {e.text}" if e.text else e.title)))
+            r.hits.append(Hit(rect, e.act, e.tooltip or (f"{e.title}: {e.text}" if e.text else e.title), e.icon))
             cx = rect.right + 6
         return y + size + 4 - top
     body, small = r.font(theme.FONT_SMALL, bold=True), r.font(theme.FONT_SMALL)
@@ -308,7 +309,7 @@ def _list(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         r.blit(body.render(fit_text(body, e.title, row.right - tx - badge_w - 8), True, tone(e.tone)), (tx, y + 4))
         for i, line in enumerate(lines):
             r.blit((small if r.full else tiny).render(line, True, theme.TEXT_MUTED), (tx, y + 24 + i * lh))
-        r.hits.append(Hit(row, e.act, e.tooltip))
+        r.hits.append(Hit(row, e.act, e.tooltip, e.icon))
         y += h + 4
     return y - top
 
@@ -447,6 +448,10 @@ class WidgetView:
                 if clip is not None:
                     h.rect = h.rect.clip(clip)
         return height
+
+    def element(self, key: str) -> pygame.Rect | None:
+        """Where the element with this icon id was last drawn (None when it was not)."""
+        return next((pygame.Rect(h.rect) for h in self.hits if key and h.key == key), None)
 
     def hit(self, pos: tuple[int, int]) -> Hit | None:
         # Later (more specific) hits win over earlier fallback areas.
