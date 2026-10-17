@@ -52,9 +52,10 @@ jobs:
       - name: Integrated application smoke (offline)
         run: python scripts/ci_smoke.py --gui
 
-      - name: Content and sound assets
+      - name: Content, art and sound assets
         run: |
           python -m chaos_blackjack.content validate example
+          python scripts/validate_assets.py
           python -m chaos_blackjack.audio validate
           python scripts/export_sounds.py --verify
 
@@ -66,6 +67,11 @@ jobs:
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" new --seed 7
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief bet 10
           python -m chaos_blackjack.agent --state "$RUNNER_TEMP/run.json" --brief act stand
+          python -m chaos_blackjack.agent --state "$RUNNER_TEMP/j54.json" new --seed 7 --mode j54
+          python -m chaos_blackjack.agent --state "$RUNNER_TEMP/j54.json" --brief choose none
+          python -m chaos_blackjack.agent --state "$RUNNER_TEMP/j54.json" --brief perform j54_hot_purge
+          python -m chaos_blackjack.agent --state "$RUNNER_TEMP/j54.json" --brief bet 10
+          python -m chaos_blackjack.agent --state "$RUNNER_TEMP/j54.json" --brief act stand
           CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data saves
           CHAOS_DB="$RUNNER_TEMP/game.db" python -m chaos_blackjack.data show default | grep "reward.first_win.tokens" > /dev/null
 
