@@ -617,6 +617,39 @@ def test_runs_finish_without_errors(seed: int) -> None:
     assert len(c.table.cards) >= c.table.min_deck
 
 
+def test_a_seeded_run_through_the_agent_cli_finishes(capsys, tmp_path) -> None:
+    """The one-shot CLI with a run file: firmware, cuts by heat, the suggested stake, until the run ends."""
+    import json
+
+    from chaos_blackjack.agent.__main__ import main
+
+    def cli(*args: str) -> dict:
+        main(["--state", str(tmp_path / "run.json"), "--compact", *args])
+        return json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+    r = cli("new", "--mode", "j54", "--seed", "11")
+    assert r["ok"] and r["obs"]["choice"]["kind"] == FIRMWARE_CHOICE
+    r = cli("choose", r["obs"]["choice"]["options"][0]["id"])
+    for _ in range(300):
+        obs = r["obs"]
+        assert r["ok"], r
+        if obs["phase"] == "run_over":
+            break
+        if obs["phase"] == "betting":
+            public = obs["table"]["public"]
+            cuts = {a["arg"]: a for a in obs["table_actions"] if a["action"] == CUT and a["arg"] and a["enabled"]}
+            hot = max(cuts, key=lambda g: public["heat"].get(g, 0), default=None)
+            if hot and public["heat"].get(hot, 0) > 0:
+                r = cli("perform", CUT, hot)
+                assert r["obs"]["table"]["public"]["compute"] == public["compute"] - 1
+                continue
+            low, high = obs["bet_range"]
+            r = cli("bet", str(max(low, min(high, public["band"]["suggested"]))))
+        else:
+            r = cli("act", "hit" if obs["you"]["total"] < 13 else "stand")
+    assert r["obs"]["phase"] == "run_over" and r["obs"]["run_end"]["kind"] in ("victory", "defeat")
+
+
 def test_meta_run_saves_resumes_and_finishes() -> None:
     from chaos_blackjack import meta
     from chaos_blackjack.meta.fake import install_fake
