@@ -89,3 +89,7 @@ Original artwork (geometric vector paths and glyphs authored in `scripts/draw_po
 | ph_quad | quadruple_bet_ticket A | A perforated x4 ticket. |
 
 The original drawings follow the repository artwork licensing policy; this record does not assign a new license. File hashes, source references and runtime IDs are in [the delivery manifest](poker_head/manifest.json).
+
+## J-54 v2 table icons
+
+Original artwork (flat shapes and a 5x7 pixel font authored in `scripts/draw_j54_icons.py`; no third-party images or paths): the seven conditions `j54_black_plus`, `j54_even_plus`, `j54_hearts_scale`, `j54_stand_19`, `j54_stand_15`, `j54_low_plus`, `j54_faces_set`; the firmwares `fw_mid`, `fw_fives`, `fw_low`, `fw_margin`; the operations `j54_cut`, `j54_hot_purge`, `j54_release`; the badges `j54_compute`, `j54_next`, `j54_bounty`. Language and motifs: [docs/design/J54_ART.md](../docs/design/J54_ART.md).

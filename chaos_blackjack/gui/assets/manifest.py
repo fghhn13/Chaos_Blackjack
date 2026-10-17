@@ -92,6 +92,7 @@ for _spec in (
     AssetSpec("tiebreaker_shift", "rule", ICON, ph.icon("TB", theme.CHAOS_MAGENTA), "Tiebreaker Shift"),
     # J-54's table (demo; placeholders): mode icon, deck rules and contracts.
     AssetSpec("mode_j54", "mode", ICON, ph.fitted_image(host_persona("j54").portraits["resting_mania"]), "J-54"),
+    # v2 conditions, badges, operations and firmwares: art from scripts/draw_j54_icons.py (docs/design/J54_ART.md).
     AssetSpec("j54_black_plus", "rule", ICON, ph.icon("B+", _J54_RED), "Black Bias"),
     AssetSpec("j54_even_plus", "rule", ICON, ph.icon("E+", _J54_RED), "Even Bias"),
     AssetSpec("j54_hearts_scale", "rule", ICON, ph.icon("H2", _J54_RED), "Heart Gain"),
