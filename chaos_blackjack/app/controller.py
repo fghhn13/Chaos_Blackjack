@@ -530,7 +530,8 @@ class GameController:
             used = self.shop.free_rerolls_used
             self.shop = self._roll_shop()
             self.shop = ShopState(self.shop.stock_round, self.shop.offers, free_rerolls_used=used)
-            self._notify(NoticeKind.SHOP_RESTOCKED, "The shop has new stock.")
+            if self.shop.offers:  # a table that sells nothing never announces stock
+                self._notify(NoticeKind.SHOP_RESTOCKED, "The shop has new stock.")
         self._check_can_bet()
 
     def save(self, name: str) -> RunSaveData:

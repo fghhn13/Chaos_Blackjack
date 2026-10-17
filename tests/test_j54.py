@@ -295,13 +295,24 @@ def test_cut_without_a_group_asks_which() -> None:
     assert c.table.group_counts()["Kb"] == 0 and c.table.compute == 1
 
 
-def test_hot_purge_takes_a_hottest_rank_until_the_evaluator_is_wired() -> None:
+def test_hot_purge_takes_one_of_the_three_hottest_ranks() -> None:
     c = _controller()
+    hottest = c.table._hottest_ranks(3)  # noqa: SLF001
     c.perform(HOT_PURGE)
     counts = dict(c.table.deck_counts())
     purged = [r for r, n in counts.items() if n == 1]
-    assert len(purged) == 1 and purged[0] in ("2", "3", "4") and len(c.table.cards) == 49
+    assert len(purged) == 1 and purged[0] in hottest and len(c.table.cards) == 49
     assert any(e.startswith(f"Hot Purge drew rank {purged[0]}") for e in _events(c))
+
+
+def test_hottest_ranks_follow_the_heat() -> None:
+    c = _controller()
+    _force(c, "j54_stand_19")
+    heat = c.table.public().heat
+    per_rank = {r: heat.get(f"{r}r", 0.0) + heat.get(f"{r}b", 0.0) for r, n in c.table.deck_counts() if n}
+    expected = sorted(per_rank, key=lambda r: (-per_rank[r], list(per_rank).index(r)))[:3]
+    assert c.table._hottest_ranks(3) == expected  # noqa: SLF001
+    assert all(per_rank[r] >= max(v for k, v in per_rank.items() if k not in expected) for r in expected)
 
 
 def test_moves_stop_at_the_deck_floor_and_without_compute() -> None:
@@ -449,22 +460,75 @@ def test_public_snapshot_and_agent_observation() -> None:
     snap = c.table.public()
     d = snap.to_dict()
     assert d["kind"] == "j54" and d["compute"] == 2 and d["compute_cap"] == 8
-    assert set(d["condition"]) == {"id", "name", "camp", "rounds_left"}
-    assert d["firmware"] == {"id": "fw_low", "name": "Low Firmware"} and d["joker"] == SEALED
+    assert set(d["condition"]) == {"id", "name", "text", "camp", "rounds_left"}
+    assert d["firmware"]["id"] == "fw_low" and d["firmware"]["name"] == "Low Firmware" and d["joker"] == SEALED
     assert d["deck_size"] == 52 and d["removed"] == 0 and d["bounty"]["chips"] == 2
-    assert d["bar"] is None and d["heat"] is None  # package C fills them from the evaluator
+    assert 0 < d["bar"] < 1 and -1 < d["ev"] < 1 and d["capture"] == 0
+    assert 0 < len(d["heat"]) <= 26 and set(d["heat"]) <= set(GROUPS)
+    assert set(d["band"]) == {"low", "stake_pct", "suggested"} and d["band"]["suggested"] >= c.view().bet_min
+    assert [b["low"] for b in d["bands"]] == [50, 55, 60] and d["seen"][0]["id"] == d["condition"]["id"]
     assert c.view().table_public == snap
 
     s = AgentSession.new(seed=5, mode="j54")
     obs = s.observe()
-    assert obs["choice"] and [o["id"] for o in obs["choice"]["options"]][-1] == "none"
+    assert obs["choice"]["kind"] == FIRMWARE_CHOICE and [o["id"] for o in obs["choice"]["options"]][-1] == "none"
     obs = s.execute({"cmd": "choose", "option": "none"})["obs"]
-    assert obs["phase"] == "betting" and obs["table"]["public"]["compute"] == 2
+    public = obs["table"]["public"]
+    assert obs["phase"] == "betting" and public["compute"] == 2
+    assert {"bar", "ev", "band", "capture", "heat"} <= set(public) and 0 < public["bar"] < 1
     assert {a["action"] for a in obs["table_actions"]} == {CUT, HOT_PURGE, RELEASE}
+    release = next(a for a in obs["table_actions"] if a["action"] == RELEASE)
+    assert not release["enabled"] and "compute" in release["reason"]
     assert sum(obs["table"]["deck"].values()) == 52 and obs["shop"]["offers"] == []
+    assert "Shop:" not in obs["summary"] and "Active chaos rules" not in obs["summary"]
+    assert obs["summary"].count(public["condition"]["name"]) == 1 and "Condition" not in obs["table"]["info"]
     reply = s.execute({"cmd": "perform", "action": CUT, "arg": "9b"})
     assert reply["ok"] and reply["obs"]["table"]["public"]["removed"] == 2
+    assert reply["obs"]["table"]["public"]["heat"] != public["heat"]  # recomputed after the move
+    obs = s.execute({"cmd": "perform", "action": CUT, "arg": ""})["obs"]
+    assert obs["choice"]["kind"] == CUT_CHOICE and all(" pp · " in o["help"] for o in obs["choice"]["options"])
+    obs = s.execute({"cmd": "choose", "option": "5r"})["obs"]
+    assert obs["choice"] is None and obs["table"]["public"]["removed"] == 4
     assert AgentSession.new(seed=5).observe()["table"] is None
+
+
+def test_the_cut_choice_shows_each_groups_heat() -> None:
+    c = _controller()
+    heat = c.table.public().heat
+    c.perform(CUT)
+    for option in c.view().choice.options:
+        pp = heat[option.id]
+        assert option.description == f"{pp:+.1f} pp · {'cut' if pp > 0 else 'keep'}"
+
+
+def test_the_meter_reads_plain_blackjack_signs_under_a_classic_condition() -> None:
+    from chaos_blackjack.j54.public import band_for, parse_bands
+
+    c = _controller()
+    _force(c, "j54_black_plus")
+    snap = c.table.public()
+    assert 0 <= snap.bar <= 1
+    assert snap.rank_heat("5") > 0 and snap.rank_heat("10") < 0  # removing 5s helps, removing tens hurts
+    bands = parse_bands("50:10,55:20,60:30")
+    assert band_for(0.45, bands, 200, 5, 100) == {"low": 0, "stake_pct": 0, "suggested": 5}
+    assert band_for(0.57, bands, 200, 5, 100) == {"low": 55, "stake_pct": 20, "suggested": 40}
+    assert band_for(0.70, bands, 400, 5, 100)["suggested"] == 100  # within the bet range
+
+
+def test_releasing_the_joker_shows_a_capture_chance() -> None:
+    c = _controller()
+    c.table.compute = 8
+    c.perform(RELEASE)
+    snap = c.table.public()
+    assert snap.joker == IN_DECK and 0 < snap.capture < 1 and snap.deck_size == 53
+
+
+def test_an_empty_shop_is_never_announced() -> None:
+    c = _controller()
+    for _ in range(4):
+        _hand(c, [_c("10"), _c("9")], [_c("10", "♥"), _c("7", "♦")])
+        c.next_round()
+        assert not [n for n in c.drain_notices() if n.kind == NoticeKind.SHOP_RESTOCKED]
 
 
 # ------------------------------------------------------------------ saves

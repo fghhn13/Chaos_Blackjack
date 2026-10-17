@@ -25,9 +25,8 @@ run replays identically however it is saved and resumed.
 
 from __future__ import annotations
 
-import json
 import random
-from dataclasses import asdict, dataclass, replace
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from chaos_blackjack.app.choice import Choice, ChoiceOption, Move
@@ -38,6 +37,7 @@ from chaos_blackjack.core.game_state import Card, GameState, Rank
 from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, is_joker
 from chaos_blackjack.j54.firmware import CATALOG as FIRMWARES, NO_FIRMWARE, Firmware, firmware
 from chaos_blackjack.j54.program import Program, generate, int_range
+from chaos_blackjack.j54.public import J54Snapshot, heat_text, hottest_ranks, measure, snapshot
 from chaos_blackjack.rules.modifiers import adjust_rank_value_for
 from chaos_blackjack.rules.plugins.j54_conditions import CONDITIONS, ConditionModifier, build_condition
 from chaos_blackjack.rules.rule_engine import BLACKJACK, DefaultBlackjackRules, RuleContext, bust_limit
@@ -201,43 +201,6 @@ class J54Rules(DefaultBlackjackRules):
         return "dealer" if "dealer_wins_ties" in flags else "push"
 
 
-# --------------------------------------------------------------------------- public snapshot
-
-
-@dataclass(frozen=True)
-class J54Snapshot:
-    """What any player at J-54's table may see (never undealt cards, never the deck order).
-
-    Package C moves this to j54/public.py and fills the evaluator's fields
-    (`bar`, `ev`, `band`, `capture`, `heat`), which are None until then.
-    """
-
-    compute: int
-    compute_cap: int
-    condition: dict[str, Any] | None          # {"id", "name", "camp", "rounds_left"}
-    announcement: str | None                  # "Next condition: anti camp", or None
-    program: tuple[dict[str, Any], ...] | None   # the whole schedule when announce == "schedule"
-    firmware: dict[str, str] | None           # {"id", "name"}
-    joker: str                                # "sealed" | "in the deck" | "captured"
-    deck_size: int
-    removed: int
-    bounty: dict[str, Any] | None             # {"rank", "chips"}
-    target: int
-    target_from_round: int
-    round: int
-    rounds: int
-    bar: float | None = None
-    ev: float | None = None
-    band: dict[str, int] | None = None
-    capture: float | None = None
-    heat: dict[str, float] | None = None
-    kind: str = "j54"
-
-    def to_dict(self) -> dict[str, Any]:
-        """Plain JSON data (lists, not tuples), detached from the snapshot."""
-        return json.loads(json.dumps(asdict(self)))
-
-
 # --------------------------------------------------------------------------- the table
 
 
@@ -277,6 +240,7 @@ class J54Table(TableMechanics):
         self.lost: str | None = None
         self._bounty_paid = 0           # chips the settling hand's bounty paid (settlement -> after_settle)
         self._ops = 0                   # RNG counter (saved), see _rng
+        self._meter: tuple | None = None  # the evaluator's last reading (j54/public.py measure)
 
     def _pool(self) -> tuple[str, ...]:
         pool = self.config.rule_pool
@@ -353,19 +317,16 @@ class J54Table(TableMechanics):
             out[group_of(c)] += 1
         return out
 
-    # --- seams for the evaluator (package C) -------------------------------
+    # --- the evaluator's reading (j54/public.py) -----------------------------
 
     def _hottest_ranks(self, n: int) -> list[str]:
-        """SEAM (package C routes this through chaos_blackjack.j54.evaluator): the `n` ranks present
-        with the highest heat, summed over both colours, under the condition and the firmware.
-        Until the evaluator is wired in: the `n` lowest ranks present."""
-        present = [r for r, count in self.deck_counts() if count]
-        return present[:n]
+        """The `n` ranks present with the highest heat, summed over both colours, under the condition and
+        the firmware (ties by rank order)."""
+        return hottest_ranks(measure(self)[1], n)
 
     def _bounty_rank(self) -> str:
-        """SEAM (package C may route this through the heat map): the rank J-54 values most under the
-        condition in force, ties by rank order. Until then: the rank whose worth for J-54 the
-        condition raises most over the four suits (the first rank when nothing rises)."""
+        """The rank J-54 values most under the condition in force: the rank whose worth for J-54 the
+        condition raises most over the four suits, ties by rank order (the first rank when nothing rises)."""
         m = self.condition()
         if m is None or m.rule is None:
             return RANKS[0]
@@ -420,10 +381,11 @@ class J54Table(TableMechanics):
                 "add a low card."]
 
     def info(self, run: "RunState") -> tuple[tuple[str, str], ...]:
+        # The condition in force is the table's active rule (active_rules), so it is not repeated here.
         rows: list[tuple[str, str]] = [("Compute", f"{self.compute}/{self.compute_cap}")]
-        m = self.condition()
-        if m is not None:
-            rows.append(("Condition", f"{m.name}: {m.text} ({_plural(self.rounds_left(), 'round')} left)"))
+        snap = self.public()
+        rows.append(("Meter", f"{snap.bar:.1%} win, EV {snap.ev:+.2f} bets, suggested stake {snap.band['suggested']}"
+                     + (f", capture {snap.capture:.1%}" if self.joker == IN_DECK else "")))
         if self.announcement:
             rows.append(("Next", self.announcement))
         fw = self.firmware
@@ -453,23 +415,7 @@ class J54Table(TableMechanics):
                          icon=m.id, tier=m.camp),)
 
     def public(self) -> J54Snapshot:
-        m = self.condition()
-        condition = None if m is None else {"id": m.id, "name": m.name, "camp": m.camp,
-                                            "rounds_left": self.rounds_left()}
-        program = None
-        if self.settings["announce"] == "schedule":
-            program = tuple({"id": s.rule, "name": self.conditions[s.rule].name,
-                             "camp": self.conditions[s.rule].camp, "start": s.start, "end": s.end}
-                            for s in self.program.segments)
-        fw = self.firmware
-        return J54Snapshot(
-            compute=self.compute, compute_cap=self.compute_cap, condition=condition,
-            announcement=self.announcement, program=program,
-            firmware={"id": fw.id, "name": fw.name} if fw else None, joker=self.joker,
-            deck_size=self.deck_size, removed=len(self.removed),
-            bounty={"rank": self.bounty_rank, "chips": self._int("bounty")} if self.bounty_rank else None,
-            target=self.c.run.target_money, target_from_round=self._int("target_from_round"),
-            round=self.entered_round, rounds=self.rounds)
+        return snapshot(self)
 
     # --- program and compute -------------------------------------------------
 
@@ -580,8 +526,8 @@ class J54Table(TableMechanics):
                           f"the deck for {self._int('cut_cost')} compute.", options, payload={}))
 
     def _heat_text(self, group: str) -> str:
-        """The group's heat for the cut choice (package C fills it from the evaluator)."""
-        return ""
+        """The group's heat for the cut choice: "+0.3 pp · cut" / "-0.2 pp · keep"."""
+        return heat_text(measure(self)[1].get(group, 0.0))
 
     def _cut(self, group: str) -> None:
         reason = self.cut_reason(group)
