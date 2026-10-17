@@ -150,9 +150,11 @@ class CodexScene(Scene):
         kinds = {self._category(e) for e in self.entries}
         labels = {**CATEGORY_LABELS, "core": "Core gifts", "permanent": "Permanents",
                   "item": "Consumables", "finance": "Financial products", "rule": "Chaos rules",
-                  "environment": "Environment rules", "mode": "Tables", "ai": "Guest dealers"}
+                  "environment": "Environment rules", "mode": "Tables", "ai": "Guest dealers",
+                  "condition": "Conditions", "firmware": "Firmware"}
         categories = [("all", "All entries")] + [(k, labels.get(k, k.replace('_', ' ').title()))
-            for k in ("mode", "core", "permanent", "item", "finance", "environment", "rule", "ai") if k in kinds]
+            for k in ("mode", "core", "permanent", "item", "finance", "environment", "rule", "condition",
+                      "firmware", "ai") if k in kinds]
         categories += [(k, k.replace('_', ' ').title()) for k in sorted(kinds - set(labels))]
         self.category_buttons = {}
         for index, (kind, label) in enumerate(categories):

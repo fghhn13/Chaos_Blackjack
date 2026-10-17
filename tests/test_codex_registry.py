@@ -13,7 +13,7 @@ from chaos_blackjack.registry import get_registry
 
 
 def test_builtins_and_tab_order():
-    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment"]
+    assert [k.id for k in codex_kinds()] == ["rule", "mode", "item", "ai", "build", "environment", "firmware"]
     assert [e.id for e in codex_entries("environment")] == [
         "fixed", "shift", "bust", "tie", "bust_outcome", "profit_cap", "item_ban", "markup", "hidden"]
     assert len(codex_entries("build")) == 43
@@ -171,3 +171,24 @@ def test_build_references_use_live_effects_prices_and_slot_limit():
     for entry in entries.values():
         assert entry.category and entry.style and entry.timing and entry.price
         assert all(target in entries for target in entry.related)
+
+
+def test_j54s_tab_lists_its_firmwares_and_conditions_in_plain_words() -> None:
+    from chaos_blackjack.codex.sections import codex_sections
+    from chaos_blackjack.data.balance import default_balance
+    from chaos_blackjack.j54.firmware import CATALOG
+    from chaos_blackjack.rules.plugins.j54_conditions import CONDITIONS
+
+    cfg = RunConfig.from_balance(default_balance())
+    j54 = next(s for s in codex_sections(cfg) if s.id == "j54")
+    groups = {g.id: g for g in j54.groups}
+    assert [g.id for g in j54.groups][:2] == ["firmware", "rules"] and groups["rules"].label == "Conditions"
+    firmwares = groups["firmware"].entries
+    assert [e.id for e in firmwares] == list(CATALOG) and all(e.name == CATALOG[e.id].name for e in firmwares)
+    assert "50 chips from your starting chips" in next(e for e in firmwares if e.id == "fw_mid").detail(cfg)
+    conditions = groups["rules"].entries
+    assert {e.id for e in conditions} == set(CONDITIONS) and all(e.category == "condition" for e in conditions)
+    for e in conditions:
+        assert e.name == CONDITIONS[e.id][0] and e.summary.endswith(" camp.") and "(J-54" not in e.summary
+        detail = e.detail(cfg)
+        assert detail.startswith(e.summary.split(". ")[0]) and "never yours" in detail and "Active rule" not in detail

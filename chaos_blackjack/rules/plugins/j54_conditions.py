@@ -174,6 +174,26 @@ def _demo(rule_id: str):
     ))
 
 
+# What a camp means for the player, for the Collection.
+CAMP_TEXT = {
+    "classic": "Classic camp: it leans the way plain blackjack does, so the heat map keeps its usual colours.",
+    "anti": "Anti camp: it leans the other way, so the heat map turns around; cards worth keeping may now be "
+            "worth cutting.",
+    "loner": "Loner camp: it goes its own way; read the heat map afresh.",
+}
+
+
+def _codex_detail(rule_id: str, config) -> str:
+    """The Collection page: what the condition does with the profile's numbers, its camp, and how long."""
+    from chaos_blackjack.j54.table import _settings
+
+    m = build_condition(rule_id, config.chaos_rule_params.get(rule_id, {}))
+    low, _, high = str(_settings(config)["segment_len"]).partition(",")
+    return (f"{m.text}. It changes J-54's cards only, never yours. {CAMP_TEXT[m.camp]} J-54 runs one condition "
+            f"at a time, each for {low} to {high or low} rounds, and on a condition's last round it names the "
+            "next one's camp, so you can keep compute for the new map.")
+
+
 def _plugin(rule_id: str) -> type:
     name, text, default = CONDITIONS[rule_id]
 
@@ -182,7 +202,10 @@ def _plugin(rule_id: str) -> type:
         return build_condition(rule_id, params)
 
     return type(f"Condition_{rule_id}", (), {
-        "id": rule_id, "codex_name": name, "codex_summary": f"{text.format(**default)} (J-54's table).",
+        "id": rule_id, "codex_name": name,
+        "codex_summary": f"{text.format(**default)}. {str(default['camp']).title()} camp.",
+        "codex_detail": staticmethod(lambda config: _codex_detail(rule_id, config)),
+        "codex_category": "condition",
         "from_params": from_params, "codex_demo": _demo(rule_id),
     })
 
