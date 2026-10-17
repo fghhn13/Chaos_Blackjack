@@ -321,3 +321,21 @@ def test_later_explanations_wait_for_their_moment_and_light_up_their_element(app
         _settle(app)
     assert set(seen) == {J54_INTRO_CONDITION, J54_INTRO_RELEASE}
     assert {J54_INTRO_CONDITION, J54_INTRO_RELEASE} <= meta.milestones(player.id)
+
+
+# ------------------------------------------------------------------ polish: suits in GUI text
+
+
+def test_gui_text_spells_suits_the_fonts_cannot_draw() -> None:
+    from chaos_blackjack.app.notices import Notice, NoticeKind
+    from chaos_blackjack.gui.texts import notice_line, spell_suits
+
+    assert spell_suits("Cut 10 red: 10♥, 10♦ removed") == "Cut 10 red: 10 of hearts, 10 of diamonds removed"
+    line = notice_line(Notice(NoticeKind.TABLE_EVENT, "Cut 2 black: 2♠, 2♣ removed (1 compute left)."))
+    assert line[0] == "Cut 2 black: 2 of spades, 2 of clubs removed (1 compute left)."
+    c = _controller()
+    c.choose("none")
+    c.perform(CUT, "5r")
+    pile = build_part("j54.program", PartContext(c, c.view()), "full")[-1]
+    assert [e.title for e in pile.entries] == ["5h", "5d"] or [e.title for e in pile.entries] == ["5d", "5h"]
+    assert all(e.tooltip in ("5 of hearts", "5 of diamonds") and e.tone == "bad" for e in pile.entries)

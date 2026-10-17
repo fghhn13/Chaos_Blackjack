@@ -19,7 +19,7 @@ import pygame
 
 from chaos_blackjack.app.widgets import Act, Widget
 from chaos_blackjack.gui import theme
-from chaos_blackjack.gui.texts import BAD, GOOD
+from chaos_blackjack.gui.texts import BAD, GOOD, spell_suits
 from chaos_blackjack.gui.widgets import draw_tooltip, fit_text, wrap_text
 
 if TYPE_CHECKING:
@@ -362,7 +362,7 @@ def _log(r: _Render, w: Any, x: int, y: int, width: int) -> int:
     if not r.full:  # tail: the last lines, one line each
         for line in w.lines:
             color = LOG_COLORS.get(line.category, theme.IVORY)
-            r.blit(font.render(fit_text(font, line.text, width), True, color), (x, y))
+            r.blit(font.render(fit_text(font, spell_suits(line.text), width), True, color), (x, y))
             y += font.get_linesize() + 2
         return y - top
     y = r.heading(w.title, x, y, width)
@@ -390,7 +390,7 @@ def _log(r: _Render, w: Any, x: int, y: int, width: int) -> int:
         r.blit(r.font(theme.FONT_TINY, bold=True).render(f"ROUND {number}", True, theme.GOLD_DIM), (x, y))
         y += 18
         for line in rounds[number]:
-            for part in wrap_text(font, line.text, width - 16, max_lines=3):
+            for part in wrap_text(font, spell_suits(line.text), width - 16, max_lines=3):
                 r.blit(font.render(part, True, LOG_COLORS.get(line.category, theme.IVORY)), (x + 12, y))
                 y += font.get_linesize()
             y += 2

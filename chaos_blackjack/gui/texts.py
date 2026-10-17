@@ -7,6 +7,7 @@ event feed — unknown kinds fall back to `notice.text`.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from chaos_blackjack.app.notices import Notice, NoticeKind
@@ -18,6 +19,17 @@ Line = tuple[str, theme.Color]
 
 GOOD = (0x9C, 0xC2, 0x96)
 BAD = (0xD0, 0x7C, 0x70)
+
+
+SUIT_WORDS = {"♠": "spades", "♥": "hearts", "♦": "diamonds", "♣": "clubs"}
+_CARD = re.compile(r"(10|[2-9AJQK])([♠♥♦♣])")
+
+
+def spell_suits(text: str) -> str:
+    """"Cut 2 red: 2♥, 2♦ removed" -> "... 2 of hearts, 2 of diamonds ...": the UI fonts have no suit glyphs
+    (cards draw their suits as shapes, components/cards.py), so text that names a card spells its suit."""
+    text = _CARD.sub(lambda m: f"{m.group(1)} of {SUIT_WORDS[m.group(2)]}", text)
+    return "".join(SUIT_WORDS.get(ch, ch) for ch in text)
 
 
 def asset_name(asset_id: str) -> str:
@@ -61,9 +73,8 @@ NOTICE_TEXT: dict[str, Callable[[Notice], Line | None]] = {
 
 def notice_line(notice: Notice) -> Line | None:
     fmt = NOTICE_TEXT.get(notice.kind)
-    if fmt is not None:
-        return fmt(notice)
-    return (notice.text, theme.TEXT) if notice.text else None
+    line = fmt(notice) if fmt is not None else (notice.text, theme.TEXT) if notice.text else None
+    return (spell_suits(line[0]), line[1]) if line is not None else None
 
 
 def outcome_banner(r: RoundResult) -> tuple[str, str, theme.Color]:

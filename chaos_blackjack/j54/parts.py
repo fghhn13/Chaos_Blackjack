@@ -108,8 +108,14 @@ def _deck(ctx: PartContext, variant: str) -> tuple[Widget, ...]:
     return tuple(widgets)
 
 
+_SUIT_WORDS = {"♠": "spades", "♥": "hearts", "♦": "diamonds", "♣": "clubs"}
+
+
 def _removed_pile(d: J54Snapshot) -> Widget:
-    entries = tuple(Entry(card, tone="bad" if card[-1] in "♥♦" else "") for card in d.removed_cards)
+    # "5h" chips (the UI fonts have no suit glyphs), red for hearts and diamonds; the tooltip spells it out.
+    entries = tuple(Entry(f"{card[:-1]}{_SUIT_WORDS[card[-1]][0]}", tone="bad" if card[-1] in "♥♦" else "",
+                          tooltip=f"{card[:-1]} of {_SUIT_WORDS[card[-1]]}")
+                    for card in d.removed_cards)
     return ListWidget(entries, title="Removed pile", empty="Nothing removed yet.", compact=True)
 
 
