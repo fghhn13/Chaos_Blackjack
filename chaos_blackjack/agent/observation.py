@@ -87,7 +87,10 @@ def next_step_hint(v: GameView, acts: list[str]) -> str:
         if "perform" in acts:
             extra.append("perform <action>")
         if extra:
-            return bet + f" Or first: {' / '.join(extra)} (see obs.shop, obs.items)."
+            see = [*(["obs.shop"] if Action.BUY in acts or Action.REROLL in acts else []),
+                   *(["obs.items"] if Action.USE_ITEM in acts else []),
+                   *(["obs.table_actions"] if "perform" in acts else [])]
+            return bet + f" Or first: {' / '.join(extra)} (see {', '.join(see)})."
         return bet
     parts = [a if a != Action.USE_ITEM else "use_item <item_id>" for a in acts if a != "perform"]
     hint = "Your move: act " + " | ".join(parts)
@@ -164,7 +167,7 @@ def build_observation(v: GameView, *, last_round: dict[str, Any] | None = None) 
             "restock_in": v.shop_restock_in,
             "reroll_price": v.shop_reroll_price,
             "reroll_affordable": v.can(Action.REROLL),
-        } if v.phase == TablePhase.BETTING else None,
+        } if v.phase == TablePhase.BETTING and v.has_shop else None,
         "chaos": {
             "enabled": v.chaos_enabled,
             "budget": v.chaos_budget if v.chaos_budget_shown else None,

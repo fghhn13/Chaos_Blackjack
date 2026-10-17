@@ -663,6 +663,7 @@ class GameController:
             table_public=self.table.public() if self.table is not None else None,
             goal=self.table.goal_progress(self.run) if self.table is not None else None,
             chaos_budget_shown=self.table is None or self.table.uses_chaos_budget,
+            has_shop=self.table is None or self.table.has_shop,
         )
 
     def moves(self) -> tuple[Move, ...]:
@@ -742,7 +743,9 @@ class GameController:
         """The phase's actions before any item check (tables use this to test
         whether e.g. a double or surrender is allowed)."""
         actions = _ACTIONS_BY_PHASE[self.phase]
-        if self.phase == TablePhase.BETTING and self.shop.offers:
+        if self.table is not None and not self.table.has_shop:
+            actions = actions - {Action.BUY}
+        elif self.phase == TablePhase.BETTING and self.shop.offers:
             price = self.reroll_price()
             if price is not None and self.can_bet(self.run.money - price):
                 actions = actions | {Action.REROLL}

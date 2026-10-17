@@ -339,3 +339,25 @@ def test_gui_text_spells_suits_the_fonts_cannot_draw() -> None:
     pile = build_part("j54.program", PartContext(c, c.view()), "full")[-1]
     assert [e.title for e in pile.entries] == ["5h", "5d"] or [e.title for e in pile.entries] == ["5d", "5h"]
     assert all(e.tooltip in ("5 of hearts", "5 of diamonds") and e.tone == "bad" for e in pile.entries)
+
+
+def test_a_table_that_sells_nothing_has_no_shop_button_and_no_buying(app) -> None:
+    from chaos_blackjack.agent import AgentSession
+    from chaos_blackjack.app.view import Action
+
+    scene = _open(app, _player(True))
+    scene.intro.skip()
+    scene.controller.choose("none")
+    scene._after_command()
+    _settle(app)
+    v = scene.view
+    assert not v.has_shop and not v.can(Action.BUY) and not v.can(Action.REROLL)
+    buttons = scene.buttons_block
+    assert not buttons.shop.visible and buttons.panel.rect.w == buttons.rect.w
+    _key(app, pygame.K_b)                            # the hotkey opens nothing either
+    assert type(app.scenes.top).__name__ == "MetaTableScene"
+    obs = AgentSession.new(seed=3, mode="j54").execute({"cmd": "choose", "option": "none"})["obs"]
+    assert obs["legal_actions"] == ["bet", "perform"] and obs["shop"] is None
+    assert obs["hint"].endswith("(see obs.table_actions).")
+    classic = GameController(RunConfig.from_balance(default_balance(), seed=1)).view()
+    assert classic.has_shop and classic.can(Action.BUY)

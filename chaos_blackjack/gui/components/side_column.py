@@ -140,11 +140,12 @@ class ButtonsBlock(Block):
 
     def place(self, rect: pygame.Rect) -> None:
         self.rect = rect
-        half = (rect.w - 8) // 2
-        self.shop.rect = pygame.Rect(rect.x, rect.bottom - 48, half, 48)
+        half = (rect.w - 8) // 2 if self.shop.visible else -8  # a table without a shop: Panel takes the row
+        self.shop.rect = pygame.Rect(rect.x, rect.bottom - 48, max(half, 0), 48)
         self.panel.rect = pygame.Rect(rect.x + half + 8, rect.bottom - 48, rect.w - half - 8, 48)
 
     def sync(self, view: GameView) -> None:
+        self.shop.visible = view.has_shop
         self.shop.enabled = view.can(Action.BUY)
         self.restock_in = view.shop_restock_in
         self.stocked = bool(view.shop_offers)  # a table that sells nothing has no stock to announce

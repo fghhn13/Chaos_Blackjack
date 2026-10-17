@@ -42,6 +42,8 @@ class TableMechanics:
     uses_chaos_budget = True
     # The table changes the rules itself (Poker Head's environment), instead of the Chaos AI's registry rules.
     environment_rules = False
+    # The table has a shop (False: it sells nothing; no buying or rerolling, and no Shop button).
+    has_shop = True
 
     @classmethod
     def enabled(cls, config: "RunConfig") -> bool:

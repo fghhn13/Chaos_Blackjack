@@ -212,6 +212,7 @@ class J54Table(TableMechanics):
     # False: the codex reads this flag as "Poker Head's environment catalog"; J-54's rules are its
     # registered conditions (the mode's pool), which the codex lists as its rules.
     environment_rules = False
+    has_shop = False  # compute buys the moves; nothing is sold here
 
     @classmethod
     def goal(cls, config: "RunConfig") -> str:

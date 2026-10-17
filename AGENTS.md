@@ -89,7 +89,7 @@ drawing, moving to the next round) happens automatically inside your command:
 - `obs.you.total` already includes active chaos rules — trust it over your own arithmetic.
 - After a round settles, the next `obs` is `betting` and `obs.last_round` holds the result: `outcome` (`player` / `dealer` / `push` / `blackjack` / `surrender`), `delta` (bankroll change), both final hands, `doubled`.
 - `obs.items[].usable` / `reason` and `obs.shop.offers[].affordable` / `reason` come from the same moves the GUI enables. `obs.choice` is `{"prompt", "options": [{"id", "label", "help"}], "cancellable"}` while a command waits for an answer.
-- While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n, "reroll_price": n | null, "reroll_affordable": bool}`; `null` in other phases.
+- While betting, `obs.shop` is `{"offers": [{"item", "price", "sold", "affordable", "help"}], "restock_in": n, "reroll_price": n | null, "reroll_affordable": bool}`; `null` in other phases and at a table that sells nothing (J-54's).
 - On failure `ok` is `false` and `error` is `{code, message, legal_actions}`; the state is unchanged, so fix the command and retry. Codes: `illegal_action`, `invalid_argument`, `unknown_command`, `run_over`, `step_limit`, `usage`.
 - Exit code: `0` ok, `1` command rejected, `2` usage or missing/invalid run file.
 
@@ -139,7 +139,7 @@ firmware, joker, bar, ev, band: {low, stake_pct, suggested}, capture, heat:
 {group: pp}, deck_size, removed, bounty, target, ...}`: `bar` is the win chance
 of a hand from this deck, `heat` > 0 means cutting that group helps you, `band`
 suggests a stake (advice only). `obs.table.deck` is the make-up by rank (never
-the order). The shop sells nothing here. Spec: [docs/design/J54_V2_SPEC.md](docs/design/J54_V2_SPEC.md); guide §8a.
+the order). The shop sells nothing here (`obs.shop` is null). Spec: [docs/design/J54_V2_SPEC.md](docs/design/J54_V2_SPEC.md); guide §8a.
 
 ### Fair play
 

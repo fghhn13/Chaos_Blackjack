@@ -480,7 +480,7 @@ def test_public_snapshot_and_agent_observation() -> None:
     assert {a["action"] for a in obs["table_actions"]} == {CUT, HOT_PURGE, RELEASE}
     release = next(a for a in obs["table_actions"] if a["action"] == RELEASE)
     assert not release["enabled"] and "compute" in release["reason"]
-    assert sum(obs["table"]["deck"].values()) == 52 and obs["shop"]["offers"] == []
+    assert sum(obs["table"]["deck"].values()) == 52 and obs["shop"] is None
     assert "Shop:" not in obs["summary"] and "Active chaos rules" not in obs["summary"]
     assert obs["summary"].count(public["condition"]["name"]) == 1 and "Condition" not in obs["table"]["info"]
     reply = s.execute({"cmd": "perform", "action": CUT, "arg": "9b"})
