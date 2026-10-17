@@ -38,7 +38,7 @@ from chaos_blackjack.j54 import onboarding as first_visit
 from chaos_blackjack.j54.deck_ops import JOKER, RANKS, SUITS, DeckContext, DeckOp, apply, is_joker
 from chaos_blackjack.j54.firmware import CATALOG as FIRMWARES, NO_FIRMWARE, Firmware, firmware
 from chaos_blackjack.j54.program import Program, generate, int_range
-from chaos_blackjack.j54.public import J54Snapshot, heat_text, hottest_ranks, measure, snapshot
+from chaos_blackjack.j54.public import J54Snapshot, heat_text, hottest_ranks, measure, rank_heat, snapshot
 from chaos_blackjack.rules.modifiers import adjust_rank_value_for
 from chaos_blackjack.rules.plugins.j54_conditions import CONDITIONS, ConditionModifier, build_condition
 from chaos_blackjack.rules.rule_engine import BLACKJACK, DefaultBlackjackRules, RuleContext, bust_limit
@@ -328,8 +328,13 @@ class J54Table(TableMechanics):
         return hottest_ranks(measure(self)[1], n)
 
     def _bounty_rank(self) -> str:
-        """The rank J-54 values most under the condition in force: the rank whose worth for J-54 the
-        condition raises most over the four suits, ties by rank order (the first rank when nothing rises)."""
+        """The rank J-54 values most under the condition in force: the rank whose removal helps you most on
+        the heat map (both colours summed, ties by rank order). When no removal helps, the rank whose worth
+        for J-54 the condition raises most over the four suits (the first rank when nothing rises)."""
+        heat = measure(self)[1]
+        best = hottest_ranks(heat, 1)
+        if best and rank_heat(heat)[best[0]] > 0:
+            return best[0]
         m = self.condition()
         if m is None or m.rule is None:
             return RANKS[0]

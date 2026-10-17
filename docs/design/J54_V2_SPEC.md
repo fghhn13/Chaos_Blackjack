@@ -238,7 +238,9 @@ needed unless a new table is required.
 
 - **Sample bounty** (Collection as a side reward, the only form that
   survived the lab): with each condition J-54 names the rank it values most
-  under it (ties by rank order); every card of that rank that lands in the
+  under it: the rank whose removal helps the player most on the heat map at
+  the switch (both colours summed, ties by rank order), or, when no removal
+  helps, the rank the condition raises most for J-54; every card of that rank that lands in the
   player's hand pays `mode.j54.bounty` (2) chips at settlement, win or lose.
   Shown as a badge; announced with the condition.
 - **Host lines**: new intro / condition / capture / victory / defeat beats

@@ -423,13 +423,24 @@ def test_the_bounty_pays_for_every_named_rank_in_your_hand() -> None:
     assert any(e.startswith("Bounty: 4 chips") for e in _events(c))
 
 
-def test_each_condition_names_a_bounty_rank() -> None:
+def test_each_condition_names_a_bounty_rank(monkeypatch) -> None:
+    """The rank whose removal helps the player most on the heat map, ties by rank order; the rank the
+    condition raises most for J-54 when no removal helps."""
+    import chaos_blackjack.j54.table as j54_table
+
     c = _controller()
     t = c.table
+    named = {}
+    for rule in ("j54_black_plus", "j54_hearts_scale", "j54_low_plus", "j54_stand_15"):
+        _force(c, rule)
+        named[rule] = t._bounty_rank()
+    assert named == {"j54_black_plus": "7", "j54_hearts_scale": "A", "j54_low_plus": "2", "j54_stand_15": "10"}
+    assert len(set(named.values())) == 4  # no longer "2" for nearly every condition
+    monkeypatch.setattr(j54_table, "measure", lambda table: (None, {"5r": -0.1, "5b": -0.2}))
     _force(c, "j54_hearts_scale")
-    assert t._bounty_rank() == "A"
-    _force(c, "j54_low_plus")
-    assert t._bounty_rank() == "2"
+    assert t._bounty_rank() == "A"  # the fallback: hearts double, so aces gain most
+    _force(c, "j54_stand_15")
+    assert t._bounty_rank() == "2"  # a threshold raises nothing: the first rank
     assert t.public().bounty is None or t.public().bounty["chips"] == 2
 
 
