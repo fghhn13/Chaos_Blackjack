@@ -73,7 +73,10 @@ never executes the contained SQL. Restoring happens only inside the browser's
 virtual database. No packed deck is inspected by the bridge.
 
 Cloud writes require the prior revision. Stale tabs stop instead of overwriting
-newer progress. Local backups are kept when the network fails; conflicts are
+newer progress. A write whose reply was lost (a timeout or dropped connection)
+may still have been stored; when the next write is refused, the tab reads the
+cloud save and continues if it holds a snapshot this tab sent, so a flaky
+connection is not mistaken for another tab. Local backups are kept when the network fails; conflicts are
 archived under a `:conflict:` key. The save status shows whether synchronization
 succeeded. Wait for "Saved to your account" before closing. Snapshots have a 2 MB
 limit. Account disablement or session expiry blocks cloud access and resource loads.

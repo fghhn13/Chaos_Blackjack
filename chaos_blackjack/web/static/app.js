@@ -4,6 +4,8 @@ const textNode=(tag,text,cls)=>{const el=document.createElement(tag);el.textCont
 let user=null,csrf='',registering=false,saveRevision=0,pendingSave=null,saving=false,conflicted=false;
 let saveKey='',launchVersion=0;
 let saveWaiters=[];
+// Saves sent whose reply never arrived: the server may have stored one, so a later 409 can be our own write.
+let unconfirmedSaves=[];
 let nameState=null,nameCommand='',nameSequence=0,namePending=0,nameComposing=false;
 function closeNameInput(){nameState=null;nameCommand='';namePending=0;nameComposing=false;if($('player-name-dialog').open)$('player-name-dialog').close();}
 window.chaosNameInput=raw=>{
@@ -31,8 +33,8 @@ $('player-name-form').onsubmit=event=>{event.preventDefault();if(!nameComposing)
 $('player-name-cancel').onclick=()=>queueNameInput('cancel');
 $('player-name-dialog').oncancel=event=>{event.preventDefault();queueNameInput('cancel');};
 window.chaosInitialSave='';
-async function api(path,data){
- const options={credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000)};
+async function api(path,data,timeout=15000){
+ const options={credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(timeout)};
  if(data!==undefined){options.method='POST';options.headers={'Content-Type':'application/json','X-CSRF-Token':csrf};options.body=JSON.stringify(data);}
  const response=await fetch(path,options),result=await response.json();
  if(!response.ok||!result.ok){const err=new Error(result.error?.message||'Request failed.');err.status=response.status;throw err;}
@@ -45,7 +47,7 @@ function signedOut(){stopGame();user=null;csrf='';pendingSave=null;$('auth').hid
 async function signedIn(result){
  user=result.user;csrf=result.csrf;saveKey='chaos-save:'+user.id;
  $('username').textContent=user.username;$('auth').hidden=true;$('game').hidden=false;$('identity').hidden=false;$('admin-panel').hidden=!user.admin;$('auth-password').value='';$('auth-token').value='';
- const cloud=await api('/api/browser-save');saveRevision=cloud.revision;window.chaosInitialSave=cloud.snapshot;pendingSave=null;conflicted=false;
+ const cloud=await api('/api/browser-save');saveRevision=cloud.revision;window.chaosInitialSave=cloud.snapshot;pendingSave=null;conflicted=false;unconfirmedSaves=[];
  try{const local=JSON.parse(localStorage.getItem(saveKey));if(local&&local.snapshot!==cloud.snapshot){if(local.revision===cloud.revision){window.chaosInitialSave=local.snapshot;pendingSave=local.snapshot;}else{localStorage.setItem(saveKey+':conflict:'+Date.now(),JSON.stringify(local));}}}catch(e){}
  $('save-status').textContent='Your save is ready. Click Play to start.';$('launch').hidden=false;$('launch').disabled=false;
 }
@@ -61,17 +63,31 @@ async function flushSave(){
  if(pendingSave===null||!user||conflicted)return;
  saving=true;const snapshot=pendingSave,uid=user.id,version=launchVersion;
  try{
-  const reply=await api('/api/browser-save',{revision:saveRevision,snapshot});
+  const reply=await api('/api/browser-save',{revision:saveRevision,snapshot},45000);
   if(!user||user.id!==uid||version!==launchVersion)return;
-  saveRevision=reply.revision;window.chaosInitialSave=snapshot;
-  if(pendingSave===snapshot)pendingSave=null;
-  try{localStorage.setItem(saveKey,JSON.stringify({revision:saveRevision,snapshot:pendingSave??snapshot}));}catch(e){}
-  $('save-status').textContent=pendingSave===null?'Saved to your account':'Saving…';
+  confirmSave(reply.revision,snapshot);
  }catch(e){
+  if(e.status===undefined||e.status===408||e.status>=500){unconfirmedSaves=[...unconfirmedSaves.filter(s=>s!==snapshot),snapshot].slice(-5);}
+  if(e.status===409&&unconfirmedSaves.length&&await adoptOwnSave(uid,version))return;
   if(e.status===409){conflicted=true;try{localStorage.setItem(saveKey+':conflict:'+Date.now(),localStorage.getItem(saveKey));}catch(error){}stopGame();$('game-error').textContent='Your save changed in another tab. Reload this page to continue with the latest save. This tab’s backup remains on this device.';}
   else if(e.status===401){stopGame();$('game-error').textContent='Your session expired. Reload and sign in again. Your local backup is retained.';conflicted=true;}
   else $('save-status').textContent='Sync unavailable. A local backup is retained; retrying…';
  }finally{saving=false;saveWaiters.splice(0).forEach(resolve=>resolve());}
+}
+function confirmSave(revision,snapshot){
+ saveRevision=revision;window.chaosInitialSave=snapshot;unconfirmedSaves=[];
+ if(pendingSave===snapshot)pendingSave=null;
+ try{localStorage.setItem(saveKey,JSON.stringify({revision:saveRevision,snapshot:pendingSave??snapshot}));}catch(e){}
+ $('save-status').textContent=pendingSave===null?'Saved to your account':'Saving…';
+}
+// A 409 right after a lost reply: if the cloud holds a save this tab sent, it was our write, not another tab's.
+async function adoptOwnSave(uid,version){
+ try{
+  const cloud=await api('/api/browser-save');
+  if(!user||user.id!==uid||version!==launchVersion||!unconfirmedSaves.includes(cloud.snapshot))return false;
+  confirmSave(cloud.revision,cloud.snapshot);
+  return true;
+ }catch(e){$('save-status').textContent='Sync unavailable. A local backup is retained; retrying…';return true;}
 }
 setInterval(flushSave,1000);
 window.chaosClosed=()=>{closeNameInput();flushSave();$('launch').textContent='Play again';$('launch').hidden=false;};
